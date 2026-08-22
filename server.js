@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Live static server for the AAMS progress report.
+ * Live static server for the FacePass FabLab AAMS console.
  * Serves files from this directory, binds all interfaces, and
  * reloads the browser when HTML/CSS/JS on disk changes.
  */

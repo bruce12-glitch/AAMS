@@ -1,6 +1,6 @@
 # AAMS
 
-FacePass FabLab — project progress report.
+FacePass FabLab — AAMS console prototype (Live Monitor, Entry Logs, Alerts, Users & Enrollment, Reports).
 
 ## Live server
 
@@ -8,7 +8,7 @@ FacePass FabLab — project progress report.
 npm start
 ```
 
-Serves `index.html` at [http://localhost:3000](http://localhost:3000) and reloads the page when files change.
+Serves the console at [http://localhost:3000](http://localhost:3000) and reloads the page when files change.
 
 Override the bind address or port if needed:
 

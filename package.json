@@ -2,7 +2,7 @@
   "name": "aams",
   "version": "1.0.0",
   "private": true,
-  "description": "FacePass FabLab — AAMS project progress report",
+  "description": "FacePass FabLab — AAMS console prototype",
   "scripts": {
     "start": "node server.js",
     "serve": "node server.js"
