@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FacePass FabLab — Project Progress Report</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-400-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-500-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-600-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/inter@latest/latin-700-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/latin-600-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/latin-700-normal.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/latin-800-normal.min.css">
+<style>
+:root{
+  --bg:#f4f6fa; --surface:#ffffff; --line:#e7eaf1; --line2:#dde2ec;
+  --ink:#101828; --sub:#667085; --faint:#98a2b3;
+  --primary:#4f46e5; --primary-soft:#eef1fe; --primary-line:#d9ddf9;
+  --green:#12b76a; --green-soft:#eafaf1; --green-line:#c6efdc;
+  --red:#f04438; --red-soft:#fef3f2; --red-line:#fecdca;
+  --amber:#f79009; --amber-soft:#fff6e8; --amber-line:#fedf89;
+  --blue:#2e90fa; --blue-soft:#eff8ff; --blue-line:#b2ddff;
+  --violet:#7a5af8; --violet-soft:#f4f3ff; --violet-line:#d9d2ff;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07);
+  --disp:'Manrope','Inter',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:#d3d9e3;border-radius:8px;border:2px solid var(--bg)}
+.wrap{max-width:1200px;margin:0 auto;padding:30px 24px 80px}
+
+/* ---------- hero ---------- */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:30px 34px;display:flex;gap:30px;align-items:center;flex-wrap:wrap;margin-bottom:24px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(79,70,229,.12),transparent 70%)}
+.hero::after{content:'';position:absolute;left:30%;bottom:-120px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(18,183,106,.08),transparent 70%)}
+.hero-left{display:flex;gap:22px;align-items:center;flex:1;min-width:340px;position:relative;z-index:2}
+.mark{width:64px;height:64px;border-radius:19px;background:linear-gradient(135deg,#6366f1,#4f46e5 55%,#4338ca);display:grid;place-items:center;color:#fff;box-shadow:0 10px 24px rgba(79,70,229,.35);flex:0 0 64px}
+.hero h1{font-family:var(--disp);font-size:25px;font-weight:800;letter-spacing:-.5px}
+.hero .sub{color:var(--sub);font-size:13px;margin-top:5px;line-height:1.6;max-width:480px}
+.pills{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:22px;font-size:11.5px;font-weight:700;border:1px solid transparent}
+.pill.blue{background:var(--blue-soft);color:#175cd3;border-color:var(--blue-line)}
+.pill.gray{background:#f2f4f7;color:#475467;border-color:#e4e7ec}
+.pill.green{background:var(--green-soft);color:#027a48;border-color:var(--green-line)}
+.pill.amber{background:var(--amber-soft);color:#b54708;border-color:var(--amber-line)}
+.ring-wrap{position:relative;width:128px;height:128px;flex:0 0 128px;z-index:2}
+.ring-wrap .val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring-wrap .val b{font-family:var(--disp);font-size:28px;font-weight:800;color:var(--primary)}
+.ring-wrap .val span{font-size:9px;font-weight:800;letter-spacing:1.2px;color:var(--faint);text-transform:uppercase;margin-top:2px}
+
+/* ---------- summary strip ---------- */
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:10px}
+.s-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:16px 18px;box-shadow:var(--shadow);display:flex;gap:13px;align-items:flex-start}
+.s-card .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 40px}
+.s-card b{font-family:var(--disp);font-size:22px;font-weight:800;display:block;line-height:1.1}
+.s-card small{font-size:11.5px;color:var(--sub);font-weight:500;display:block;margin-top:2px}
+.s-card .hint{font-size:10px;color:var(--faint);margin-top:3px;display:block}
+
+/* ---------- section ---------- */
+.sec{margin:34px 0 14px;display:flex;align-items:center;gap:11px}
+.sec h2{font-family:var(--disp);font-size:18px;font-weight:800;letter-spacing:-.3px}
+.sec .tag{font-size:10px;font-weight:800;color:var(--faint);letter-spacing:1px;text-transform:uppercase;border:1px solid var(--line2);border-radius:7px;padding:3px 9px;background:#fff}
+.sec .note{font-size:12px;color:var(--faint);margin-left:auto}
+
+/* ---------- feature matrix ---------- */
+.matrix{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.mx-head,.mx-row{display:grid;grid-template-columns:54px 1.6fr 1fr 1fr 1fr;gap:12px;padding:13px 20px;align-items:center}
+.mx-head{background:#fafbfe;border-bottom:1px solid var(--line);font-size:10px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--faint)}
+.mx-row{border-bottom:1px solid #f0f2f7;font-size:13px;transition:.15s}
+.mx-row:last-child{border-bottom:none}
+.mx-row:hover{background:#fafbfe}
+.mx-n{width:34px;height:34px;border-radius:10px;background:var(--primary-soft);color:var(--primary);font-weight:800;font-size:12px;display:grid;place-items:center;font-family:var(--disp)}
+.mx-row b{font-weight:600;display:block}
+.mx-row .d{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.4}
+.cell{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600}
+.cell svg{flex:0 0 15px}
+.cell.ok{color:var(--green)}
+.cell.sim{color:var(--amber)}
+.cell.no{color:#c3cad6}
+.cell .lbl.no{color:var(--faint);font-weight:500}
+.cell .lbl.sim{color:#b54708}
+
+/* ---------- what we have ---------- */
+.have-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.have{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:19px;box-shadow:var(--shadow);transition:.18s;position:relative}
+.have:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(16,24,40,.09)}
+.have .h-ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:13px}
+.have b{font-family:var(--disp);font-size:14px;font-weight:800;display:block}
+.have p{font-size:12px;color:var(--sub);margin-top:6px;line-height:1.6}
+.have .done-tag{position:absolute;top:16px;right:16px}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;padding:4px 9px;border-radius:8px;letter-spacing:.4px;border:1px solid transparent}
+.b-done{background:var(--green-soft);color:#027a48;border-color:var(--green-line)}
+.b-demo{background:var(--amber-soft);color:#b54708;border-color:var(--amber-line)}
+.b-todo{background:#f2f4f7;color:#667085;border-color:#e4e7ec}
+.b-cur{background:var(--blue-soft);color:#175cd3;border-color:var(--blue-line)}
+
+/* ---------- roadmap ---------- */
+.road{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:26px 26px 14px}
+.ph-line{display:flex;overflow-x:auto;padding-bottom:14px}
+.ph{flex:1;min-width:92px;text-align:center;position:relative;padding-top:30px}
+.ph::before{content:'';position:absolute;top:12px;left:-50%;right:50%;height:3px;background:#eef0f6;z-index:1}
+.ph:first-child::before{display:none}
+.ph.done::before{background:var(--green)}
+.ph.cur::before{background:linear-gradient(90deg,var(--green),var(--blue))}
+.ph .nd{position:absolute;top:0;left:50%;transform:translateX(-50%);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#eef0f6;color:var(--faint);z-index:2}
+.ph.done .nd{background:var(--green);color:#fff}
+.ph.cur .nd{background:var(--blue);color:#fff;box-shadow:0 0 0 6px rgba(46,144,250,.16);animation:pulse 1.8s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 10px rgba(46,144,250,.06)}}
+.ph b{font-size:11.5px;font-weight:700;display:block;line-height:1.3}
+.ph small{font-size:9.5px;color:var(--faint);display:block;margin-top:3px;line-height:1.4}
+.ph .stx{display:inline-block;margin-top:6px;font-size:9px;font-weight:800;padding:2px 8px;border-radius:12px}
+.stx.d{background:var(--green-soft);color:#027a48}
+.stx.c{background:var(--blue-soft);color:#175cd3}
+.stx.p{background:#f2f4f7;color:var(--faint)}
+.road-note{border-top:1px dashed var(--line2);margin-top:6px;padding:14px 2px 10px;font-size:12px;color:var(--sub);line-height:1.65}
+.road-note b{color:var(--ink)}
+
+/* ---------- integrations ---------- */
+.int-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}
+.int{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);display:flex;gap:16px;align-items:flex-start}
+.int .i-ic{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:0 0 44px}
+.int b{font-family:var(--disp);font-size:14px;font-weight:800;display:block}
+.int .i-sub{font-size:12px;color:var(--sub);margin-top:5px;line-height:1.6}
+.int .i-tech{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.tech{font-size:10px;font-weight:700;background:#f2f4f7;border:1px solid #e4e7ec;color:#475467;padding:3px 9px;border-radius:7px;font-family:'Manrope'}
+.int .i-st{margin-left:auto;flex:0 0 auto}
+
+/* ---------- next steps ---------- */
+.next{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.nx-row{display:flex;gap:15px;align-items:center;padding:15px 22px;border-bottom:1px solid #f0f2f7;transition:.15s}
+.nx-row:last-child{border-bottom:none}
+.nx-row:hover{background:#fafbfe}
+.nx-num{width:32px;height:32px;border-radius:10px;background:var(--primary);color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;flex:0 0 32px;font-family:var(--disp)}
+.nx-row.future .nx-num{background:#eef0f6;color:var(--faint)}
+.nx-row b{font-weight:600;font-size:13.5px;display:block}
+.nx-row .nx-d{font-size:11.5px;color:var(--faint);margin-top:2px}
+.nx-row .nx-out{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--sub);background:#f2f4f7;border:1px solid #e4e7ec;padding:4px 10px;border-radius:8px;white-space:nowrap}
+
+/* ---------- definition of done ---------- */
+.dod{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.dod-it{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 15px;display:flex;gap:11px;align-items:center;font-size:12.5px;font-weight:500;box-shadow:var(--shadow)}
+.dod-it .cb{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;flex:0 0 22px}
+.dod-it.done{color:var(--sub)}
+.dod-it.done .cb{background:var(--green);color:#fff}
+.dod-it.todo .cb{background:#f2f4f7;color:#c3cad6;border:1px dashed var(--line2)}
+.dod-it b{color:var(--ink);font-weight:600}
+.dod-it.done b{color:var(--sub)}
+
+/* ---------- footer ---------- */
+.foot{margin-top:36px;text-align:center;font-size:11.5px;color:var(--faint);line-height:1.8}
+.foot b{color:var(--sub)}
+
+@media(max-width:1000px){
+  .summary{grid-template-columns:repeat(2,1fr)}
+  .have-grid{grid-template-columns:1fr 1fr}
+  .int-grid{grid-template-columns:1fr}
+  .dod{grid-template-columns:1fr}
+  .mx-head,.mx-row{grid-template-columns:44px 1.4fr 1fr 1fr 1fr;padding:12px 14px}
+}
+@media(max-width:640px){
+  .have-grid{grid-template-columns:1fr}
+  .summary{grid-template-columns:1fr 1fr}
+  .mx-head{display:none}
+  .mx-row{grid-template-columns:44px 1fr;gap:8px}
+  .mx-row .cell:nth-child(3),.mx-row .cell:nth-child(4),.mx-row .cell:nth-child(5){display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ================= HERO ================= -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="mark">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M9 10h.01M15 10h.01M9.5 14.5a3.5 3.5 0 0 0 5 0"/></svg>
+      </div>
+      <div>
+        <h1>FacePass FabLab — Progress Report</h1>
+        <div class="sub">Smart Anti-Proxy Facial Access & Attendance System for SRMIST Fab Lab. This report shows what is built, what is simulated, and exactly what remains before live deployment.</div>
+        <div class="pills">
+          <span class="pill blue">● Current stage: Phase 8 — Dashboard prototype</span>
+          <span class="pill amber">Backend & AI: not started</span>
+          <span class="pill gray">Target: Fab Lab entrance • 10–20 users</span>
+        </div>
+      </div>
+    </div>
+    <div class="ring-wrap">
+      <svg width="128" height="128" viewBox="0 0 128 128">
+        <circle cx="64" cy="64" r="54" fill="none" stroke="#eef0f6" stroke-width="12"/>
+        <circle id="ringFill" cx="64" cy="64" r="54" fill="none" stroke="url(#grad)" stroke-width="12" stroke-linecap="round"
+          stroke-dasharray="339.3" stroke-dashoffset="339.3" transform="rotate(-90 64 64)"/>
+        <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#4f46e5"/>
+        </linearGradient></defs>
+      </svg>
+      <div class="val"><b id="ringPct">0%</b><span>overall</span></div>
+    </div>
+  </div>
+
+  <!-- ================= SUMMARY ================= -->
+  <div class="summary">
+    <div class="s-card"><div class="ic" style="background:var(--green-soft);color:var(--green)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div><b>3</b><small>Workstreams complete</small><span class="hint">spec analysis • UX design • dashboard UI</span></div></div>
+    <div class="s-card"><div class="ic" style="background:var(--amber-soft);color:var(--amber)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><div><b>1</b><small>In progress</small><span class="hint">dashboard → demo-ready simulation</span></div></div>
+    <div class="s-card"><div class="ic" style="background:#f2f4f7;color:#667085"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/></svg></div><div><b>8</b><small>Phases ahead</small><span class="hint">AI pipeline → hardware → live testing</span></div></div>
+    <div class="s-card"><div class="ic" style="background:var(--primary-soft);color:var(--primary)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg></div><div><b>~28%</b><small>Overall completion</small><span class="hint">front end leads, engine pending</span></div></div>
+  </div>
+
+  <!-- ================= WHAT WE HAVE ================= -->
+  <div class="sec"><h2>What we already have</h2><span class="tag">Delivered</span><span class="note">Working today, in the prototype</span></div>
+  <div class="have-grid">
+    <div class="have"><span class="done-tag"><span class="badge b-done">COMPLETE</span></span><div class="h-ic" style="background:var(--primary-soft);color:var(--primary)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></div><b>Requirements blueprint</b><p>The full 179-page AAMS document is analysed: 9 core features, decision matrix §11.2, access states §11.3, database schema §16, alert formats §15, test cases TC01–TC12 and research targets RQ1–RQ6.</p></div>
+    <div class="have"><span class="done-tag"><span class="badge b-done">COMPLETE</span></span><div class="h-ic" style="background:var(--green-soft);color:var(--green)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></div><b>Client-ready dashboard UI</b><p>All 5 pages from §28 built and polished: Live Monitor, Entry Logs, Alerts, Members & Enrollment, Reports — light professional theme, ready to present to clients and management.</p></div>
+    <div class="have"><span class="done-tag"><span class="badge b-demo">SIMULATED</span></span><div class="h-ic" style="background:var(--blue-soft);color:var(--blue)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg></div><b>Live demo engine</b><p>8 realistic demo scenarios (authorized, proxy, expired, unknown, photo spoof, tailgating, no-face, camera offline) animate the full verification flow so clients can see every outcome live.</p></div>
+    <div class="have"><span class="done-tag"><span class="badge b-demo">SIMULATED</span></span><div class="h-ic" style="background:var(--amber-soft);color:var(--amber)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><b>Alert & report flows</b><p>Telegram-style alert cards with photo evidence, priority levels (§29), admin one-time approvals, and Daily / Weekly / Proxy / Unpaid / Occupancy report previews with copy & send actions.</p></div>
+    <div class="have"><span class="done-tag"><span class="badge b-demo">SIMULATED</span></span><div class="h-ic" style="background:var(--violet-soft);color:var(--violet)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><b>Member management</b><p>Full enrollment workflow: add member, 5-pose face capture with quality checks, consent flag, payment editing, activate/deactivate, signed QR pass issuance, CSV export of logs.</p></div>
+    <div class="have"><span class="done-tag"><span class="badge b-done">COMPLETE</span></span><div class="h-ic" style="background:var(--red-soft);color:var(--red)"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><b>Demo assets</b><p>Sample member portraits, entrance camera view and scenario data generated — the prototype tells a complete, believable story of a working Fab Lab day.</p></div>
+  </div>
+
+  <!-- ================= FEATURE STATUS MATRIX ================= -->
+  <div class="sec"><h2>Feature status — spec vs. build</h2><span class="tag">9 core features</span><span class="note">UI = interface built • Demo = simulated data • Live = real engine behind it</span></div>
+  <div class="matrix">
+    <div class="mx-head"><span>#</span><span>Feature (from document)</span><span>Front-end UI</span><span>Demo simulation</span><span>Live engine</span></div>
+    <div class="mx-row"><div class="mx-n">F1</div><div><b>Face Enrollment</b><div class="d">Name, ID, phone, payment, face images, embedding, consent</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">5-pose capture flow</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Real embeddings needed</span></div></div>
+    <div class="mx-row"><div class="mx-n">F2</div><div><b>Face Recognition Entry</b><div class="d">Detect → embed → match → identify</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Animated flow</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">SCRFD + ArcFace pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F3</div><div><b>Payment Verification</b><div class="d">Active / expired / unpaid / pending status</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Editable statuses</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Needs users table</span></div></div>
+    <div class="mx-row"><div class="mx-n">F4</div><div><b>Proxy Detection</b><div class="d">Claimed token ≠ detected face → deny + alert + photo</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">TC05 scenario</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Mismatch logic pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F5</div><div><b>Unknown Person Detection</b><div class="d">No enrolled match → alert + image stored</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">TC04 scenario</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">1:N search pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F6</div><div><b>Unpaid User Detection</b><div class="d">Recognized but expired → deny + alert, admin may approve</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">+ admin approval</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Live DB check pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F7</div><div><b>Live Occupant List</b><div class="d">Who is inside, entry time, duration, payment status</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Entry / checkout</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Exit scan + timeout pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F8</div><div><b>In-Charge Alerts</b><div class="d">Telegram bot with photo evidence, priority levels</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">All 6 formats</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">Real bot API pending</span></div></div>
+    <div class="mx-row"><div class="mx-n">F9</div><div><b>Daily Report</b><div class="d">8:00 PM summary — entries, users, attempts, active list</div></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">Built</span></div><div class="cell ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span class="lbl">5 report types</span></div><div class="cell no"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg><span class="lbl no">APScheduler pending</span></div></div>
+  </div>
+
+  <!-- ================= ROADMAP ================= -->
+  <div class="sec"><h2>Implementation roadmap</h2><span class="tag">Phases 0–11</span><span class="note">From §24 of the blueprint</span></div>
+  <div class="road">
+    <div class="ph-line">
+      <div class="ph done"><div class="nd"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><b>Phase 0</b><small>Preparation & spec</small><span class="stx d">Done</span></div>
+      <div class="ph"><div class="nd"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="9"/></svg></div><b>Phase 1</b><small>Basic face matching</small><span class="stx p">Next</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 2</b><small>Enrollment module</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 3</b><small>Real-time recognition</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 4</b><small>Token / QR integration</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 5</b><small>Proxy detection</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 6</b><small>Payment logic</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 7</b><small>Telegram alerts</small><span class="stx p">Pending</span></div>
+      <div class="ph cur"><div class="nd"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div><b>Phase 8</b><small>Dashboard</small><span class="stx c">In progress</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 9</b><small>Occupancy tracking</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 10</b><small>Testing & tuning</small><span class="stx p">Pending</span></div>
+      <div class="ph"><div class="nd"></div><b>Phase 11</b><small>Fab Lab deployment</small><span class="stx p">Pending</span></div>
+    </div>
+    <div class="road-note"><b>Where we stand:</b> the Dashboard phase is ahead of schedule — the interface is demo-ready with simulated data, which lets us pitch the product now. The engine behind it (Phases 1–7) is the next build block. Once Phases 1–7 land, the same dashboard switches from <b>demo data to live data</b> with no redesign needed.</div>
+  </div>
+
+  <!-- ================= INTEGRATIONS ================= -->
+  <div class="sec"><h2>What must be integrated next</h2><span class="tag">6 integrations</span><span class="note">To move from demo to working product</span></div>
+  <div class="int-grid">
+    <div class="int"><div class="i-ic" style="background:var(--primary-soft);color:var(--primary)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9"/></svg></div><div style="flex:1"><b>1 · AI / CV engine</b><div class="i-sub">The brain. Webcam frames in, decisions out: detect faces, check quality, extract 512-d embeddings, cosine-match at threshold 0.45, blink-based liveness. Replaces the demo animation with real results.</div><div class="i-tech"><span class="tech">InsightFace</span><span class="tech">SCRFD</span><span class="tech">ArcFace</span><span class="tech">OpenCV</span><span class="tech">Python 3.11</span></div></div><span class="i-st"><span class="badge b-todo">TO BUILD</span></span></div>
+    <div class="int"><div class="i-ic" style="background:var(--blue-soft);color:var(--blue)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0"/></svg></div><div style="flex:1"><b>2 · Backend API + database</b><div class="i-sub">FastAPI service exposing the 6 tables from §16 (users, tokens, entry_logs, occupants, alerts, admin_actions). The dashboard already renders exactly these shapes — the API just feeds them for real.</div><div class="i-tech"><span class="tech">FastAPI</span><span class="tech">SQLite → PostgreSQL</span><span class="tech">REST / WebSocket</span></div></div><span class="i-st"><span class="badge b-todo">TO BUILD</span></span></div>
+    <div class="int"><div class="i-ic" style="background:var(--green-soft);color:var(--green)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></div><div style="flex:1"><b>3 · Telegram alert bot</b><div class="i-sub">Bot + private in-charge group. Sends the 6 alert formats (§15) with photo evidence and the 8:00 PM daily report via APScheduler. Alert templates are already finalized in the UI.</div><div class="i-tech"><span class="tech">Telegram Bot API</span><span class="tech">APScheduler</span><span class="tech">Photo evidence</span></div></div><span class="i-st"><span class="badge b-todo">TO BUILD</span></span></div>
+    <div class="int"><div class="i-ic" style="background:var(--amber-soft);color:var(--amber)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div><div style="flex:1"><b>4 · Camera + entrance hardware</b><div class="i-sub">1080p USB webcam (Logitech C920 preferred) at eye level 1–1.5 m from the user, entrance display showing the door screens, optional buzzer/LED. Mounted per §31 placement rules.</div><div class="i-tech"><span class="tech">USB Webcam 1080p</span><span class="tech">7–10" display</span><span class="tech">Buzzer / LED</span></div></div><span class="i-st"><span class="badge b-todo">TO BUY</span></span></div>
+    <div class="int"><div class="i-ic" style="background:var(--violet-soft);color:var(--violet)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M18 18h3v3h-3z"/></svg></div><div style="flex:1"><b>5 · Token reader (QR / RFID)</b><div class="i-sub">Claimed identity source for proxy detection (Mode B). Signed QR payloads {user_id, issued_at, expires_at, HMAC} prevent forged codes. The dashboard's "Issue pass" feature already generates them.</div><div class="i-tech"><span class="tech">USB QR scanner</span><span class="tech">or RC522 RFID</span><span class="tech">HMAC-signed QR</span></div></div><span class="i-st"><span class="badge b-todo">TO BUY</span></span></div>
+    <div class="int"><div class="i-ic" style="background:var(--red-soft);color:var(--red)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M12 6h.01M12 10h.01M12 14h.01"/></svg></div><div style="flex:1"><b>6 · Edge device + operations</b><div class="i-sub">Laptop for development, Raspberry Pi 4/5 for 24/7 deployment. Includes consent forms, entrance signage (§31.3), daily DB backups, 90-day log retention and the daily-operation checklist (§32).</div><div class="i-tech"><span class="tech">Laptop → RPi 4/5</span><span class="tech">Consent & signage</span><span class="tech">DB backup</span></div></div><span class="i-st"><span class="badge b-cur">PARTIAL</span></span></div>
+  </div>
+
+  <!-- ================= NEXT STEPS ================= -->
+  <div class="sec"><h2>Immediate next steps</h2><span class="tag">Sprint plan</span><span class="note">Build order from §39 of the blueprint</span></div>
+  <div class="next">
+    <div class="nx-row"><div class="nx-num">1</div><div><b>Face matching script</b><div class="nx-d">Install InsightFace, compare two photos, output same / different person.</div></div><span class="nx-out">≈ 3 days</span></div>
+    <div class="nx-row future"><div class="nx-num">2</div><div><b>Enrollment database</b><div class="nx-d">SQLite users table + capture 5–10 poses per volunteer + store 3 embeddings each.</div></div><span class="nx-out">≈ 3 days</span></div>
+    <div class="nx-row future"><div class="nx-num">3</div><div><b>Live camera recognition</b><div class="nx-d">Webcam stream, real-time detect + recognize at 3–5 fps, show name overlay.</div></div><span class="nx-out">≈ 4 days</span></div>
+    <div class="nx-row future"><div class="nx-num">4</div><div><b>Token + face verification</b><div class="nx-d">QR scanner in, claimed identity vs. detected face comparison (proxy logic).</div></div><span class="nx-out">≈ 3 days</span></div>
+    <div class="nx-row future"><div class="nx-num">5</div><div><b>Telegram alerts + reports</b><div class="nx-d">Real bot sends the 6 alert types with photos + 8:00 PM daily summary.</div></div><span class="nx-out">≈ 2 days</span></div>
+    <div class="nx-row future"><div class="nx-num">6</div><div><b>Wire this dashboard to the API</b><div class="nx-d">Replace demo data with live FastAPI endpoints — UI is already done.</div></div><span class="nx-out">≈ 2 days</span></div>
+    <div class="nx-row future"><div class="nx-num">7</div><div><b>Testing & deployment</b><div class="nx-d">TC01–TC12 test cases, threshold calibration, one full live day at the Fab Lab.</div></div><span class="nx-out">≈ 8 days</span></div>
+  </div>
+
+  <!-- ================= DEFINITION OF DONE ================= -->
+  <div class="sec"><h2>Definition of done</h2><span class="tag">§37 checklist</span><span class="note">2 of 10 criteria met so far</span></div>
+  <div class="dod">
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>10+ users enrolled</b> with real face data & consent</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>Real-time recognition</b> on live camera feed</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>Payment status</b> verified from live database</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>Token–face mismatch</b> detected automatically</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>Telegram alert with photo</b> delivered in &lt; 5 s</div></div>
+    <div class="dod-it done"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Entry logs</b> — log screen & CSV export <b>ready</b> (needs live source)</div></div>
+    <div class="dod-it done"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Occupant list UI</b> <b>ready</b> (needs entry/exit events)</div></div>
+    <div class="dod-it done"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><div><b>Daily report</b> — all 5 formats designed & previewable</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>One full working day</b> continuously at the Fab Lab</div></div>
+    <div class="dod-it todo"><span class="cb"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></span><div><b>Test report</b> — accuracy, proxy, spoof & usability results</div></div>
+  </div>
+
+  <div class="foot">
+    <b>Bottom line:</b> the product is designed and presentable today — clients can click through the full experience.<br>
+    The next milestone is the recognition engine: <b>face matching script → enrollment DB → live camera → token verification → real Telegram alerts</b>, then wire it into this dashboard.
+  </div>
+</div>
+
+<script>
+/* animate progress ring to 28% */
+(function(){
+  const target=28, C=2*Math.PI*54;
+  const ring=document.getElementById('ringFill');
+  const pct=document.getElementById('ringPct');
+  ring.style.transition='stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1)';
+  let start=null;
+  requestAnimationFrame(()=>{ ring.style.strokeDashoffset=C*(1-target/100); });
+  function tick(ts){
+    if(!start)start=ts;
+    const p=Math.min((ts-start)/1600,1);
+    const eased=1-Math.pow(1-p,3);
+    pct.textContent=Math.round(eased*target)+'%';
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
