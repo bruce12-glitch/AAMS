@@ -1,0 +1,10 @@
+{
+  "name": "aams",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FacePass FabLab — AAMS project progress report",
+  "scripts": {
+    "start": "node server.js",
+    "serve": "node server.js"
+  }
+}
