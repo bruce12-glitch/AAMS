@@ -62,16 +62,27 @@ async def get_activity():
 
 @router.get('/live')
 async def get_live_status():
-    """Get live camera status, current event, steps."""
+    """Get live camera status plus the most recent entry event."""
     from app.camera import CameraManager
-    
-    camera = CameraManager()
-    camera_status = camera.get_status()
-    
+    from app.database import get_connection
+
+    camera_status = CameraManager().get_status()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM entry_logs ORDER BY event_time DESC LIMIT 1')
+    row = cursor.fetchone()
+    conn.close()
+
+    current = dict(row) if row else None
     return {
         'camera': camera_status,
-        'current_event': None,
-        'steps': ['IDLE']
+        'current_event': current,
+        'steps': [
+            'TOKEN_DETECTED', 'FACE_DETECTED', 'QUALITY', 'EMBEDDING',
+            'MATCH', 'LIVENESS', 'PAYMENT', 'DECISION',
+        ],
+        'mode': 'prototype-live',
     }
 
 @router.get('/research')

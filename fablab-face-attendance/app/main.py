@@ -22,10 +22,12 @@ app = FastAPI(
 )
 
 # Enable CORS for frontend
+# Preview / local consoles talk to this API through a same-origin proxy
+# or a sandbox preview host. Keep origins open in prototype mode.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['*'],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -54,8 +56,15 @@ async def root():
 
 @app.get('/health')
 async def health_check():
-    """Health check endpoint."""
-    return {'status': 'healthy'}
+    """Health check used by the live console badge and start-live.sh."""
+    try:
+        from app.database import get_connection
+        conn = get_connection()
+        users = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        conn.close()
+        return {'status': 'healthy', 'users': users}
+    except Exception as exc:
+        return {'status': 'degraded', 'error': str(exc)}
 
 @app.on_event('startup')
 async def startup_event():

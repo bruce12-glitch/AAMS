@@ -2,13 +2,15 @@
   "name": "aams",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "FacePass FabLab — AAMS console prototype",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port 3000",
     "start": "node server.js",
-    "serve": "node server.js"
+    "serve": "node server.js",
+    "live": "bash scripts/start-live.sh"
   },
   "dependencies": {
     "@astryxdesign/core": "^0.4.6",

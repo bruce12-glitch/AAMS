@@ -5,8 +5,9 @@ Implements §10 Token+Face Mode and §19 Face-Only Mode.
 """
 
 import numpy as np
-from app.database import get_connection, list_from_rows
-from app.face_engine import FaceEngine
+from app.config import get_face_config
+from app.database import get_connection
+from app.embeddings import as_embedding, cosine_similarity, find_best_match
 
 class IdentityVerifier:
     """
@@ -17,8 +18,12 @@ class IdentityVerifier:
         """
         Initialize the identity verifier with face engine and database access.
         """
-        self.face_engine = FaceEngine()
-        self.match_threshold = 0.45  # Configurable via config.yaml
+        face_cfg = {}
+        try:
+            face_cfg = get_face_config() or {}
+        except Exception:
+            face_cfg = {}
+        self.match_threshold = float(face_cfg.get('match_threshold', 0.45))
     
     def get_user_embeddings(self, user_id: str) -> list:
         """
@@ -49,9 +54,10 @@ class IdentityVerifier:
         for i in range(3):
             emb_data = row[i]
             if emb_data is not None:
-                # Convert bytes back to numpy array
-                embedding = np.frombuffer(emb_data, dtype=np.float64)
-                embeddings.append(embedding)
+                try:
+                    embeddings.append(as_embedding(emb_data))
+                except ValueError:
+                    continue
         
         return embeddings
     
@@ -82,8 +88,10 @@ class IdentityVerifier:
             for i in range(1, 4):  # Columns 1-3 are embeddings
                 emb_data = row[i]
                 if emb_data is not None:
-                    embedding = np.frombuffer(emb_data, dtype=np.float64)
-                    embeddings.append(embedding)
+                    try:
+                        embeddings.append(as_embedding(emb_data))
+                    except ValueError:
+                        continue
             
             if embeddings:
                 all_embeddings[user_id] = embeddings
@@ -175,8 +183,9 @@ class IdentityVerifier:
         
         # Step 3: Compare against all 3 embeddings
         max_similarity = 0.0
+        query = as_embedding(face_embedding)
         for user_emb in user_embeddings:
-            similarity = self.face_engine.match_embeddings(face_embedding, user_emb)
+            similarity = cosine_similarity(query, user_emb)
             if similarity > max_similarity:
                 max_similarity = similarity
         
@@ -192,7 +201,7 @@ class IdentityVerifier:
         
         # Step 5: Check if face matches ANY other user (proxy detection)
         all_embeddings = self.get_all_user_embeddings()
-        best_match_id, best_score = self.face_engine.find_best_match(
+        best_match_id, best_score = find_best_match(
             face_embedding, all_embeddings, threshold=self.match_threshold
         )
         
@@ -235,7 +244,7 @@ class IdentityVerifier:
         """
         all_embeddings = self.get_all_user_embeddings()
         
-        best_match_id, best_score = self.face_engine.find_best_match(
+        best_match_id, best_score = find_best_match(
             face_embedding, all_embeddings, threshold=self.match_threshold
         )
         

@@ -6,7 +6,6 @@ Implements CRUD for users/enrollment.
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-import numpy as np
 
 router = APIRouter(prefix='/api/users', tags=['users'])
 

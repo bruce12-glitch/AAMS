@@ -56,6 +56,21 @@ def test_all_rows():
     result = policy.evaluate_access('U1', {'result': 'MATCH'}, 'active', 'real', 3)
     assert result['alert_type'] == 'TAILGATE'
     print("✓ Row 9: Tailgating detected")
+
+    # pending is unpaid (RQ3)
+    result = policy.evaluate_access('U1', {'result': 'MATCH', 'match': True}, 'pending', 'real', 1)
+    assert result['decision'] == 'DENIED' and result['tag'] == 'unpaid'
+    print("✓ pending payment denied")
+
+    # MATCH with zero faces must not grant
+    result = policy.evaluate_access('U1', {'result': 'MATCH', 'match': True}, 'active', 'real', 0)
+    assert result['decision'] == 'DENIED' and result['tag'] == 'noface'
+    print("✓ MATCH + no face denied")
+
+    # tailgate + unpaid keeps unpaid (RQ3)
+    result = policy.evaluate_access('U1', {'result': 'MATCH'}, 'expired', 'real', 2)
+    assert result['decision'] == 'DENIED' and result['tag'] == 'unpaid'
+    print("✓ tailgate + unpaid stays unpaid")
     
     print("\n✓ All 9 decision matrix rows tested successfully!")
 

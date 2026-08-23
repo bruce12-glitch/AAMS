@@ -3,24 +3,47 @@
 Seed demo data for FacePass FabLab.
 Populates database with demo users, logs, alerts, and occupants.
 Run: python -m scripts.seed_demo_data
+     python -m scripts.seed_demo_data --if-empty   # no-op when users exist
+     python -m scripts.seed_demo_data --force        # wipe and reseed
 """
 
+import argparse
 import sys
 sys.path.insert(0, '..')
 
 import numpy as np
-from app.database import get_connection
+from app.database import get_connection, init_db
+from app.embeddings import embedding_to_bytes
 
 def generate_random_embedding() -> bytes:
-    """Generate a random normalized 512-d embedding."""
-    emb = np.random.randn(512)
+    """Generate a random normalized 512-d float32 embedding."""
+    emb = np.random.randn(512).astype(np.float32)
     emb = emb / np.linalg.norm(emb)
-    return emb.tobytes()
+    return embedding_to_bytes(emb)
 
 def main():
     """Seed the database with demo data."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--if-empty', action='store_true',
+                        help='Skip seeding when the users table already has rows')
+    parser.add_argument('--force', action='store_true',
+                        help='Wipe existing rows and reseed')
+    args = parser.parse_args()
+
+    init_db()
     conn = get_connection()
     cursor = conn.cursor()
+
+    cursor.execute('SELECT COUNT(*) FROM users')
+    existing = cursor.fetchone()[0]
+    if args.if_empty and existing:
+        conn.close()
+        print(f"Database already has {existing} users — skip seed (use --force to wipe).")
+        return
+    if existing and not args.force and not args.if_empty:
+        conn.close()
+        print(f"Database already has {existing} users. Re-run with --force to wipe, or --if-empty to skip.")
+        return
     
     print("Seeding demo data...")
     
@@ -45,8 +68,8 @@ def main():
     for user in users:
         embedding = generate_random_embedding()
         cursor.execute('''
-            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, face_embedding)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, face_embedding, consent_given, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1)
         ''', (*user, embedding))
     
     print(f"✓ Created {len(users)} users")
@@ -80,7 +103,7 @@ def main():
     ]
     
     for i, log in enumerate(logs):
-        event_time = (now - timedelta(hours=i*2)).isoformat()
+        event_time = (now - timedelta(minutes=15 * i)).isoformat()
         cursor.execute('''
             INSERT INTO entry_logs (event_time, claimed_id, recognized_id, similarity, payment_status, liveness_status, decision, reason, tag)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)

@@ -40,6 +40,8 @@ class AccessDecision:
             - tag: str (authorized/proxy/unpaid/unknown/spoof/tailgate/noface)
         """
         
+        unpaid_statuses = {"expired", "unpaid", "inactive", "pending"}
+
         # Row 8: Any + spoof detected → DENY + SPOOF alert
         if liveness_status == "spoof":
             return {
@@ -47,6 +49,15 @@ class AccessDecision:
                 "reason": "Spoof attempt detected (photo/video attack)",
                 "alert_type": "SPOOF",
                 "tag": "spoof"
+            }
+
+        # Row 4 first: a MATCH with zero faces must never grant
+        if face_count == 0:
+            return {
+                "decision": "DENIED",
+                "reason": "No face detected",
+                "alert_type": "NOFACE",
+                "tag": "noface"
             }
         
         # Row 9: Multiple faces → GRANT (to verified) + TAILGATE alert
@@ -63,8 +74,8 @@ class AccessDecision:
                 return {
                     "decision": "DENIED",
                     "reason": "Multiple faces detected and payment issue",
-                    "alert_type": "TAILGATE",
-                    "tag": "tailgate"
+                    "alert_type": "UNPAID",
+                    "tag": "unpaid"
                 }
         
         # Row 1: Valid token + face matches + active payment + real → GRANT
@@ -80,7 +91,7 @@ class AccessDecision:
         
         # Row 2: Valid token + face matches + expired payment + real → DENY + UNPAID alert
         if (face_result.get('result') == 'MATCH' and 
-            payment_status in ['expired', 'unpaid', 'inactive'] and 
+            payment_status in unpaid_statuses and 
             liveness_status == 'real'):
             return {
                 "decision": "DENIED",
@@ -98,15 +109,6 @@ class AccessDecision:
                 "tag": "proxy"
             }
         
-        # Row 4: Valid token + no face → DENY + NOFACE alert
-        if face_count == 0:
-            return {
-                "decision": "DENIED",
-                "reason": "No face detected",
-                "alert_type": "NOFACE",
-                "tag": "noface"
-            }
-        
         # Row 5: Invalid token + face recognized + active → Optional allow or alert
         if (face_result.get('result') == 'INVALID_TOKEN' and 
             face_result.get('detected_user') and 
@@ -122,7 +124,7 @@ class AccessDecision:
         # Row 6: Invalid token + face recognized + expired → DENY + UNPAID alert
         if (face_result.get('result') == 'INVALID_TOKEN' and 
             face_result.get('detected_user') and 
-            payment_status in ['expired', 'unpaid', 'inactive']):
+            payment_status in unpaid_statuses):
             return {
                 "decision": "DENIED",
                 "reason": "Invalid token and payment issue",

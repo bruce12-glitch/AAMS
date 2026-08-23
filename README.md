@@ -27,11 +27,23 @@ python run.py                # API on http://localhost:8000 (docs at /docs)
 
 First run downloads InsightFace `buffalo_l` models (~500 MB) into `models/insightface/`.
 
+## Live prototype (console + API)
+
+Other coding agents: read **`AGENTS.md` first**.
+
+```bash
+bash scripts/start-live.sh
+```
+
+This starts FastAPI on `0.0.0.0:8000` and the Vite console on `0.0.0.0:3000`.
+The browser only talks to the Vite origin; `/api` and `/health` are proxied.
+Use the **Live Monitor** scenario buttons — they persist logs, alerts, and occupants.
+
 ## Quick start — frontend
 
 ```bash
 npm install
-npm run dev                  # Vite dev server on http://localhost:3000
+npm run dev                  # Vite live console on http://0.0.0.0:3000
 ```
 
 The React app uses `@astryxdesign/core` + `@astryxdesign/theme-neutral` (see `src/main.jsx`
@@ -78,18 +90,15 @@ fablab-face-attendance/
 
 ## Known issues / TODO
 
+Tracked as claimable work in **`docs/TASKS.md`**. Agents: read **`AGENTS.md`** first.
+
 - `liveness.py` uses InsightFace 5-point landmarks — EAR blink detection needs a
-  68/106-point model for production reliability (noted in code).
-- `enrollment/enroll_user.py` stores a **random placeholder embedding** — real webcam
-  capture of 5 poses is not yet implemented.
-- `api/routes_entry.py` accepts raw embeddings from the client; production should accept
-  an image/frame and run detection server-side.
-- CORS is `allow_origins=['*']` and admin routes have no auth yet — restrict before deploy.
-- `config.yaml` ships with placeholder secrets (`CHANGE_THIS...`); real values belong in `.env`.
-- `routes_dashboard.py /live` constructs a fresh `CameraManager` per request instead of
-  sharing a running instance.
-- The React front-end is a static scaffold; wiring it to the API endpoints is the next step
-  (see `fablab-face-attendance/README.md` § Frontend Integration).
+  68/106-point model (T06).
+- `enrollment/enroll_user.py` stores a **random placeholder embedding** (T01).
+- `api/routes_entry.py` still accepts raw embeddings; production must accept a frame (T02).
+- Admin routes have no auth yet (T08).
+- `config.yaml` ships with placeholder secrets; real values belong in `.env`.
+- Camera is not a process-wide singleton / watchdog (T07).
 
 ## Tests
 

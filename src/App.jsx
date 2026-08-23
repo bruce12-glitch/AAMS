@@ -1,108 +1,84 @@
-import React from 'react';
-import { Layout, Grid, Stack, Box, Card, Button, Table, Badge } from '@astryxdesign/core';
-import { Theme, neutralTheme } from '@astryxdesign/theme-neutral';
+import React, { useEffect, useState } from 'react';
+import { Layout, Stack, Box, Button, Badge, Theme, neutralTheme } from './ui.jsx';
+import LivePage from './pages/LivePage.jsx';
+import LogsPage from './pages/LogsPage.jsx';
+import AlertsPage from './pages/AlertsPage.jsx';
+import UsersPage from './pages/UsersPage.jsx';
+import ReportsPage from './pages/ReportsPage.jsx';
+import { pingHealth } from './api/client.js';
+
+const NAV = [
+  { id: 'live', label: 'Live Monitor' },
+  { id: 'logs', label: 'Entry Logs' },
+  { id: 'alerts', label: 'Alerts' },
+  { id: 'users', label: 'Users' },
+  { id: 'reports', label: 'Reports' },
+];
 
 function App() {
+  const [page, setPage] = useState('live');
+  const [apiUp, setApiUp] = useState(null);
+  const [clock, setClock] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const ok = await pingHealth();
+      if (!cancelled) setApiUp(ok);
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
   return (
     <Theme theme={neutralTheme}>
       <Layout>
-        {/* Header Block */}
         <Box padding="md" background="surface.base">
           <Stack direction="row" justify="space-between" align="center">
             <Box>
-              <h1>AAMS - FacePass FabLab</h1>
-              <p>Console Prototype</p>
+              <h1>FacePass FabLab</h1>
+              <p>AAMS live console · SRMIST Fab Lab · prototype</p>
             </Box>
-            <Stack direction="row" gap="sm">
-              <Button variant="primary">Live Monitor</Button>
-              <Button variant="secondary">Reports</Button>
-              <Button variant="danger">Alerts</Button>
+            <Stack direction="row" gap="sm" align="center">
+              <Badge variant={apiUp ? 'positive' : apiUp === false ? 'negative' : 'attention'}>
+                API {apiUp ? 'online' : apiUp === false ? 'offline' : 'checking'}
+              </Badge>
+              <Badge variant="neutral">SCRFD + ArcFace · thr 0.45</Badge>
+              <Badge variant="neutral">
+                {clock.toLocaleTimeString('en-GB')}
+              </Badge>
             </Stack>
           </Stack>
+          <Box marginTop="sm">
+            <Stack direction="row" gap="sm">
+              {NAV.map((item) => (
+                <Button
+                  key={item.id}
+                  variant={page === item.id ? 'primary' : 'secondary'}
+                  onClick={() => setPage(item.id)}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
         </Box>
 
-        {/* Main Content Area */}
         <Box padding="lg">
-          {/* Multi-Metric Data Row */}
-          <Grid columns={{ base: 1, sm: 2, lg: 4 }} gap="md">
-            <Card variant="outlined">
-              <Stack direction="column" gap="xs">
-                <Badge variant="neutral">Total Entries</Badge>
-                <Box fontSize="xl" fontWeight="bold">1,247</Box>
-              </Stack>
-            </Card>
-            <Card variant="outlined">
-              <Stack direction="column" gap="xs">
-                <Badge variant="positive">Successful</Badge>
-                <Box fontSize="xl" fontWeight="bold">1,198</Box>
-              </Stack>
-            </Card>
-            <Card variant="outlined">
-              <Stack direction="column" gap="xs">
-                <Badge variant="attention">Pending</Badge>
-                <Box fontSize="xl" fontWeight="bold">32</Box>
-              </Stack>
-            </Card>
-            <Card variant="outlined">
-              <Stack direction="column" gap="xs">
-                <Badge variant="negative">Failed</Badge>
-                <Box fontSize="xl" fontWeight="bold">17</Box>
-              </Stack>
-            </Card>
-          </Grid>
-
-          {/* Action Table Area */}
-          <Box marginTop="lg">
-            <Card variant="default">
-              <Stack direction="column" gap="md">
-                <Stack direction="row" justify="space-between" align="center">
-                  <h2>Recent Entry Logs</h2>
-                  <Button variant="secondary">View All</Button>
-                </Stack>
-                <Table>
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.Head>Name</Table.Head>
-                      <Table.Head>Status</Table.Head>
-                      <Table.Head>Time</Table.Head>
-                      <Table.Head>Location</Table.Head>
-                      <Table.Head>Action</Table.Head>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    <Table.Row>
-                      <Table.Cell>John Doe</Table.Cell>
-                      <Table.Cell><Badge variant="positive">Granted</Badge></Table.Cell>
-                      <Table.Cell>10:23 AM</Table.Cell>
-                      <Table.Cell>Main Entrance</Table.Cell>
-                      <Table.Cell><Button variant="secondary">Details</Button></Table.Cell>
-                    </Table.Row>
-                    <Table.Row>
-                      <Table.Cell>Jane Smith</Table.Cell>
-                      <Table.Cell><Badge variant="positive">Granted</Badge></Table.Cell>
-                      <Table.Cell>10:18 AM</Table.Cell>
-                      <Table.Cell>Lab Door A</Table.Cell>
-                      <Table.Cell><Button variant="secondary">Details</Button></Table.Cell>
-                    </Table.Row>
-                    <Table.Row>
-                      <Table.Cell>Mike Johnson</Table.Cell>
-                      <Table.Cell><Badge variant="negative">Denied</Badge></Table.Cell>
-                      <Table.Cell>10:15 AM</Table.Cell>
-                      <Table.Cell>Main Entrance</Table.Cell>
-                      <Table.Cell><Button variant="danger">Review</Button></Table.Cell>
-                    </Table.Row>
-                    <Table.Row>
-                      <Table.Cell>Sarah Williams</Table.Cell>
-                      <Table.Cell><Badge variant="attention">Pending</Badge></Table.Cell>
-                      <Table.Cell>10:10 AM</Table.Cell>
-                      <Table.Cell>Lab Door B</Table.Cell>
-                      <Table.Cell><Button variant="secondary">Details</Button></Table.Cell>
-                    </Table.Row>
-                  </Table.Body>
-                </Table>
-              </Stack>
-            </Card>
-          </Box>
+          {page === 'live' && <LivePage />}
+          {page === 'logs' && <LogsPage />}
+          {page === 'alerts' && <AlertsPage />}
+          {page === 'users' && <UsersPage />}
+          {page === 'reports' && <ReportsPage />}
         </Box>
       </Layout>
     </Theme>

@@ -6,8 +6,8 @@ Uses InsightFace library for face analysis.
 
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
 from app.config import get_face_config
+from app.embeddings import cosine_similarity, find_best_match as gallery_best_match
 
 class FaceEngine:
     """
@@ -22,10 +22,8 @@ class FaceEngine:
         """
         config = get_face_config()
         self.det_size = tuple(config.get('resolution', [640, 640]))
-        
-        # Initialize InsightFace with CPU provider (can be changed to CUDA)
-        self.app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
-        self.app.prepare(ctx_id=0, det_size=self.det_size)
+        self.app = None
+        self._insightface_error = None
         
         # Load configuration thresholds
         self.min_face_size = config.get('min_face_size', 120)
@@ -35,6 +33,24 @@ class FaceEngine:
         self.max_yaw = config.get('max_yaw', 25)
         self.max_pitch = config.get('max_pitch', 20)
         self.max_roll = config.get('max_roll', 20)
+
+    def _ensure_app(self):
+        """Load InsightFace only when a frame actually needs detection."""
+        if self.app is not None:
+            return self.app
+        if self._insightface_error:
+            raise RuntimeError(self._insightface_error)
+        try:
+            from insightface.app import FaceAnalysis
+            self.app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+            self.app.prepare(ctx_id=0, det_size=self.det_size)
+            return self.app
+        except Exception as exc:
+            self._insightface_error = (
+                f"InsightFace unavailable ({exc}). Matching still works on embeddings; "
+                "frame detection requires insightface + buffalo_l."
+            )
+            raise RuntimeError(self._insightface_error) from exc
     
     def detect_faces(self, frame: np.ndarray) -> list:
         """
@@ -50,7 +66,7 @@ class FaceEngine:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         
         # Detect faces
-        faces = self.app.get(rgb_frame)
+        faces = self._ensure_app().get(rgb_frame)
         
         return faces
     
@@ -151,15 +167,7 @@ class FaceEngine:
         Returns:
             Cosine similarity score (0.0 to 1.0)
         """
-        # Cosine similarity = dot product of normalized vectors
-        similarity = np.dot(embedding_a, embedding_b)
-        
-        # Clip to valid range due to floating point precision
-        similarity = np.clip(similarity, -1.0, 1.0)
-        
-        # Convert from cosine distance to similarity (higher is better)
-        # InsightFace returns cosine similarity directly
-        return float(similarity)
+        return cosine_similarity(embedding_a, embedding_b)
     
     def find_best_match(self, embedding: np.ndarray, all_embeddings: dict, threshold: float = 0.45) -> tuple:
         """
@@ -173,24 +181,7 @@ class FaceEngine:
         Returns:
             Tuple of (best_user_id or None, best_score)
         """
-        best_user_id = None
-        best_score = 0.0
-        
-        for user_id, user_embeddings in all_embeddings.items():
-            # Compare against all stored embeddings for this user
-            for user_emb in user_embeddings:
-                if user_emb is not None:
-                    similarity = self.match_embeddings(embedding, user_emb)
-                    
-                    if similarity > best_score:
-                        best_score = similarity
-                        best_user_id = user_id
-        
-        # Return None if below threshold
-        if best_score < threshold:
-            return None, best_score
-        
-        return best_user_id, best_score
+        return gallery_best_match(embedding, all_embeddings, threshold=threshold)
     
     def process_frame(self, frame: np.ndarray) -> dict:
         """

@@ -3,7 +3,6 @@ Camera Manager for FacePass FabLab.
 Handles webcam capture with configurable FPS and resolution.
 """
 
-import cv2
 import threading
 import time
 from app.config import get_camera_config
@@ -42,6 +41,11 @@ class CameraManager:
         """Start camera capture in background thread."""
         if self.running:
             return
+
+        try:
+            import cv2
+        except ImportError as exc:
+            raise RuntimeError("opencv-python is required to start the camera") from exc
         
         self.camera = cv2.VideoCapture(self.source)
         
@@ -111,6 +115,7 @@ class CameraManager:
         return {
             "online": self.is_online(),
             "fps": self.fps,
-            "resolution": self.resolution,
-            "source": self.source
+            "resolution": list(self.resolution),
+            "source": self.source,
+            "note": "singleton camera is started by the live API, not per request",
         }

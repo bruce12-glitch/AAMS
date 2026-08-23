@@ -1,0 +1,13 @@
+# Lightweight API stack for the live prototype (no InsightFace / OpenCV).
+# Frame detection still needs requirements.txt on a machine with a camera.
+fastapi>=0.104.0
+uvicorn>=0.24.0
+numpy>=1.24.0
+python-telegram-bot>=20.7
+APScheduler>=3.10.4
+Pillow>=10.0.0
+python-dotenv>=1.0.0
+pyyaml>=6.0
+qrcode>=7.4.2
+python-multipart>=0.0.6
+pytest>=7.4.0
