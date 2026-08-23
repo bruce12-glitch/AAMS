@@ -1,0 +1,48 @@
+system:
+  location: "SRMIST Fab Lab"
+  mode: "token_plus_face"
+  debug: true
+
+camera:
+  source: 0
+  fps: 5
+  resolution: [1280, 720]
+
+face:
+  detection_model: "scrfd"
+  recognition_model: "arcface"
+  match_threshold: 0.45
+  min_face_size: 120
+  max_yaw: 25
+  max_pitch: 20
+  max_roll: 20
+  blur_threshold: 100
+  brightness_min: 40
+  brightness_max: 220
+
+liveness:
+  enabled: true
+  method: "blink"
+  timeout_seconds: 5
+
+occupancy:
+  timeout_minutes: 30
+  indoor_scan_enabled: false
+  indoor_scan_interval_seconds: 120
+
+alerts:
+  telegram_enabled: true
+  telegram_chat_id: "YOUR_CHAT_ID"
+  send_photo: true
+  alert_on_proxy: true
+  alert_on_unpaid: true
+  alert_on_unknown: true
+  alert_on_spoof: true
+  daily_report_time: "20:00"
+
+database:
+  path: "database/fablab.db"
+
+security:
+  qr_secret_key: "CHANGE_THIS_TO_RANDOM_STRING"
+  api_admin_password: "CHANGE_THIS"
