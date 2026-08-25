@@ -34,6 +34,17 @@ npm run dev                  # Vite dev server on http://localhost:3000
 The dev server proxies `/api/*` to `http://localhost:8000`, so run the backend first for live data.
 Without a backend the console still renders fully populated sample data ("Demo Data" badge).
 
+### Quick start — Docker (API + console, one command)
+
+```bash
+docker compose up --build
+# API  -> http://localhost:8000  (/health is orchestrator-safe)
+# Web  -> http://localhost:8090  (nginx serves console + proxies /api)
+```
+
+Volumes persist the SQLite database, evidence photos and the InsightFace model
+cache across rebuilds. TLS termination guidance: see `SECURITY.md`.
+
 ### Frontend stack
 
 - React 19 + Vite 8

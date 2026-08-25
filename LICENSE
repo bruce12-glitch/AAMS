@@ -1,0 +1,18 @@
+AAMS / FacePass FabLab — Internal Use License
+
+Copyright (c) 2026 SRMIST Fab Lab project team
+
+This software and its associated documentation are developed as an
+academic prototype for the SRMIST Fab Lab. Permission is granted to
+members of the project team and Fab Lab administration to use, copy,
+and modify these materials solely for the purposes of the Fab Lab
+access-control pilot and related academic evaluation.
+
+Redistribution outside the project team, commercial use, public
+deployment, or transfer of the biometric-processing components without
+written permission of the Fab Lab in-charge is not permitted.
+
+Biometric data collected by this system remains subject to the consent
+policy documented in SECURITY.md and the project's §26 privacy spec.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
