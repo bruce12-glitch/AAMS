@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Seed demo data for FacePass FabLab.
 Populates database with demo users, logs, alerts, and occupants.
@@ -49,7 +49,7 @@ def main():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (*user, embedding))
     
-    print(f"✓ Created {len(users)} users")
+    print(f"[OK] Created {len(users)} users")
     
     # Generate tokens for users
     import time
@@ -61,7 +61,7 @@ def main():
             VALUES (?, ?, 'qr', 1)
         ''', (token_value, user_id))
     
-    print("✓ Created tokens for all users")
+    print("[OK] Created tokens for all users")
     
     # 9 Demo entry logs
     from datetime import datetime, timedelta
@@ -86,7 +86,7 @@ def main():
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (event_time, *log))
     
-    print(f"✓ Created {len(logs)} entry logs")
+    print(f"[OK] Created {len(logs)} entry logs")
     
     # 5 Demo occupants (3 inside, 2 exited)
     occupants = [
@@ -105,7 +105,7 @@ def main():
             VALUES (?, ?, ?, ?, ?)
         ''', (occ[0], entry_time, entry_time, exit_time, occ[1]))
     
-    print(f"✓ Created {len(occupants)} occupancy records")
+    print(f"[OK] Created {len(occupants)} occupancy records")
     
     # 5 Demo alerts
     alerts = [
@@ -122,7 +122,7 @@ def main():
             VALUES (?, ?, ?, 'sent')
         ''', alert)
     
-    print(f"✓ Created {len(alerts)} alerts")
+    print(f"[OK] Created {len(alerts)} alerts")
     
     # 1 Admin exception
     cursor.execute('''
@@ -130,12 +130,13 @@ def main():
         VALUES ('Dr. Meena K.', 'Manual override entry', 'RA2111003010128', 'Student forgot ID card - verified manually')
     ''')
     
-    print("✓ Created 1 admin action")
+    print("[OK] Created 1 admin action")
     
     conn.commit()
     conn.close()
     
-    print("\n✓ Demo data seeded successfully!")
+    print("\n[OK] Demo data seeded successfully!")
 
 if __name__ == '__main__':
     main()
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Database creation script for FacePass FabLab.
 Creates all 6 tables as specified in §16.
@@ -14,7 +14,7 @@ def main():
     """Initialize the database with all tables."""
     print("Creating database tables...")
     init_db()
-    print("✓ Database created successfully!")
+    print("[OK] Database created successfully!")
     print("Tables created:")
     print("  - users")
     print("  - tokens")
@@ -25,3 +25,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

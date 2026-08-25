@@ -15,6 +15,11 @@ def get_connection():
     Get a SQLite database connection.
     Returns a connection object with row_factory set for dict-like access.
     """
+    # Ensure the database directory exists (first-run friendliness)
+    try:
+        Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     conn = sqlite3.connect(DATABASE_PATH)
     conn.row_factory = sqlite3.Row
     return conn

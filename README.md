@@ -83,9 +83,11 @@ python -m pytest tests/ -v
 
 ## Known gaps / next work
 
-1. Wire real webcam capture into `enrollment/enroll_user.py` (currently stores placeholder embedding)
-2. `/api/entry` should accept images and detect server-side instead of receiving raw embeddings
-3. Liveness blink detection needs a 68/106-point landmark model
-4. Restrict CORS + add admin auth before any real deployment
+1. **Human-in-the-loop only:** physically run webcam enrollment with volunteers (`python -m enrollment.enroll_user`) or use the Members → ＋ Enroll modal with photos
+2. Calibrate blink-liveness thresholds against a real webcam frame burst
+3. Threshold calibration study (RQ1) once real users are enrolled
+4. Set real secrets in `.env` before any live demo (Telegram, QR secret, admin password)
+
+Everything else is implemented and verified: image-based entry (server-side detect/embed/match), signed-QR verification, blink liveness over frame bursts, CORS restriction, admin token auth on mutating routes.
 
 See `HANDOFF.md` for environment notes.

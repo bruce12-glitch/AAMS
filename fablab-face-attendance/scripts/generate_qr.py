@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Generate QR code for a user.
 Run: python -m scripts.generate_qr RA2111003010123
@@ -25,8 +25,9 @@ def main():
     with open(output_path, 'wb') as f:
         f.write(qr_bytes)
     
-    print(f"✓ QR code generated for {user_id}")
+    print(f"[OK] QR code generated for {user_id}")
     print(f"  Saved to: {output_path}")
 
 if __name__ == '__main__':
     main()
+

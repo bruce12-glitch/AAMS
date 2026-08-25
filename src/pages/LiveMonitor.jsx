@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { simulateEntry, SIM_SCENARIOS } from '../api/client'
+import { apiPost, fileToDataUri } from '../api/client'
 import { MOCK_LIVE } from '../api/mock'
 import { IconCheck, IconX } from '../components/icons'
 
@@ -14,23 +14,65 @@ const PIPELINE = [
   'DECISION_MADE'
 ]
 
-const SCENARIOS = Object.keys(SIM_SCENARIOS)
+const SCENARIOS = ['authorized', 'proxy', 'unpaid', 'unknown', 'spoof', 'tailgate']
+
+const REDUCED_SCAN =
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function LiveMonitor() {
   const live = usePolling('/dashboard/live', MOCK_LIVE, 5000)
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
 
+  // snapshot test state
+  const [mode, setMode] = useState('token_face')
+  const [photoUri, setPhotoUri] = useState('')
+  const [burstUris, setBurstUris] = useState([])
+  const [tokenValue, setTokenValue] = useState('')
+  const [skipLiveness, setSkipLiveness] = useState(true)
+  const [cvError, setCvError] = useState('')
+
+  const mainRef = useRef(null)
+  const burstRef = useRef(null)
+
   const camera = live.data?.camera ?? MOCK_LIVE.camera
   const camOnline = String(camera?.status ?? '').toLowerCase() === 'online' || camera?.fps > 0
   const steps = Array.isArray(live.data?.steps) ? live.data.steps : ['IDLE']
 
-  const run = async (scenario) => {
+  const runScenario = async (scenario) => {
     setBusy(true)
     setResult(null)
     try {
-      const res = await simulateEntry(scenario)
-      setResult(res)
+      const res = await apiPost('/entry/simulate', { scenario }, 4000)
+      setResult({ ...res, source: 'api' })
+    } catch {
+      setResult(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const runSnapshot = async () => {
+    setCvError('')
+    setResult(null)
+    if (!photoUri) return setCvError('Pick a face photo first')
+    if (mode === 'token_face' && !tokenValue.trim())
+      return setCvError('Enter a token value (user ID or full signed QR JSON)')
+
+    setBusy(true)
+    try {
+      const body = {
+        image_b64: photoUri,
+        liveness_frames_b64: skipLiveness ? [] : burstUris,
+        skip_liveness: skipLiveness || burstUris.length < 2
+      }
+      const path = mode === 'token_face' ? '/entry/process' : '/entry/face-only'
+      if (mode === 'token_face') body.token_value = tokenValue.trim()
+      const res = await apiPost(path, body, 60000)
+      setResult({ ...res, source: 'api' })
+    } catch (err) {
+      setCvError(err.message || 'Entry request failed')
     } finally {
       setBusy(false)
     }
@@ -40,7 +82,7 @@ export default function LiveMonitor() {
     <div className="page-wrap">
       <div className="page-intro">
         <h1 className="page-title">Live Monitor</h1>
-        <p className="page-sub">Entrance pipeline status and scenario simulator for testing the decision matrix.</p>
+        <p className="page-sub">Entrance pipeline status and real CV entry testing.</p>
       </div>
 
       <div className="grid-main">
@@ -86,25 +128,30 @@ export default function LiveMonitor() {
                   {camOnline ? `CAM 0 · ${camera.fps} FPS · 1280×720` : 'CAMERA STANDBY'}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-mid)' }}>
-                  {camOnline ? 'Monitoring entrance…' : 'Waiting for backend camera service'}
+                  {camOnline ? 'Monitoring entrance…' : 'Test entry with a snapshot below'}
                 </div>
               </div>
             </div>
 
             <div className="pipeline" style={{ marginTop: 16 }}>
-              {PIPELINE.map((step) => (
-                <div key={step} className={`pipeline-step ${steps.includes(step) ? 'hot' : ''}`}>
-                  <span className="step-node" />
-                  {step.replace(/_/g, ' ')}
-                </div>
-              ))}
+              {PIPELINE.map((step) => {
+                const hot =
+                  result?.decision && steps.includes(step) ||
+                  ['MATCHED', 'DECISION_MADE'].includes(step) && result?.decision
+                return (
+                  <div key={step} className={`pipeline-step ${result?.decision ? 'hot' : ''}`}>
+                    <span className="step-node" />
+                    {step.replace(/_/g, ' ')}
+                  </div>
+                )
+              })}
             </div>
           </motion.section>
 
           <AnimatePresence mode="wait">
             {result && (
               <motion.section
-                key={`${result.tag}-${result.decision}-${Date.now()}`}
+                key={`${result.tag}-${result.decision}-${Math.random()}`}
                 className={`decision-banner ${result.decision === 'GRANTED' ? 'granted' : 'denied'}`}
                 initial={{ opacity: 0, scale: 0.94, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -122,6 +169,13 @@ export default function LiveMonitor() {
                     Access {result.decision}
                   </div>
                   <div className="decision-reason">{result.reason}</div>
+                  {typeof result.similarity === 'number' && (
+                    <div className="alert-time mono">
+                      similarity {result.similarity.toFixed(2)} · liveness {result.liveness_status ?? 'n/a'}
+                      {result.face_count > 0 ? ` · faces ${result.face_count}` : ''}
+                      {result.occupant_state ? ` · ${result.occupant_state}` : ''}
+                    </div>
+                  )}
                 </div>
                 <span
                   className="badge neutral"
@@ -133,46 +187,100 @@ export default function LiveMonitor() {
               </motion.section>
             )}
           </AnimatePresence>
+
+          {cvError && (
+            <motion.div className="form-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              {cvError}
+            </motion.div>
+          )}
         </div>
 
-        <motion.section
-          className="panel"
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.15 }}
-        >
-          <div className="panel-head">
-            <h2 className="panel-title"><span className="tick" />Entry Simulator</h2>
-          </div>
-          <p style={{ fontSize: 12.5, color: 'var(--text-mid)', lineHeight: 1.55, margin: '0 0 14px' }}>
-            Fire a scenario through the access policy engine (§11.2 decision matrix). Each run is logged to the entry trail.
-          </p>
-          <div className="chip-row">
-            {SCENARIOS.map((sc) => (
-              <button key={sc} className="scenario-chip" onClick={() => run(sc)} disabled={busy} type="button">
-                {sc}
-              </button>
-            ))}
-          </div>
+        <div className="stack">
+          <motion.section
+            className="panel"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.15 }}
+          >
+            <div className="panel-head">
+              <h2 className="panel-title"><span className="tick" />Snapshot Entry Test</h2>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-mid)', lineHeight: 1.55, margin: '0 0 14px' }}>
+              Runs the real pipeline server-side: detect → quality → ArcFace embed → match → policy.
+            </p>
 
-          <div className="kv-row" style={{ marginTop: 18 }}>
-            <span className="kv-key">Match threshold</span>
-            <span className="kv-val">0.45</span>
-          </div>
-          <div className="kv-row">
-            <span className="kv-key">Mode</span>
-            <span className="kv-val">TOKEN + FACE</span>
-          </div>
-          <div className="kv-row">
-            <span className="kv-key">Liveness</span>
-            <span className="kv-val">BLINK (EAR)</span>
-          </div>
-        </motion.section>
+            <div className="chip-row" style={{ marginBottom: 12 }}>
+              <button className={`filter-chip ${mode === 'token_face' ? 'on' : ''}`} onClick={() => setMode('token_face')} type="button">Token + Face</button>
+              <button className={`filter-chip ${mode === 'face_only' ? 'on' : ''}`} onClick={() => setMode('face_only')} type="button">Face only</button>
+            </div>
+
+            <button className={`dropzone slim ${photoUri ? 'has-files' : ''}`} onClick={() => mainRef.current?.click()} type="button">
+              <input ref={mainRef} type="file" accept="image/*" hidden
+                onChange={async (e) => { try { setPhotoUri(await fileToDataUri(e.target.files?.[0])) } catch (err) { setCvError(err.message) } }} />
+              {photoUri
+                ? <img src={photoUri} alt="snapshot" style={{ maxHeight: 110, borderRadius: 8 }} />
+                : <>📷 Pick entrance snapshot<span>JPG / PNG — face clearly visible</span></>}
+            </button>
+
+            {mode === 'token_face' && (
+              <input className="search-input" style={{ width: '100%', marginTop: 10 }}
+                placeholder="Token (user ID or signed QR JSON)"
+                value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} />
+            )}
+
+            <label className="consent-row" style={{ marginTop: 10 }}>
+              <input type="checkbox" checked={skipLiveness}
+                onChange={(e) => setSkipLiveness(e.target.checked)} />
+              Skip blink liveness (single snapshot)
+            </label>
+
+            {!skipLiveness && (
+              <>
+                <button className={`dropzone slim ${burstUris.length ? 'has-files' : ''}`}
+                  onClick={() => burstRef.current?.click()} type="button" style={{ marginTop: 10 }}>
+                  <input ref={burstRef} type="file" accept="image/*" multiple hidden
+                    onChange={async (e) => {
+                      const uris = []
+                      for (const f of Array.from(e.target.files ?? []).slice(0, 12)) {
+                        try { uris.push(await fileToDataUri(f)) } catch (err) { setCvError(err.message) }
+                      }
+                      setBurstUris(uris)
+                    }} />
+                  {burstUris.length
+                    ? <span>{burstUris.length} burst frames ready</span>
+                    : <>🎞️ Pick 4–10 frame burst<span>short sequence capturing a blink</span></>}
+                </button>
+                {burstUris.length > 0 && burstUris.length < 4 && (
+                  <p className="alert-time" style={{ marginTop: 6 }}>Fewer than 4 frames — liveness will stay “unknown”.</p>
+                )}
+              </>
+            )}
+
+            <button className="btn primary" style={{ width: '100%', marginTop: 14 }}
+              onClick={runSnapshot} disabled={busy} type="button">
+              {busy ? 'Running CV pipeline…' : 'Process Entry'}
+            </button>
+          </motion.section>
+
+          <motion.section
+            className="panel"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.25 }}
+          >
+            <div className="panel-head">
+              <h2 className="panel-title"><span className="tick" />Scenario Simulator</h2>
+            </div>
+            <div className="chip-row">
+              {SCENARIOS.map((sc) => (
+                <button key={sc} className="scenario-chip" onClick={() => runScenario(sc)} disabled={busy} type="button">
+                  {sc}
+                </button>
+              ))}
+            </div>
+          </motion.section>
+        </div>
       </div>
     </div>
   )
 }
-
-const REDUCED_SCAN =
-  typeof window !== 'undefined' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
