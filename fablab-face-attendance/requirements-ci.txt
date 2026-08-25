@@ -1,0 +1,18 @@
+# CI subset: unit tests never load ONNX models or talk to Telegram,
+# so the heavy packages are excluded to keep the pipeline fast and
+# dependency-light. Full stack: see requirements.txt (pinned).
+
+opencv-python==5.0.0.93
+numpy==2.4.6
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+python-dotenv==1.2.3
+PyYAML==6.0.3
+qrcode==8.2
+Pillow==12.3.0
+APScheduler==3.11.3
+aiofiles==25.1.0
+
+pytest==9.1.1
+pytest-asyncio==1.4.0

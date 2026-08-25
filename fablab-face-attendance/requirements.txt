@@ -1,15 +1,23 @@
-opencv-python>=4.8.0
-numpy>=1.24.0
-fastapi>=0.104.0
-uvicorn>=0.24.0
-python-telegram-bot>=20.7
-APScheduler>=3.10.4
-Pillow>=10.0.0
-insightface>=0.7.3
-onnxruntime>=1.16.0
-python-dotenv>=1.0.0
-pyyaml>=6.0
-qrcode>=7.4.2
-python-multipart>=0.0.6
-aiofiles>=23.2.1
-pytest-asyncio>=0.24
+# FacePass FabLab backend — PINNED (audit fix: reproducible builds)
+# Versions match the verified-working environment (pytest 30/30, E2E CV run).
+# Upgrade deliberately: bump one package at a time and re-run the suite.
+
+opencv-python==5.0.0.93
+numpy==2.4.6
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.4
+python-telegram-bot==22.8
+APScheduler==3.11.3
+Pillow==12.3.0
+insightface==1.0.1
+onnxruntime==1.29.0
+python-dotenv==1.2.3
+PyYAML==6.0.3
+qrcode==8.2
+python-multipart==0.0.32
+aiofiles==25.1.0
+
+# --- test tooling ---
+pytest==9.1.1
+pytest-asyncio==1.4.0
