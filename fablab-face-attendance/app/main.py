@@ -12,7 +12,8 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.security import allowed_origins
+from app.ratelimit import RateLimitMiddleware, requests_per_minute
+from app.security import allowed_origins, auth_enabled
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title='FacePass FabLab API',
     description='Smart Anti-Proxy Facial Access and Attendance System for SRMIST Fab Lab',
-    version='1.1.0'
+    version='1.2.0'
 )
 
 app.add_middleware(
@@ -33,6 +34,8 @@ app.add_middleware(
     allow_methods=['GET', 'POST', 'PUT', 'DELETE'],
     allow_headers=['Content-Type', 'X-Admin-Token'],
 )
+
+app.add_middleware(RateLimitMiddleware)
 
 # Include routers
 from api.routes_entry import router as entry_router
@@ -60,15 +63,19 @@ async def root():
 
 @app.get('/health')
 async def health_check():
-    """Health check endpoint."""
-    cv_ready = False
-    try:
-        from app.vision import get_engine
-        get_engine()
-        cv_ready = True
-    except Exception:
-        cv_ready = False
-    return {'status': 'healthy', 'cv_engine': 'ready' if cv_ready else 'not_loaded'}
+    """
+    Liveness probe — intentionally CHEAP and side-effect free.
+    Never initializes the CV engine (orchestrator-safe).
+    Model state is reported separately at /model-status.
+    """
+    return {'status': 'ok'}
+
+
+@app.get('/model-status')
+async def model_status():
+    """CV engine state without triggering initialization/download."""
+    from app.vision import engine_state
+    return {'cv_engine': engine_state()}
 
 
 @app.on_event('startup')
@@ -79,6 +86,12 @@ async def startup_event():
     from app.database import init_db
     init_db()
     logger.info('Database initialized')
+
+    if not auth_enabled():
+        logger.warning(
+            '*** API_ADMIN_PASSWORD is not set — admin endpoints are OPEN '
+            '(dev mode). Set it in .env before any real deployment. ***'
+        )
 
     # CV engine intentionally NOT loaded here — first request triggers it.
     logger.info('CV engine will lazy-load on first image request')

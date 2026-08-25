@@ -30,6 +30,18 @@ class VisionUnavailableError(RuntimeError):
     """Raised when the CV engine cannot be initialized (e.g. missing models)."""
 
 
+def engine_state() -> str:
+    """
+    Report engine status WITHOUT initializing anything.
+    'not_loaded' | 'ready' | 'failed' — safe for health probes.
+    """
+    if _ENGINE is not None:
+        return 'ready'
+    if _ENGINE_FAILED:
+        return 'failed'
+    return 'not_loaded'
+
+
 def get_engine():
     """Return the shared FaceEngine singleton, initializing lazily."""
     global _ENGINE, _ENGINE_FAILED

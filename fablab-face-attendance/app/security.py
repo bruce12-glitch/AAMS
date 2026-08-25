@@ -8,6 +8,7 @@ If no password is configured (placeholder/empty) the guard runs in
 dev-open mode and logs a warning — convenient locally, loud in logs.
 """
 
+import hmac
 import logging
 from pathlib import Path
 
@@ -41,7 +42,8 @@ async def require_admin(request: Request) -> None:
         return
 
     token = request.headers.get('X-Admin-Token', '')
-    if token != admin_password():
+    # Constant-time comparison prevents token-timing oracles
+    if not hmac.compare_digest(token.encode(), admin_password().encode()):
         raise HTTPException(status_code=401, detail='Admin token missing or invalid')
 
 

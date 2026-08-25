@@ -108,3 +108,43 @@ def test_env_override_cors_origins(monkeypatch):
         ]
     finally:
         importlib.reload(sec)
+
+
+# ---------------------------------------------------------------- #
+# Rate limiter
+# ---------------------------------------------------------------- #
+
+def test_rate_limiter_blocks_after_limit():
+    from app.ratelimit import RateLimitMiddleware
+
+    class Req:
+        url = type('U', (), {'path': '/api/users'})()
+        client = type('C', (), {'host': '10.0.0.1'})()
+
+    mw = RateLimitMiddleware(app=None, limit=3, window_seconds=60)
+
+    async def call_next(_):
+        return 'ok'
+
+    import asyncio
+    results = [asyncio.run(mw.dispatch(Req(), call_next)) for _ in range(5)]
+    statuses = [getattr(r, 'status_code', 200) for r in results]
+    assert statuses == [200, 200, 200, 429, 429]
+
+
+def test_rate_limiter_exempt_paths():
+    from app.ratelimit import RateLimitMiddleware
+
+    class Req:
+        url = type('U', (), {'path': '/health'})()
+        client = type('C', (), {'host': '10.0.0.2'})()
+
+    mw = RateLimitMiddleware(app=None, limit=1, window_seconds=60)
+
+    async def call_next(_):
+        return 'ok'
+
+    import asyncio
+    for _ in range(10):
+        r = asyncio.run(mw.dispatch(Req(), call_next))
+        assert getattr(r, 'status_code', 200) == 200
