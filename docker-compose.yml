@@ -1,0 +1,46 @@
+name: aams
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Lock the browser console origin; add your LAN/host origin for pilots.
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8090
+      - RATE_LIMIT_PER_MIN=120
+      # --- set real secrets before any pilot (or mount a .env file) ---
+      # - API_ADMIN_PASSWORD=change-me
+      # - QR_SECRET_KEY=change-me
+      # - TELEGRAM_BOT_TOKEN=...
+      # - TELEGRAM_CHAT_ID=...
+    volumes:
+      - api-db:/app/database        # SQLite + backups
+      - api-images:/app/images      # enrollment/evidence photos
+      - insightface-models:/root/.insightface   # ~275MB, survives rebuilds
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - "8090:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Optional TLS terminator for pilots (see SECURITY.md):
+  # caddy:
+  #   image: caddy:2-alpine
+  #   ports: ["80:80", "443:443"]
+  #   volumes:
+  #     - ./deploy/Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy-data:/data
+
+volumes:
+  api-db:
+  api-images:
+  insightface-models:
