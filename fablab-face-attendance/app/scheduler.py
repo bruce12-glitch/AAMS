@@ -65,6 +65,14 @@ class ReportScheduler:
             id='db_backup',
             name='Backup database'
         )
+
+        # Retention enforcement (§26.4) nightly at 03:00
+        self.scheduler.add_job(
+            self.run_retention,
+            CronTrigger(hour=3, minute=0),
+            id='retention',
+            name='Apply data retention policy'
+        )
     
     async def send_daily_report(self):
         """Generate and send daily report at 8 PM."""
@@ -110,6 +118,15 @@ class ReportScheduler:
         except Exception as e:
             logger.error(f"Failed to backup database: {e}")
     
+    def run_retention(self):
+        """Purge expired entry logs and alert images (§26.4)."""
+        try:
+            from app.retention import apply_retention
+            summary = apply_retention()
+            logger.info('Retention run: %s', summary)
+        except Exception as e:
+            logger.error(f'Failed to apply retention policy: {e}')
+
     def start(self):
         """Start the scheduler."""
         self.scheduler.start()
