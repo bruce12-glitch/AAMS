@@ -2,15 +2,12 @@
 
 **Smart Anti-Proxy Facial Access and Attendance Management System** for the SRMIST Fab Lab.
 
-This repository contains three generations of the project:
+Two components:
 
-| Directory | What it is | Status |
-|---|---|---|
-| `fablab-face-attendance/` | **Main system** — FastAPI backend with InsightFace recognition, SQLite, Telegram alerts, APScheduler, tests | Active development |
-| `src/` + `App.jsx` | React (Vite) console front-end built on Astryx Design components | Scaffold |
-| `index.html` + `server.js` | Original single-file HTML/JS console prototype (static demo) | Legacy |
-| `facepass-backend/` | Phase-1 webcam face-matching experiment script | Legacy |
-| `legacy/` | Recovered fragment of a newer console UI found corrupted in the workspace tar | Reference only |
+| Directory | What it is |
+|---|---|
+| `fablab-face-attendance/` | FastAPI backend — InsightFace (SCRFD + ArcFace) recognition, SQLite, HMAC-signed QR tokens, Telegram alerts, APScheduler daily reports, pytest suite |
+| `src/` + `index.html` | React 19 console (Vite) — Three.js animated scene, Framer Motion transitions, live-polling dashboard with offline fallback |
 
 ## Quick start — backend
 
@@ -34,9 +31,26 @@ npm install
 npm run dev                  # Vite dev server on http://localhost:3000
 ```
 
-The React app uses `@astryxdesign/core` + `@astryxdesign/theme-neutral` (see `src/main.jsx`
-for the required CSS imports). The legacy static prototype still works via `npm start`
-(node `server.js`, port 3000 — stop Vite first, they share the port).
+The dev server proxies `/api/*` to `http://localhost:8000`, so run the backend first for live data.
+Without a backend the console still renders fully populated sample data ("Demo Data" badge).
+
+### Frontend stack
+
+- React 19 + Vite 8
+- `three` + `@react-three/fiber` — particle field / wireframe background (lazy-loaded, DPR-capped)
+- `framer-motion` — page transitions, staggered lists, animated counters
+- No CSS framework — design tokens in `src/styles/global.css`
+
+### Console pages
+
+| Page | Purpose |
+|---|---|
+| Dashboard | KPIs, recent activity, occupants inside, latest alerts |
+| Live Monitor | Camera/pipeline status + entry-scenario simulator (`POST /api/entry/simulate`) |
+| Entry Logs | Filterable trail of every access attempt |
+| Alerts | Security alerts by severity with acknowledge action |
+| Members | Enrolled users with payment/consent status |
+| Reports | Daily summary, security events, retention policy |
 
 ## Backend architecture
 
@@ -48,56 +62,30 @@ fablab-face-attendance/
 │   ├── database.py          # SQLite schema (6 tables) + helpers
 │   ├── face_engine.py       # InsightFace SCRFD + ArcFace, quality checks, 1:N search
 │   ├── liveness.py          # Blink detection via Eye Aspect Ratio (EAR)
-│   ├── identity.py          # 1:1 token+face and 1:N face-only verification
-│   ├── access_policy.py     # 9-row decision matrix (§11.2) + state machine
-│   ├── occupancy.py         # Inside/exit/timeout tracking (§14)
-│   ├── alerts.py            # Telegram alerts with photo evidence (§15)
-│   ├── reports.py           # Daily/weekly/proxy/unpaid/occupancy reports
-│   ├── scheduler.py         # APScheduler: 8 PM report, 5-min timeouts, 23:00 backup
-│   ├── qr_manager.py        # HMAC-SHA256 signed QR tokens (§27.3)
-│   ├── camera.py            # Threaded webcam capture at controlled FPS
-│   └── utils.py
-├── api/                     # FastAPI routers: entry, users, alerts, occupants,
-│                            # reports, dashboard, admin
-├── enrollment/              # CLI enrollment (5 poses → 3 embeddings + QR)
-├── scripts/                 # create_db, seed_demo_data, backup_db, generate_qr
-├── tests/                   # pytest: decision matrix, proxy detection, matching,
-│                            # occupancy, alert formatting
-├── config.yaml              # Thresholds, camera, alerts, security settings
-└── .env.example             # Telegram token/chat, QR secret, admin password
+│   ├── identity.py          # Token+face (1:1) and face-only (1:N) verification
+│   ├── access_policy.py     # §11.2 decision matrix (9 rows)
+│   ├── occupancy.py         # Inside/outside tracking with timeout
+│   ├── alerts.py            # Telegram bot integration
+│   ├── qr_manager.py        # HMAC-signed QR passes
+│   └── scheduler.py         # APScheduler — 20:00 daily report
+├── api/                     # Route modules (entry, users, alerts, occupants, reports, dashboard, admin)
+├── enrollment/              # CLI enrollment (capture → quality check → embeddings)
+├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
+└── tests/                   # pytest suite
 ```
 
-### Key design points
-
-- **Decision matrix** (`access_policy.py`): 9 rows covering authorized, unpaid, proxy,
-  no-face, invalid-token variants, unknown, spoof, and tailgating — each mapped to a
-  decision, reason, alert type, and log tag.
-- **Match threshold 0.45** (cosine similarity, ArcFace embeddings, 3 stored per user).
-- **Signed QR passes**: HMAC-SHA256 over `{user_id, issued_at, expires_at}` with 24 h TTL.
-- **Privacy**: consent flag recorded at enrollment; user deletion purges embeddings.
-
-## Known issues / TODO
-
-- `liveness.py` uses InsightFace 5-point landmarks — EAR blink detection needs a
-  68/106-point model for production reliability (noted in code).
-- `enrollment/enroll_user.py` stores a **random placeholder embedding** — real webcam
-  capture of 5 poses is not yet implemented.
-- `api/routes_entry.py` accepts raw embeddings from the client; production should accept
-  an image/frame and run detection server-side.
-- CORS is `allow_origins=['*']` and admin routes have no auth yet — restrict before deploy.
-- `config.yaml` ships with placeholder secrets (`CHANGE_THIS...`); real values belong in `.env`.
-- `routes_dashboard.py /live` constructs a fresh `CameraManager` per request instead of
-  sharing a running instance.
-- The React front-end is a static scaffold; wiring it to the API endpoints is the next step
-  (see `fablab-face-attendance/README.md` § Frontend Integration).
-
-## Tests
+## Testing
 
 ```bash
 cd fablab-face-attendance
 python -m pytest tests/ -v
 ```
 
-## License
+## Known gaps / next work
 
-SRMIST FabLab — internal use.
+1. Wire real webcam capture into `enrollment/enroll_user.py` (currently stores placeholder embedding)
+2. `/api/entry` should accept images and detect server-side instead of receiving raw embeddings
+3. Liveness blink detection needs a 68/106-point landmark model
+4. Restrict CORS + add admin auth before any real deployment
+
+See `HANDOFF.md` for environment notes.

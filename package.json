@@ -2,25 +2,20 @@
   "name": "aams",
   "version": "1.0.0",
   "private": true,
-  "description": "FacePass FabLab — AAMS console prototype",
+  "description": "FacePass FabLab — AAMS console (React + Vite + Three.js)",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "start": "node server.js",
-    "serve": "node server.js"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@astryxdesign/core": "^0.4.6",
-    "@astryxdesign/theme-neutral": "^0.4.6",
-    "lucide-react": "^1.33.0",
+    "@react-three/fiber": "^9.5.0",
+    "framer-motion": "^12.23.31",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "three": "^0.181.0"
   },
-  "astryx": {
-    "theme": "@astryxdesign/theme-neutral"
-  },
-  "main": "server.js",
   "keywords": [],
   "author": "",
   "license": "ISC",
