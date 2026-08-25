@@ -180,8 +180,9 @@ class LivenessChecker:
         return base
 
     def _detect_blink(self, ratios: list) -> bool:
-        """Blink = closed dip followed by recovery, honoring refractory gap."""
-        was_closed_at = -10
+        """Blink = observed closed dip followed by recovery within a
+        plausible window. An open frame before any closure never counts."""
+        was_closed_at = None
         cooldown = 0
         for i, r in enumerate(ratios):
             if r < 0:
@@ -190,11 +191,13 @@ class LivenessChecker:
                 cooldown -= 1
                 continue
             if r < self.open_ratio_closed:
-                was_closed_at = i
-            elif r > self.open_ratio_open and (i - was_closed_at) >= 1 \
-                    and (i - was_closed_at) < 15:
-                cooldown = self.min_frames_between_blinks
-                return True
+                if was_closed_at is None or i - was_closed_at > 15:
+                    was_closed_at = i  # (re)start of a closed phase
+            elif r > self.open_ratio_open and was_closed_at is not None:
+                gap = i - was_closed_at
+                if 1 <= gap < 15:  # recovered shortly after a real closure
+                    cooldown = self.min_frames_between_blinks
+                    return True
         return False
 
     def check_liveness_single_frame(self, frame=None, face=None) -> dict:
