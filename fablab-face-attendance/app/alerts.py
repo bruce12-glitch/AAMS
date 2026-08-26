@@ -97,7 +97,7 @@ class AlertService:
         """Send the 8:00 PM daily summary report."""
         if not self.enabled or not self.bot:
             return False
-        
+
         try:
             await self.bot.send_message(
                 chat_id=self.chat_id,
@@ -109,6 +109,53 @@ class AlertService:
         except Exception as e:
             logger.error(f"Failed to send daily report: {e}")
             return False
+
+    async def flush_pending(self, max_age_hours: int = 24) -> int:
+        """
+        Retry delivery of alerts stored while offline (§30.7).
+        Pending rows younger than max_age_hours are re-sent; older ones are
+        marked 'expired' so the queue cannot grow unbounded.
+        Returns number of alerts successfully delivered.
+        """
+        if not self.enabled or not self.bot:
+            return 0
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, alert_type, message, image_path, severity
+            FROM alerts
+            WHERE sent_status = 'pending'
+              AND datetime(created_at) >= datetime('now', ?)
+            ORDER BY id ASC
+        ''', (f'-{int(max_age_hours)} hours',))
+        pending = cursor.fetchall()
+        # Expire ancient backlog instead of spamming the group later
+        cursor.execute('''
+            UPDATE alerts SET sent_status = 'expired'
+            WHERE sent_status = 'pending'
+              AND datetime(created_at) < datetime('now', ?)
+        ''', (f'-{int(max_age_hours)} hours',))
+        conn.commit()
+
+        delivered = 0
+        for row in pending:
+            try:
+                await self.send_alert(row['alert_type'], row['message'],
+                                      image_path=row['image_path'],
+                                      severity=row['severity'] or 'medium')
+                cursor.execute(
+                    "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
+                    (datetime.now().isoformat(), row['id']))
+                conn.commit()
+                delivered += 1
+            except Exception as e:
+                logger.warning('Retry failed for alert %s: %s', row['id'], e)
+
+        conn.close()
+        if pending:
+            logger.info('Alert retry: %d/%d delivered', delivered, len(pending))
+        return delivered
     
     def save_alert_to_db(self, alert_type: str, message: str, 
                         image_path: str = None, severity: str = "medium") -> int:

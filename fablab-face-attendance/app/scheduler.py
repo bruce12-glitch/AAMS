@@ -73,6 +73,14 @@ class ReportScheduler:
             id='retention',
             name='Apply data retention policy'
         )
+
+        # Offline alert retry queue (§30.7) every 5 minutes
+        self.scheduler.add_job(
+            self.flush_pending_alerts,
+            IntervalTrigger(minutes=5),
+            id='alert_retry',
+            name='Flush pending alerts'
+        )
     
     async def send_daily_report(self):
         """Generate and send daily report at 8 PM."""
@@ -118,6 +126,13 @@ class ReportScheduler:
         except Exception as e:
             logger.error(f"Failed to backup database: {e}")
     
+    async def flush_pending_alerts(self):
+        """Resend alerts that were stored while the network was down."""
+        try:
+            await self.alert_service.flush_pending()
+        except Exception as e:
+            logger.error(f'Failed to flush pending alerts: {e}')
+
     def run_retention(self):
         """Purge expired entry logs and alert images (§26.4)."""
         try:
