@@ -39,9 +39,14 @@ class LivenessChecker:
         self.timeout_seconds = float(liveness_cfg.get('timeout_seconds', 5))
 
         # Eye-openness thresholds (ratio of eye height to eye width).
-        self.open_ratio_closed = 0.14  # below => eye considered closed
-        self.open_ratio_open = 0.20    # above => eye considered open again
-        self.min_frames_between_blinks = 2
+        self.open_ratio_closed = float(liveness_cfg.get('open_ratio_closed', 0.14))
+        self.open_ratio_open = float(liveness_cfg.get('open_ratio_open', 0.20))
+        self.min_frames_between_blinks = int(liveness_cfg.get('min_frames_between_blinks', 2))
+
+        # Head-motion challenge (§13 Method 2) — kps-based yaw proxy
+        self.head_motion_enabled = bool(liveness_cfg.get('head_motion_enabled', True))
+        self.head_motion_range = float(liveness_cfg.get('head_motion_range', 0.18))
+        self.min_motion_frames = int(liveness_cfg.get('min_motion_frames', 4))
 
     # ------------------------------------------------------------------ #
     # Landmark helpers
@@ -171,10 +176,21 @@ class LivenessChecker:
         if blink:
             base['status'] = 'real'
             base['reason'] = 'Blink detected'
-        elif len(positive_ratios) >= 4:
+            return base
+
+        # Head-motion challenge as an independent liveness signal (§13.1 M2)
+        motion = self.check_head_motion(faces_sequence)
+        base['head_motion'] = {'moved': motion.get('moved', False),
+                               'swing': motion.get('swing')}
+        if motion.get('moved'):
+            base['status'] = 'real'
+            base['reason'] = 'Head-motion challenge passed (no blink observed)'
+            return base
+
+        if len(positive_ratios) >= 4:
             # Enough temporal evidence and still no blink → likely a replay.
             base['status'] = 'spoof'
-            base['reason'] = 'No blink observed across sequence'
+            base['reason'] = 'No blink or head movement across sequence'
         else:
             base['reason'] = 'Not enough frames to judge'
         return base
@@ -199,6 +215,45 @@ class LivenessChecker:
                     cooldown = self.min_frames_between_blinks
                     return True
         return False
+
+    # ------------------------------------------------------------------ #
+    # Head-motion challenge (§13 Method 2)
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _yaw_proxy(face) -> float:
+        """
+        Horizontal head-turn proxy from 5-pt kps:
+        (nose_x - eye_midpoint_x) / inter-eye distance.
+        ~0 when facing camera, grows positive/negative on turns.
+        """
+        kps = getattr(face, 'kps', None)
+        if kps is None or len(kps) < 3:
+            return None
+        left_eye, right_eye, nose = np.asarray(kps[0]), np.asarray(kps[1]), np.asarray(kps[2])
+        eye_dist = float(np.linalg.norm(right_eye - left_eye))
+        if eye_dist < 1e-6:
+            return None
+        mid = (left_eye + right_eye) / 2.0
+        return float((nose[0] - mid[0]) / eye_dist)
+
+    def check_head_motion(self, faces_sequence: list) -> dict:
+        """
+        Real heads drift horizontally; a held photo/screen does not.
+        Returns moved flag + the per-frame proxy values.
+        """
+        proxies = [p for p in (self._yaw_proxy(f) for f in faces_sequence or [])
+                   if p is not None]
+        out = {'moved': False, 'yaw_values': [round(p, 3) for p in proxies],
+               'frames_used': len(proxies)}
+        if not self.head_motion_enabled or len(proxies) < self.min_motion_frames:
+            out['reason'] = 'insufficient frames' if len(proxies) < self.min_motion_frames \
+                else 'disabled'
+            return out
+        swing = max(proxies) - min(proxies)
+        out['swing'] = round(swing, 3)
+        out['moved'] = swing >= self.head_motion_range
+        return out
 
     def check_liveness_single_frame(self, frame=None, face=None) -> dict:
         """Single frames can't demonstrate a blink — always 'unknown'."""

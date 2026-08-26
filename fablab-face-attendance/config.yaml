@@ -22,8 +22,14 @@ face:
 
 liveness:
   enabled: true
-  method: "blink"
+  method: "blink"          # blink | head_motion | both
   timeout_seconds: 5
+  open_ratio_closed: 0.14  # eye height/width below this = closed
+  open_ratio_open: 0.20    # recovery above this completes a blink
+  min_frames_between_blinks: 2
+  head_motion_enabled: true
+  head_motion_range: 0.18  # nose-offset swing considered real movement
+  min_motion_frames: 4
 
 occupancy:
   timeout_minutes: 30

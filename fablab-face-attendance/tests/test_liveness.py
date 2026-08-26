@@ -109,3 +109,54 @@ def test_single_frame_api_never_claims_real(checker):
     result = checker.check_liveness_single_frame(face=make_face_106())
 
     assert result['status'] == 'unknown'
+
+
+# ---------------------------------------------------------------- #
+# Head-motion challenge (§13 Method 2)
+# ---------------------------------------------------------------- #
+
+def make_face_with_kps(nose_offset):
+    class Face:
+        pass
+
+    f = Face()
+    kps = np.array([
+        [10.0, 10.0], [30.0, 10.0], [20.0 + nose_offset, 25.0],
+        [12.0, 35.0], [28.0, 35.0]
+    ])
+    f.kps = kps
+    return f
+
+
+def test_head_motion_detected_on_swing(checker):
+    seq = [make_face_with_kps(o) for o in (-4, -2, 0, 2, 4)]
+    result = checker.check_head_motion(seq)
+    assert result['moved'] is True
+    assert result['swing'] >= checker.head_motion_range
+
+
+def test_static_sequence_does_not_pass_motion(checker):
+    seq = [make_face_with_kps(0.3)] * 8   # a held photo never moves
+    result = checker.check_head_motion(seq)
+    assert result['moved'] is False
+
+
+def test_motion_rescues_no_blink_sequence(checker):
+    # Eyes open the whole time (no blink) but head clearly turns.
+    open_face = make_face_106(0.34)
+    closed_pose_offsets = (-4, -2, 0, 2, 4)
+    # give each face both lmk (open eyes) and a moving kps
+    for f, off in zip([open_face] * 5, closed_pose_offsets):
+        f.kps = make_face_with_kps(off).kps
+    result = checker.check_liveness(faces_sequence=[open_face] * 5 if False else [
+        _merged(open_face, off) for off in closed_pose_offsets
+    ])
+    assert result['status'] == 'real'
+    assert 'motion' in result['reason'].lower()
+
+
+def _merged(base_face, nose_offset):
+    import copy
+    f = copy.copy(base_face)
+    f.kps = make_face_with_kps(nose_offset).kps
+    return f
