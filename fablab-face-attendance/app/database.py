@@ -131,6 +131,30 @@ def init_db():
     conn.commit()
     conn.close()
 
+    _ensure_columns()
+
+
+def _ensure_columns():
+    """
+    Lightweight migrations for databases created by older versions.
+    Adds columns idempotently so existing deployments keep their data.
+    """
+    migrations = {
+        'entry_logs': {
+            'latency_ms': 'REAL',          # §23.3 decision-time tracking
+        },
+    }
+    conn = get_connection()
+    cursor = conn.cursor()
+    for table, cols in migrations.items():
+        cursor.execute(f'PRAGMA table_info({table})')
+        existing = {row[1] for row in cursor.fetchall()}
+        for col, decl in cols.items():
+            if col not in existing:
+                cursor.execute(f'ALTER TABLE {table} ADD COLUMN {col} {decl}')
+    conn.commit()
+    conn.close()
+
 def dict_from_row(row):
     """Convert a sqlite3.Row to a dictionary."""
     if row is None:

@@ -13,6 +13,7 @@ downstream is identical.
 """
 
 import logging
+import time
 from datetime import datetime
 from typing import List, Optional
 
@@ -44,6 +45,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     Full decision flow shared by /process and /face-only.
     Returns the API response dict; persists log/alert/occupancy.
     """
+    t0 = time.perf_counter()
     import numpy as np
 
     from app.access_policy import AccessDecision
@@ -83,6 +85,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
         if face_count == 0:
             return await _finalize(
+                latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED', reason='No face detected in image',
                 tag='noface', alert_type='NOFACE', user=None,
                 similarity=0.0, liveness_status='unknown',
@@ -91,6 +94,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             )
         if not analysis['quality_passed']:
             return await _finalize(
+                latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED',
                 reason=f"Low quality face: {'; '.join(analysis['quality_reasons'])}",
                 tag='noface', alert_type=None, user=None,
@@ -138,6 +142,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             verdict = QRManager().verify_token(token_value)
             if not verdict.get('valid'):
                 return await _finalize(
+                latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                     decision='DENIED',
                     reason=f"Invalid token: {verdict.get('reason', 'rejected')}",
                     tag='unknown', alert_type='UNKNOWN', user=None,
@@ -175,6 +180,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     user_info = result.get('claimed_user') or result.get('user')
     return await _finalize(
+                latency_ms=round((time.perf_counter() - t0) * 1000, 1),
         decision=decision['decision'],
         reason=decision['reason'] + (f' ({quality_note})' if quality_note else ''),
         tag=decision['tag'],
@@ -192,7 +198,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
 
 async def _finalize(decision, reason, tag, alert_type, user, similarity,
-                    liveness_status, claimed, evidence, extra) -> dict:
+                    liveness_status, claimed, evidence, extra,
+                    latency_ms=None) -> dict:
     """Persist log + occupancy + alert, then build the response."""
     from app.alerts import AlertService
     from app.database import get_connection
@@ -205,12 +212,12 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
     cursor.execute('''
         INSERT INTO entry_logs (claimed_id, recognized_id, similarity,
                                 payment_status, liveness_status, decision,
-                                reason, tag, image_path)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                reason, tag, image_path, latency_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         claimed, recognized, similarity,
         (user or {}).get('payment_status'),
-        liveness_status, decision, reason, tag, evidence,
+        liveness_status, decision, reason, tag, evidence, latency_ms,
     ))
     conn.commit()
     conn.close()
@@ -256,6 +263,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         'liveness_status': liveness_status,
         'occupant_state': occupant_state,
         'evidence_path': evidence,
+        'latency_ms': latency_ms,
         **(extra or {}),
     }
 

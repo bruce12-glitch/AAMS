@@ -84,3 +84,38 @@ async def get_research_data():
         'brightness_range': [40, 220],
         'pose_limits': {'yaw': 25, 'pitch': 20, 'roll': 20}
     }
+
+
+@router.get('/latency')
+async def get_latency_metrics():
+    """
+    Decision-latency metrics (§23.3, target < 3000 ms).
+    Aggregates the most recent logged entry attempts.
+    """
+    from app.database import get_connection
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT latency_ms FROM entry_logs
+        WHERE latency_ms IS NOT NULL
+        ORDER BY id DESC LIMIT 200
+    ''')
+    values = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    if not values:
+        return {'samples': 0, 'avg_ms': None, 'p95_ms': None,
+                'target_ms': 3000, 'within_target': None}
+
+    ordered = sorted(values)
+    p95 = ordered[max(0, int(len(ordered) * 0.95) - 1)]
+    avg = sum(values) / len(values)
+    return {
+        'samples': len(values),
+        'avg_ms': round(avg, 1),
+        'p95_ms': round(float(p95), 1),
+        'max_ms': round(float(max(values)), 1),
+        'target_ms': 3000,
+        'within_target': bool(p95 <= 3000)
+    }
