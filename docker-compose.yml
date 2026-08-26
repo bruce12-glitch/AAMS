@@ -32,15 +32,22 @@ services:
       - api
     restart: unless-stopped
 
-  # Optional TLS terminator for pilots (see SECURITY.md):
-  # caddy:
-  #   image: caddy:2-alpine
-  #   ports: ["80:80", "443:443"]
-  #   volumes:
-  #     - ./deploy/Caddyfile:/etc/caddy/Caddyfile
-  #     - caddy-data:/data
+  # TLS terminator — enable with: docker compose --profile tls up -d
+  # Edit deploy/Caddyfile with your real hostname first.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [web, api]
+    restart: unless-stopped
 
 volumes:
   api-db:
   api-images:
   insightface-models:
+  caddy-data:
+  caddy-config:
