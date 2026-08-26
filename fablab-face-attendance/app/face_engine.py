@@ -6,25 +6,39 @@ Uses InsightFace library for face analysis.
 
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
+
 from app.config import get_face_config
+
+# Lazy/guarded import: importing this module must not require InsightFace,
+# so unit tests (and CI) can exercise the pure matching math without models.
+try:
+    from insightface.app import FaceAnalysis as _FaceAnalysis
+except Exception as _exc:  # pragma: no cover - depends on environment
+    _FaceAnalysis = None
+    _IMPORT_ERROR = str(_exc)
+
 
 class FaceEngine:
     """
     Face detection and recognition engine using InsightFace.
     Implements face detection, quality checking, and embedding extraction.
     """
-    
+
     def __init__(self):
         """
         Initialize the InsightFace FaceAnalysis app.
         Uses buffalo_l model with SCRFD detector and ArcFace recognizer.
+        Raises a clear RuntimeError when the package/models are unavailable.
         """
+        if _FaceAnalysis is None:  # pragma: no cover
+            raise RuntimeError(
+                f"InsightFace unavailable (install requirements.txt): {_IMPORT_ERROR}"
+            )
         config = get_face_config()
         self.det_size = tuple(config.get('resolution', [640, 640]))
         
         # Initialize InsightFace with CPU provider (can be changed to CUDA)
-        self.app = FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+        self.app = _FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
         self.app.prepare(ctx_id=0, det_size=self.det_size)
         
         # Load configuration thresholds
@@ -140,16 +154,19 @@ class FaceEngine:
         
         return embedding
     
-    def match_embeddings(self, embedding_a: np.ndarray, embedding_b: np.ndarray) -> float:
+    @staticmethod
+    def match_embeddings(embedding_a: np.ndarray, embedding_b: np.ndarray) -> float:
         """
         Calculate cosine similarity between two embeddings.
-        
+
+        Pure math — usable without model initialization (CI-safe).
+
         Args:
             embedding_a: First normalized embedding vector
             embedding_b: Second normalized embedding vector
-            
+
         Returns:
-            Cosine similarity score (0.0 to 1.0)
+            Cosine similarity score (-1.0 to 1.0)
         """
         # Cosine similarity = dot product of normalized vectors
         similarity = np.dot(embedding_a, embedding_b)
