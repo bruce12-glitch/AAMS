@@ -99,6 +99,17 @@ python -m pytest tests/ -v
 3. Threshold calibration study (RQ1) once real users are enrolled
 4. Set real secrets in `.env` before any live demo (Telegram, QR secret, admin password)
 
-Everything else is implemented and verified: image-based entry (server-side detect/embed/match), signed-QR verification, blink liveness over frame bursts, CORS restriction, admin token auth on mutating routes.
+## Pilot kit
 
-See `HANDOFF.md` for environment notes.
+Everything needed to run the one-week field pilot lives in `docs/pilot/`:
+
+| File | Purpose |
+|---|---|
+| `PILOT_RUNBOOK.md` | Day-by-day plan from approvals to report |
+| `CONSENT_FORM_TEMPLATE.md` | Printable §26.2 consent form |
+| `GO_LIVE_CHECKLIST.md` | Secrets/TLS/AI sanity gates before opening the door |
+| `TEST_REPORT_TEMPLATE.md` | RQ1–RQ6 results tables for the final report |
+
+See also: `SECURITY.md` (threat model + TLS), `CHANGELOG.md`.
+
+Everything else is implemented and verified: image-based entry (server-side detect/embed/match), signed-QR verification, blink **and** head-motion liveness over frame bursts, offline alert retry, retention enforcement, latency metrics (`/api/dashboard/latency`), lost-token re-keying, data-export endpoint, CORS restriction, admin token auth.
