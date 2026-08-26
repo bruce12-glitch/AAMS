@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { toArray, adminPost, apiPut, apiDelete } from '../api/client'
+import { toArray, adminPost, apiPut, apiDelete, apiGet } from '../api/client'
 import { MOCK_USERS } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
 import EnrollModal from '../components/EnrollModal'
@@ -14,6 +14,33 @@ export default function Users() {
   const [query, setQuery] = useState('')
   const [showEnroll, setShowEnroll] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  const [qrView, setQrView] = useState(null)   // {name, dataUri}
+  const [qrError, setQrError] = useState('')
+
+  const showQr = async (u) => {
+    setQrError('')
+    try {
+      const res = await apiGet(`/users/${encodeURIComponent(u.user_id)}/qr`)
+      setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
+    } catch (err) {
+      setQrError(err.message || 'Could not load QR pass')
+    }
+  }
+
+  const rekey = async (u) => {
+    if (!window.confirm(`Revoke all passes for ${u.name ?? u.user_id} and issue a new one?`)) return
+    setBusyId(u.user_id)
+    setQrError('')
+    try {
+      const res = await adminPost(`/users/${encodeURIComponent(u.user_id)}/tokens/revoke`)
+      setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
+      refresh()
+    } catch (err) {
+      setQrError(err.message || 'Re-key failed')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const rows = useMemo(() => {
     let list = toArray(data, 'users')
@@ -111,7 +138,11 @@ export default function Users() {
                   </span>
                 </td>
                 <td>
-                  <button className="btn sm ghost" onClick={() => removeUser(u)} disabled={busyId === u.user_id} type="button">✕</button>
+                  <span style={{ display: 'inline-flex', gap: 4 }}>
+                    <button className="btn sm ghost" onClick={() => showQr(u)} disabled={busyId === u.user_id} type="button" title="Show current QR pass">QR</button>
+                    <button className="btn sm ghost" onClick={() => rekey(u)} disabled={busyId === u.user_id} type="button" title="Lost token: revoke + re-issue">⟳</button>
+                    <button className="btn sm ghost" onClick={() => removeUser(u)} disabled={busyId === u.user_id} type="button" title="Delete member">✕</button>
+                  </span>
                 </td>
               </motion.tr>
             ))}
@@ -123,6 +154,28 @@ export default function Users() {
       </motion.div>
 
       <EnrollModal open={showEnroll} onClose={() => setShowEnroll(false)} onEnrolled={() => refresh()} />
+
+      <AnimatePresence>
+        {qrView && (
+          <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setQrView(null)}>
+            <motion.div className="modal" style={{ width: 'min(420px, 100%)' }} onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}>
+              <h3 className="modal-title">QR Pass — {qrView.name}</h3>
+              {qrError && <div className="form-error">{qrError}</div>}
+              {qrView.dataUri && (
+                <div className="qr-wrap">
+                  <img src={qrView.dataUri} alt="QR pass" />
+                  <span>Signed pass · expires in 24 h. Old passes were revoked if you just re-keyed.</span>
+                </div>
+              )}
+              <div className="modal-actions">
+                <button className="btn primary" onClick={() => setQrView(null)} type="button">Done</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

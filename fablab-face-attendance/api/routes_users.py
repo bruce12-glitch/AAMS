@@ -253,6 +253,81 @@ async def delete_user(user_id: str, _: None = Depends(require_admin)):
     return {'success': True}
 
 
+@router.post('/{user_id}/tokens/revoke')
+async def revoke_and_reissue_token(user_id: str, _: None = Depends(require_admin)):
+    """
+    Lost-token flow (§30.4): deactivate every active token for the user
+    and issue a fresh signed QR pass. Old passes stop working immediately.
+    """
+    import base64 as b64
+
+    from app.database import get_connection
+    from app.qr_manager import QRManager
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM users WHERE user_id = ?', (user_id,))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail='User not found')
+
+    qr = QRManager()
+    token = qr.generate_token(user_id)
+
+    cursor.execute('UPDATE tokens SET active = 0 WHERE user_id = ?', (user_id,))
+    cursor.execute('''
+        INSERT INTO tokens (token_value, user_id, token_type, active)
+        VALUES (?, ?, 'qr', 1)
+    ''', (user_id, user_id))
+    conn.commit()
+    conn.close()
+
+    return {
+        'success': True,
+        'user_id': user_id,
+        'token': token,
+        'qr_data_uri': 'data:image/png;base64,' +
+                       b64.b64encode(qr.generate_qr_image(user_id)).decode(),
+    }
+
+
+@router.get('/{user_id}/export')
+async def export_user_data(user_id: str, _: None = Depends(require_admin)):
+    """
+    Data-portability export (DPDP access right): everything stored about
+    one person, with biometric blobs stripped (they are not portable).
+    """
+    from app.database import get_connection
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT * FROM users WHERE user_id = ?', (user_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail='User not found')
+    profile = dict(row)
+    profile['face_embedding'] = '[biometric vector withheld]'
+    profile['face_embedding_2'] = '[biometric vector withheld]'
+    profile['face_embedding_3'] = '[biometric vector withheld]'
+
+    cursor.execute(
+        'SELECT event_time, decision, reason, tag, similarity FROM entry_logs '
+        'WHERE claimed_id = ? OR recognized_id = ? ORDER BY id DESC',
+        (user_id, user_id))
+    entries = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        'SELECT entry_time, exit_time, status FROM occupants WHERE user_id = ? '
+        'ORDER BY id DESC', (user_id,))
+    occupancy = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+
+    return {'profile': profile, 'entry_logs': entries,
+            'occupancy_history': occupancy}
+
+
 @router.get('/{user_id}/qr')
 async def generate_qr(user_id: str):
     """Generate signed QR pass for user."""
