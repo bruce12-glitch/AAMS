@@ -4,11 +4,6 @@
 
 Two components:
 
-| Directory | What it is |
-|---|---|
-| `fablab-face-attendance/` | FastAPI backend — InsightFace (SCRFD + ArcFace) recognition, SQLite, HMAC-signed QR tokens, Telegram alerts, APScheduler daily reports, pytest suite |
-| `src/` + `index.html` | React 19 console (Vite) — Three.js animated scene, Framer Motion transitions, live-polling dashboard with offline fallback |
-
 ## Quick start — backend
 
 ```bash
