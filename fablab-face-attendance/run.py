@@ -79,10 +79,18 @@ def main():
     from app.scheduler import ReportScheduler
     from app.config import get_database_path
     
+    # Scheduler is started in FastAPI startup_event (app/main.py) which has a running event loop.
+    # Starting it here outside an event loop causes RuntimeError with AsyncIOScheduler,
+    # so we skip it in run.py - uvicorn will start it.
     report_gen = ReportGenerator()
     scheduler = ReportScheduler(alert_service, report_gen, get_database_path())
-    scheduler.start()
-    logger.info('ReportScheduler started')
+    try:
+        scheduler.start()
+        logger.info('ReportScheduler started')
+    except RuntimeError as e:
+        logger.warning(f'Scheduler will start via FastAPI startup (no loop yet): {e}')
+        # Keep reference for graceful shutdown - actual start happens in app.main startup_event
+        scheduler = None
     
     # Step 7: Start FastAPI server
     logger.info('Starting FastAPI server on http://localhost:8000')
@@ -105,7 +113,11 @@ def main():
         uvicorn.run(app, host='0.0.0.0', port=8000, log_level='info')
     except KeyboardInterrupt:
         logger.info('Shutting down...')
-        scheduler.shutdown()
+        try:
+            if scheduler:
+                scheduler.shutdown()
+        except Exception:
+            pass
     finally:
         logger.info('FacePass FabLab stopped')
 
