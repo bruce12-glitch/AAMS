@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport } from './icons'
+import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport, IconFace } from './icons'
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: IconGauge, section: 'Overview' },
