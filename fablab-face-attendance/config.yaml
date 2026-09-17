@@ -52,3 +52,9 @@ database:
 security:
   qr_secret_key: "CHANGE_THIS_TO_RANDOM_STRING"
   api_admin_password: "CHANGE_THIS"
+  # Require a positive liveness result (blink / head motion) before granting
+  # entry. When false, a face match with active payment is granted even if
+  # liveness could not be verified (single snapshot, no burst frames) — which
+  # is what makes the single-photo flow usable, but it is weaker against a
+  # held-up photo. Set to true for any real deployment.
+  require_liveness: false

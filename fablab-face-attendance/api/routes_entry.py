@@ -169,7 +169,18 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     # ---- 4. Policy --------------------------------------------------- #
     payment_status = payment_user.get('payment_status', 'inactive')
-    policy = AccessDecision()
+
+    # security.require_liveness decides whether an unconfirmed liveness result
+    # blocks entry. Defaults to False so a single-snapshot match is usable;
+    # set it true in config.yaml for any real deployment.
+    try:
+        from app.config import get_config
+        require_liveness = bool(get_config().get('security', {})
+                                .get('require_liveness', False))
+    except Exception:
+        require_liveness = False
+
+    policy = AccessDecision(require_liveness=require_liveness)
     decision = policy.evaluate_access(
         claimed_id=token_value,
         face_result=result,

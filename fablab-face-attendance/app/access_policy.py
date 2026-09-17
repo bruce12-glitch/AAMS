@@ -11,9 +11,18 @@ class AccessDecision:
     Implements all 9 rows from §11.2 specification.
     """
     
-    def __init__(self):
-        """Initialize the decision matrix."""
-        pass
+    def __init__(self, require_liveness: bool = False):
+        """
+        Initialize the decision matrix.
+
+        Args:
+            require_liveness: when True, a face match is only granted if
+                liveness was positively confirmed ('real'). When False, a
+                match with active payment is granted even when liveness is
+                'unknown' (e.g. a single snapshot with no burst frames).
+                See security.require_liveness in config.yaml.
+        """
+        self.require_liveness = require_liveness
     
     def evaluate_access(self, claimed_id: str, face_result: dict, 
                        payment_status: str, liveness_status: str, 
@@ -89,6 +98,35 @@ class AccessDecision:
                 "tag": "unpaid"
             }
         
+        # Row 2b: Match + active payment + liveness NOT confirmed.
+        #
+        # §11.2 has no row for this case, so it fell through to the default
+        # fallback and was denied as "unknown" — even when the person was
+        # recognised with high confidence. That is actively misleading: the
+        # logs showed a 0.89 similarity match tagged 'unknown'.
+        #
+        # It also broke the normal flow, because the console defaults to
+        # "skip liveness" for a single snapshot, so liveness is 'unknown' on
+        # almost every request made through the UI.
+        if (face_result.get('result') == 'MATCH' and
+                payment_status == 'active' and
+                liveness_status != 'real'):
+            if self.require_liveness:
+                return {
+                    "decision": "DENIED",
+                    "reason": "Liveness not verified - could not confirm a live person",
+                    "alert_type": "SPOOF",
+                    "tag": "spoof"
+                }
+            return {
+                "decision": "GRANTED",
+                "reason": ("Authorized entry - verified face, active payment "
+                           "(liveness not verified; set security.require_liveness "
+                           "to true to enforce)"),
+                "alert_type": None,
+                "tag": "authorized"
+            }
+
         # Row 3: Valid token + face mismatch + real → DENY + PROXY alert
         if face_result.get('result') == 'PROXY':
             return {

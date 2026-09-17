@@ -149,11 +149,17 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
                   emb_bytes[0], emb_bytes[1], emb_bytes[2],
                   photo_rel, int(req.consent_given)))
 
-        # Issue active token (replace old ones)
+        # Issue active token (replace old ones).
+        #
+        # tokens.token_value is UNIQUE. This endpoint is documented as
+        # idempotent — re-enrolling must overwrite — but deactivating the old
+        # row with `active = 0` left it occupying the unique value, so a second
+        # enrollment for the same user died with
+        #   "UNIQUE constraint failed: tokens.token_value"  (HTTP 400).
+        # Delete the superseded rows instead of only deactivating them.
         qr = QRManager()
         token = qr.generate_token(req.user_id)
-        cursor.execute('UPDATE tokens SET active = 0 WHERE user_id = ?',
-                       (req.user_id,))
+        cursor.execute('DELETE FROM tokens WHERE user_id = ?', (req.user_id,))
         cursor.execute('''
             INSERT INTO tokens (token_value, user_id, token_type, active)
             VALUES (?, ?, 'qr', 1)
@@ -274,7 +280,10 @@ async def revoke_and_reissue_token(user_id: str, _: None = Depends(require_admin
     qr = QRManager()
     token = qr.generate_token(user_id)
 
-    cursor.execute('UPDATE tokens SET active = 0 WHERE user_id = ?', (user_id,))
+    # Same UNIQUE-constraint issue as enrollment: deactivating the old row
+    # still left it holding the unique token_value, so a second re-key for the
+    # same user failed permanently. Remove superseded rows first.
+    cursor.execute('DELETE FROM tokens WHERE user_id = ?', (user_id,))
     cursor.execute('''
         INSERT INTO tokens (token_value, user_id, token_type, active)
         VALUES (?, ?, 'qr', 1)
