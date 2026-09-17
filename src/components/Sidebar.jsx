@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport, IconFace } from './icons'
+import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport } from './icons'
+import { LogoLockup } from './Logo'
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: IconGauge, section: 'Overview' },
@@ -16,13 +17,7 @@ export default function Sidebar({ active, onSelect, isLive }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-logo">
-          <IconFace width={20} height={20} />
-        </div>
-        <div>
-          <div className="brand-name">FacePass</div>
-          <div className="brand-sub">FabLab · AAMS</div>
-        </div>
+        <LogoLockup markSize={34} />
       </div>
 
       <nav>

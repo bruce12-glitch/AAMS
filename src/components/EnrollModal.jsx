@@ -116,6 +116,13 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                   <label>Admin token<input value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Admin-Token" type="password" /></label>
                 </div>
 
+                <p className="field-hint">
+                  Admin token is required — it protects the enrollment endpoint.
+                  Set it as <code>API_ADMIN_PASSWORD</code> in{' '}
+                  <code>fablab-face-attendance/.env</code>. If it is left unset the
+                  API runs in dev-open mode and the field can stay empty.
+                </p>
+
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>
                   <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
                   {previews.length === 0
