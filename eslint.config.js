@@ -29,7 +29,13 @@ import reactHooks from 'eslint-plugin-react-hooks'
  * Run: npm run lint
  */
 export default [
-  { ignores: ['dist/**', 'node_modules/**'] },
+  {
+    // `Notin/` is an unrelated project that happens to live inside this
+    // working directory (it has its own .git). Linting it produces ~10k
+    // problems from code this repository does not own, which drowns out the
+    // real signal. `dist/` is generated output.
+    ignores: ['dist/**', 'node_modules/**', 'Notin/**', 'fablab-face-attendance/**']
+  },
   js.configs.recommended,
   {
     files: ['**/*.{js,jsx}'],

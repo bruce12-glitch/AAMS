@@ -1,0 +1,96 @@
+name: Deploy console to GitHub Pages
+
+# Static demo build of the AAMS console, published to
+#   https://bruce12-glitch.github.io/AAMS/
+#
+# No backend, no database, no biometric data: the UI renders the placeholder
+# sample data from src/api/mock.js so the interface can be reviewed from a
+# public link. Anything that needs the API (enrollment, payment changes,
+# re-keying, snapshot CV) reports that it is unavailable rather than failing
+# silently.
+#
+# One-time setup: Settings -> Pages -> Build and deployment -> Source:
+#   "GitHub Actions"
+#
+# Then push to main, or run this workflow manually from the Actions tab.
+#
+# NOTE on the base path: the Vite config hardcodes '/AAMS/' for this target.
+# If the repository is ever renamed, PAGES_BASE in vite.config.js must change
+# with it or every asset URL will 404.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let a running deploy finish rather than cancelling it mid-publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build static console
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # react/jsx-no-undef is what catches an unimported JSX component - the
+        # exact fault that shipped a blank page (see eslint.config.js). Failing
+        # the build here keeps that class of bug from reaching production.
+        run: npm run lint
+
+      - name: Build (Pages target)
+        env:
+          # Switches the Vite base to '/AAMS/' and compiles out the API health
+          # probe, so the static site makes no backend requests at all.
+          VITE_TARGET: pages
+        run: npm run build
+
+      - name: Add .nojekyll
+        # Stops Jekyll from ignoring files that begin with an underscore.
+        run: touch dist/.nojekyll
+
+      - name: Add SPA fallback
+        # GitHub Pages serves 404.html for unknown paths. Without this, a
+        # refresh or deep link on a client-side route would 404.
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

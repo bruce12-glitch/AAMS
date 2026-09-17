@@ -29,10 +29,37 @@ First run downloads InsightFace `buffalo_l` models (~500 MB) into `models/insigh
 ```bash
 npm install
 npm run dev                  # Vite dev server on http://localhost:3000
+npm run lint                 # ESLint — must be clean before committing
 ```
 
 The dev server proxies `/api/*` to `http://localhost:8000`, so run the backend first for live data.
 Without a backend the console still renders fully populated sample data ("Demo Data" badge).
+
+### Two build targets
+
+One environment flag separates the on-premises deployment from the public demo:
+
+```bash
+npm run build                # lab target  — base '/', API proxy, health probe active
+npm run build:pages          # Pages target — base '/AAMS/', no backend, no network calls
+```
+
+`VITE_TARGET=pages` compiles out the API health probe and disables every data
+hook, so the static site issues **zero** backend requests. Actions that need
+the API (enrolment, payment changes, re-keying, snapshot CV, alert acks) report
+that they are unavailable instead of failing with an opaque network error.
+
+> **Base path note.** The Pages target hardcodes `/AAMS/` in `vite.config.js`.
+> That must be an absolute path — with a relative base, the SPA fallback
+> served for a deep link like `/AAMS/alerts` resolves `./assets/x.js` against
+> `/AAMS/alerts/` and 404s, blanking the page. If the repository is ever
+> renamed, update `PAGES_BASE` to match.
+
+### Run the test-case simulator safely
+
+`Live Monitor` → *Scenario Simulator* exercises the decision pipeline without a
+camera. With no backend it falls back to the local simulation constants in
+`src/api/client.js`.
 
 ### Quick start — Docker (API + console, one command)
 
@@ -51,6 +78,27 @@ cache across rebuilds. TLS termination guidance: see `SECURITY.md`.
 - `three` + `@react-three/fiber` — particle field / wireframe background (lazy-loaded, DPR-capped)
 - `framer-motion` — page transitions, staggered lists, animated counters
 - No CSS framework — design tokens in `src/styles/global.css`
+
+### Why the console has an ESLint config
+
+`react/jsx-no-undef` is load-bearing, not decoration. Vite does not resolve JSX
+identifiers, so an unimported component — `<IconFace />` used without an
+`import` — compiles successfully and only throws at runtime, unmounting the
+React tree to a blank page. That exact fault shipped once. `npm run lint` now
+fails the build in both CI and the Pages deploy workflow.
+
+The console also carries two error boundaries (`AppBoundary` for the shell,
+`BackgroundBoundary` for the decorative WebGL scene) so a single component
+fault shows a readable message instead of a black rectangle.
+
+### Public demo
+
+`https://bruce12-glitch.github.io/AAMS/` — static build, placeholder data only.
+
+> **Never put real student data in `src/api/mock.js`.** It is compiled into the
+> public JavaScript bundle. Sample records use obviously synthetic identifiers
+> (`SAMPLE-0001`) for exactly this reason. Real data belongs in the database
+> behind the API.
 
 ### Console pages
 

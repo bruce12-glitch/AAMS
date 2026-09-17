@@ -42,5 +42,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        # react/jsx-no-undef catches an unimported JSX component. That fault
+        # compiles cleanly under Vite and only throws at runtime, which is how
+        # a blank console page reached production. Keep it failing here.
+        run: npm run lint
+
       - name: Production build
         run: npm run build
