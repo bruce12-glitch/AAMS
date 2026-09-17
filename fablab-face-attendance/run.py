@@ -9,10 +9,12 @@ Steps:
 3. Initialize FaceEngine (load InsightFace models)
 4. Initialize LivenessChecker
 5. Initialize AlertService (Telegram bot)
-6. Initialize ReportScheduler (start APScheduler)
-7. Start FastAPI server on http://localhost:8000
-8. Open frontend dashboard in browser
-9. Start camera capture thread
+6. Start FastAPI server on http://localhost:8000
+7. Open frontend dashboard in browser
+
+The scheduler and remaining services are started by the FastAPI startup event
+in app/main.py, which runs inside uvicorn's event loop. They cannot be started
+from here — see the note at step 6 in main().
 """
 
 import sys
@@ -73,18 +75,17 @@ def main():
     else:
         logger.info('AlertService initialized (Telegram disabled)')
     
-    # Step 6: Initialize and start scheduler
-    logger.info('Starting ReportScheduler...')
-    from app.reports import ReportGenerator
-    from app.scheduler import ReportScheduler
-    from app.config import get_database_path
-    
-    report_gen = ReportGenerator()
-    scheduler = ReportScheduler(alert_service, report_gen, get_database_path())
-    scheduler.start()
-    logger.info('ReportScheduler started')
-    
-    # Step 7: Start FastAPI server
+    # Step 6: Start FastAPI server.
+    #
+    # Services (database, alerts, scheduler) are initialised by the FastAPI
+    # startup event in app/main.py, which runs INSIDE uvicorn's event loop.
+    # They must NOT be started here. AsyncIOScheduler.start() calls
+    # asyncio.get_running_loop(), and no loop is running until uvicorn starts
+    # one — starting the scheduler here raised
+    #     RuntimeError: no running event loop
+    # and killed the process before the server ever bound to a port. main.py
+    # already does this correctly, and wraps it in try/except so a scheduler
+    # fault cannot stop the API from serving.
     logger.info('Starting FastAPI server on http://localhost:8000')
     
     import uvicorn
@@ -105,7 +106,6 @@ def main():
         uvicorn.run(app, host='0.0.0.0', port=8000, log_level='info')
     except KeyboardInterrupt:
         logger.info('Shutting down...')
-        scheduler.shutdown()
     finally:
         logger.info('FacePass FabLab stopped')
 
