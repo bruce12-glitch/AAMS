@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray, adminPost, apiPut, apiDelete, apiGet } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_USERS } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
 import EnrollModal from '../components/EnrollModal'
@@ -9,21 +10,32 @@ import EnrollModal from '../components/EnrollModal'
 const initials = (name) =>
   String(name ?? '').split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '??'
 
+// Shown when an action is attempted in the static demo build. These are all
+// mutating endpoints; the demo has no database behind it, so we say so rather
+// than letting the call fail with an opaque network error.
+const DEMO_MSG = 'Not available in the static demo build — these actions need the backend API and its database.'
+
 export default function Users() {
-  const { data, loading, refresh } = usePolling('/users', { users: MOCK_USERS })
+  const { data, loading, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
   const [query, setQuery] = useState('')
   const [showEnroll, setShowEnroll] = useState(false)
   const [busyId, setBusyId] = useState(null)
   const [qrView, setQrView] = useState(null)   // {name, dataUri}
   const [qrError, setQrError] = useState('')
+  const [rowError, setRowError] = useState('')
 
   const showQr = async (u) => {
     setQrError('')
+    setRowError('')
+    if (IS_STATIC_DEMO) return setRowError(DEMO_MSG)
     try {
       const res = await apiGet(`/users/${encodeURIComponent(u.user_id)}/qr`)
       setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
     } catch (err) {
-      setQrError(err.message || 'Could not load QR pass')
+      // Previously this set state that was only rendered inside the QR modal,
+      // which never opened on failure - so the error was invisible. Surface it
+      // in the table instead.
+      setRowError(err.message || 'Could not load QR pass')
     }
   }
 
@@ -31,6 +43,7 @@ export default function Users() {
     if (!window.confirm(`Revoke all passes for ${u.name ?? u.user_id} and issue a new one?`)) return
     setBusyId(u.user_id)
     setQrError('')
+    if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
       const res = await adminPost(`/users/${encodeURIComponent(u.user_id)}/tokens/revoke`)
       setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
@@ -55,20 +68,30 @@ export default function Users() {
 
   const setPayment = async (u, status) => {
     setBusyId(u.user_id)
+    setRowError('')
+    if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
       await apiPut(`/users/${encodeURIComponent(u.user_id)}?payment_status=${status}`)
       refresh()
-    } catch { /* poll will reconcile; surface via badge */ }
+    } catch (err) {
+      // Was silently swallowed, leaving the dropdown showing a value the
+      // server never accepted. Tell the user instead.
+      setRowError(err.message || 'Could not update payment status')
+    }
     finally { setBusyId(null) }
   }
 
   const removeUser = async (u) => {
     if (!window.confirm(`Delete ${u.name ?? u.user_id}? Biometric data will be purged.`)) return
     setBusyId(u.user_id)
+    setRowError('')
+    if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
       await apiDelete(`/users/${encodeURIComponent(u.user_id)}`)
       refresh()
-    } catch { /* ignore */ }
+    } catch (err) {
+      setRowError(err.message || 'Could not delete member')
+    }
     finally { setBusyId(null) }
   }
 
@@ -98,6 +121,13 @@ export default function Users() {
         style={{ position: 'relative' }}
       >
         {loading && <span className="loading-bar" />}
+        {rowError && (
+          <div className="form-error" style={{ marginBottom: 12 }} role="alert">
+            {rowError}
+            <button className="btn sm ghost" type="button" style={{ marginLeft: 10 }}
+              onClick={() => setRowError('')}>Dismiss</button>
+          </div>
+        )}
         <table className="data-table">
           <thead>
             <tr>

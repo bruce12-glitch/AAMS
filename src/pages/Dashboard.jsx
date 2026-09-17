@@ -1,23 +1,36 @@
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_STATS, MOCK_ACTIVITY, MOCK_ALERTS, MOCK_OCCUPANTS } from '../api/mock'
 import StatCard from '../components/StatCard'
 import StatusBadge from '../components/StatusBadge'
 import { IconDoor, IconFace, IconBell, IconUsers } from '../components/icons'
 
+// Static Pages build has no backend; skip polling so the console shows its
+// sample data without firing requests that can only 404.
+const LIVE = { enabled: !IS_STATIC_DEMO }
+
+// NOTE: must test d.getTime(), not isNaN(d). isNaN coerces its argument to a
+// number, and Number(dateObject) is a timestamp (or NaN only for Invalid Date),
+// so isNaN(d) is unreliable. Worse, `isNaN(d)` on a valid Date returns false by
+// accident via coercion but `isNaN` on an Invalid Date returns true - the
+// inverse of what callers expect - which made every timestamp render as an em
+// dash. getTime() returns NaN precisely when the date is invalid.
 const fmtTime = (iso) => {
   const d = new Date(iso)
-  return isNaN(d) ? '—' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
 const initials = (id) => (id ? id.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase() : '??')
 
 export default function Dashboard({ onNavigate }) {
-  const stats = usePolling('/dashboard/stats', MOCK_STATS)
-  const activity = usePolling('/dashboard/activity', { activities: MOCK_ACTIVITY })
-  const alerts = usePolling('/alerts', { alerts: MOCK_ALERTS })
-  const occupants = usePolling('/occupants', { occupants: MOCK_OCCUPANTS })
+  // Fallbacks are module-level constants with stable identity, so passing them
+  // directly is safe for the fallbackRef in usePolling.
+  const stats = usePolling('/dashboard/stats', MOCK_STATS, 8000, LIVE)
+  const activity = usePolling('/dashboard/activity', MOCK_ACTIVITY, 8000, LIVE)
+  const alerts = usePolling('/alerts', MOCK_ALERTS, 8000, LIVE)
+  const occupants = usePolling('/occupants', MOCK_OCCUPANTS, 8000, LIVE)
 
   const s = stats.data ?? MOCK_STATS
   const acts = toArray(activity.data, 'activities').slice(0, 8)

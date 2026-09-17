@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { apiPost, fileToDataUri } from '../api/client'
+import { apiPost, fileToDataUri, simulateEntry } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_LIVE } from '../api/mock'
 import { IconCheck, IconX } from '../components/icons'
 
@@ -21,7 +22,7 @@ const REDUCED_SCAN =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function LiveMonitor() {
-  const live = usePolling('/dashboard/live', MOCK_LIVE, 5000)
+  const live = usePolling('/dashboard/live', MOCK_LIVE, 5000, { enabled: !IS_STATIC_DEMO })
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
 
@@ -38,24 +39,44 @@ export default function LiveMonitor() {
 
   const camera = live.data?.camera ?? MOCK_LIVE.camera
   const camOnline = String(camera?.status ?? '').toLowerCase() === 'online' || camera?.fps > 0
-  const steps = Array.isArray(live.data?.steps) ? live.data.steps : ['IDLE']
+
+  // Stable identity for the decision banner. Previously this key embedded
+  // Math.random(), so every render produced a new key and React tore down and
+  // remounted the whole banner - replaying its entry animation on each poll.
+  const resultKey = result
+    ? `${result.decision ?? 'x'}-${result.tag ?? 'x'}-${result.event_time ?? result.similarity ?? ''}`
+    : 'none'
+
+  // Pipeline highlight: only mark steps as reached once the API has actually
+  // reported a decision. Deliberately not keyed off local step names, which
+  // previously produced an always-true expression (see git history).
+  const pipelineHot = Boolean(result?.decision)
 
   const runScenario = async (scenario) => {
     setBusy(true)
     setResult(null)
-    try {
-      const res = await apiPost('/entry/simulate', { scenario }, 4000)
-      setResult({ ...res, source: 'api' })
-    } catch {
-      setResult(null)
-    } finally {
-      setBusy(false)
-    }
+    // simulateEntry() already falls back to a local simulation constant when
+    // the API is unreachable, and tags the response `source: 'local'`. The
+    // banner renders that tag, so routing through it (instead of calling
+    // apiPost directly and nulling the result on failure) means the scenario
+    // buttons still demonstrate the pipeline without a backend — which is the
+    // entire point of the static build.
+    const res = await simulateEntry(scenario)
+    setResult(res)
+    setBusy(false)
   }
 
   const runSnapshot = async () => {
     setCvError('')
     setResult(null)
+    if (IS_STATIC_DEMO) {
+      // This build ships without a backend, so there is no CV engine to call.
+      // Say so plainly instead of letting the request fail with a network
+      // error that reads like a bug.
+      return setCvError(
+        'Snapshot processing needs the backend: the face pipeline (InsightFace + ArcFace) runs server-side and is not available in this static demo build. Deploy the lab stack to enable it.'
+      )
+    }
     if (!photoUri) return setCvError('Pick a face photo first')
     if (mode === 'token_face' && !tokenValue.trim())
       return setCvError('Enter a token value (user ID or full signed QR JSON)')
@@ -134,24 +155,19 @@ export default function LiveMonitor() {
             </div>
 
             <div className="pipeline" style={{ marginTop: 16 }}>
-              {PIPELINE.map((step) => {
-                const hot =
-                  result?.decision && steps.includes(step) ||
-                  ['MATCHED', 'DECISION_MADE'].includes(step) && result?.decision
-                return (
-                  <div key={step} className={`pipeline-step ${result?.decision ? 'hot' : ''}`}>
-                    <span className="step-node" />
-                    {step.replace(/_/g, ' ')}
-                  </div>
-                )
-              })}
+              {PIPELINE.map((step) => (
+                <div key={step} className={`pipeline-step ${pipelineHot ? 'hot' : ''}`}>
+                  <span className="step-node" />
+                  {step.replace(/_/g, ' ')}
+                </div>
+              ))}
             </div>
           </motion.section>
 
           <AnimatePresence mode="wait">
             {result && (
               <motion.section
-                key={`${result.tag}-${result.decision}-${Math.random()}`}
+                key={resultKey}
                 className={`decision-banner ${result.decision === 'GRANTED' ? 'granted' : 'denied'}`}
                 initial={{ opacity: 0, scale: 0.94, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}

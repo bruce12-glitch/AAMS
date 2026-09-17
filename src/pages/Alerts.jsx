@@ -2,19 +2,36 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray, apiPost } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_ALERTS } from '../api/mock'
 
 const SEV = ['all', 'high', 'medium', 'low']
 
+// Guard invalid timestamps: new Date(bad).toLocaleString() returns the literal
+// string "Invalid Date", which would render straight into the UI.
+const fmtStamp = (iso) => {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN')
+}
+
 export default function Alerts() {
-  const { data, isLive, refresh } = usePolling('/alerts', { alerts: MOCK_ALERTS }, 6000)
+  const { data, isLive, refresh } = usePolling(
+    '/alerts',
+    MOCK_ALERTS,
+    6000,
+    { enabled: !IS_STATIC_DEMO }
+  )
   const [sev, setSev] = useState('all')
   const [acked, setAcked] = useState({})
 
   const list = toArray(data, 'alerts').filter((a) => sev === 'all' || String(a.severity ?? '').toLowerCase() === sev)
 
   const ack = async (id) => {
+    // Update the UI first so the click always feels responsive.
     setAcked((m) => ({ ...m, [id]: true }))
+    // In the static demo there is no endpoint to call; stop here rather than
+    // firing a request that can only fail.
+    if (IS_STATIC_DEMO) return
     try {
       await apiPost(`/alerts/${id}/ack`)
       refresh()
@@ -57,7 +74,7 @@ export default function Alerts() {
                   <div className="alert-type">{String(a.alert_type ?? 'EVENT').replace(/_/g, ' ')}</div>
                   <div className="alert-msg">{a.message ?? '—'}</div>
                   <div className="alert-time mono">
-                    {new Date(a.created_at).toLocaleString('en-IN') || ''} · severity {a.severity ?? 'low'}
+                    {fmtStamp(a.created_at)} · severity {a.severity ?? 'low'}
                   </div>
                 </div>
                 {!isAcked && (

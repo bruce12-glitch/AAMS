@@ -920,6 +920,28 @@ body {
 
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
 
+/* Demo-mode banner. Sits between the page title and the clock; pushed right
+   so the topbar's space-between layout is unaffected when absent. */
+.demo-banner {
+  margin-left: auto;
+  margin-right: 18px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--amber);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  /* The clock is the more useful signal on a narrow screen. */
+  .demo-banner { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001s !important;

@@ -2,18 +2,27 @@ import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_ACTIVITY } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
 
 const TAGS = ['all', 'authorized', 'proxy', 'unpaid', 'unknown', 'spoof', 'tailgate']
 
+// See Dashboard.jsx: isNaN(d) is unreliable on Date objects. Use getTime().
 const fmt = (iso) => {
   const d = new Date(iso)
-  return isNaN(d) ? '—' : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function Logs() {
-  const { data, isLive, loading, refresh } = usePolling('/dashboard/activity', { activities: MOCK_ACTIVITY })
+  const { data, isLive, loading, refresh } = usePolling(
+    '/dashboard/activity',
+    MOCK_ACTIVITY,
+    8000,
+    { enabled: !IS_STATIC_DEMO }
+  )
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
 

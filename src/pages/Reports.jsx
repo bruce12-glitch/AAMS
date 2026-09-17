@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_DAILY_REPORT, MOCK_STATS } from '../api/mock'
 
 function ReportCard({ title, rows, delay = 0, footer }) {
@@ -28,6 +29,13 @@ function ReportCard({ title, rows, delay = 0, footer }) {
 }
 
 const pick = (obj, keys) => keys.filter((k) => obj && k in obj).map((k) => [k, obj[k]])
+
+// Stable fallback identities. These were previously inline literals inside the
+// component, which meant a brand-new object every render.
+const EMPTY_WEEK = { week: '(demo)' }
+const EMPTY_LIST = []
+const EMPTY_OBJ = {}
+
 const listRows = (payload) => {
   const arr = Array.isArray(payload) ? payload : (payload?.attempts ?? payload?.rows ?? [])
   if (!Array.isArray(arr)) return []
@@ -38,12 +46,16 @@ const listRows = (payload) => {
 }
 
 export default function Reports() {
-  const stats = usePolling('/dashboard/stats', MOCK_STATS)
-  const daily = usePolling('/reports/daily', MOCK_DAILY_REPORT)
-  const weekly = usePolling('/reports/weekly', { week: '(demo)' })
-  const proxy = usePolling('/reports/proxy', [])
-  const unpaid = usePolling('/reports/unpaid', [])
-  const occ = usePolling('/reports/occupancy', {})
+  // Reports reads six endpoints. All fallbacks are now module-level constants
+  // with stable identity, so the fallbackRef in usePolling never sees a new
+  // object on every render.
+  const LIVE = { enabled: !IS_STATIC_DEMO }
+  const stats = usePolling('/dashboard/stats', MOCK_STATS, 8000, LIVE)
+  const daily = usePolling('/reports/daily', MOCK_DAILY_REPORT, 8000, LIVE)
+  const weekly = usePolling('/reports/weekly', EMPTY_WEEK, 8000, LIVE)
+  const proxy = usePolling('/reports/proxy', EMPTY_LIST, 8000, LIVE)
+  const unpaid = usePolling('/reports/unpaid', EMPTY_LIST, 8000, LIVE)
+  const occ = usePolling('/reports/occupancy', EMPTY_OBJ, 8000, LIVE)
 
   const s = stats.data ?? {}
   const d = daily.data ?? {}

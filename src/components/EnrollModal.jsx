@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 
 const EMPTY = {
   user_id: '', name: '', phone: '',
@@ -9,7 +10,6 @@ const EMPTY = {
 
 export default function EnrollModal({ open, onClose, onEnrolled }) {
   const [form, setForm] = useState(EMPTY)
-  const [files, setFiles] = useState([])
   const [previews, setPreviews] = useState([])
   const [token, setToken] = useState(getAdminToken())
   const [busy, setBusy] = useState(false)
@@ -24,12 +24,22 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     setError('')
     const arr = Array.from(list ?? []).slice(0, 8)
     const uris = []
+    const problems = []
     for (const f of arr) {
-      try { uris.push(await fileToDataUri(f)) }
-      catch (err) { setError(err.message) }
+      try {
+        uris.push(await fileToDataUri(f))
+      } catch (err) {
+        // Collect, don't overwrite: previously the last failure won and
+        // earlier ones were lost, so the user saw only one bad file.
+        problems.push(err.message)
+      }
     }
-    setFiles(arr.slice(0, uris.length))
     setPreviews(uris)
+    if (problems.length) {
+      setError(
+        `${problems.length} of ${arr.length} photo(s) rejected: ${problems.join('; ')}`
+      )
+    }
   }
 
   const submit = async () => {
@@ -37,6 +47,13 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     if (!form.user_id.trim() || !form.name.trim()) return setError('User ID and Name are required')
     if (!previews.length) return setError('Add at least one face photo')
     if (!form.consent) return setError('Consent is required for biometric enrollment')
+    // Enrollment writes to the database and computes ArcFace embeddings
+    // server-side. The static demo has neither, so be explicit.
+    if (IS_STATIC_DEMO) {
+      return setError(
+        'Enrollment needs the backend API and its database — not available in the static demo build.'
+      )
+    }
 
     setBusy(true)
     try {
@@ -56,7 +73,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   }
 
   const close = () => {
-    setForm(EMPTY); setFiles([]); setPreviews([]); setResult(null); setError('')
+    setForm(EMPTY); setPreviews([]); setResult(null); setError('')
     onClose()
   }
 
@@ -84,9 +101,9 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                 </p>
 
                 <div className="form-grid">
-                  <label>User ID *<input value={form.user_id} onChange={set('user_id')} placeholder="RA2111003010123" /></label>
-                  <label>Full name *<input value={form.name} onChange={set('name')} placeholder="Rahul Kumar" /></label>
-                  <label>Phone<input value={form.phone} onChange={set('phone')} placeholder="+91…" /></label>
+                  <label>User ID *<input value={form.user_id} onChange={set('user_id')} placeholder="e.g. SAMPLE-0001" /></label>
+                  <label>Full name *<input value={form.name} onChange={set('name')} placeholder="Member full name" /></label>
+                  <label>Phone<input value={form.phone} onChange={set('phone')} placeholder="Optional contact number" /></label>
                   <label>Payment status
                     <select value={form.payment_status} onChange={set('payment_status')}>
                       <option value="active">active</option>

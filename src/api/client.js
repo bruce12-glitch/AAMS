@@ -17,11 +17,21 @@ function adminHeaders() {
   return h
 }
 
-async function request(path, options = {}, timeoutMs = 15000) {
+const DEFAULT_TIMEOUT_MS = 15000
+
+async function request(path, options = {}, timeoutMs) {
+  // Guard the timeout: callers frequently omit this argument. Passing
+  // undefined to setTimeout fires the callback on the next tick, which would
+  // abort every request immediately. Fall back to a sane default instead.
+  const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS
+
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const timer = setTimeout(() => controller.abort(), timeout)
   try {
     const res = await fetch(BASE + path, {
+      // Spread options FIRST so an explicit headers object on the options
+      // (e.g. adminHeaders()) wins over this default rather than being
+      // silently overwritten by it.
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       ...options
@@ -34,6 +44,8 @@ async function request(path, options = {}, timeoutMs = 15000) {
       } catch { /* non-json error body */ }
       throw new Error(detail)
     }
+    // 204 No Content (common for DELETE / ack) has no JSON body to parse.
+    if (res.status === 204) return null
     return await res.json()
   } finally {
     clearTimeout(timer)
