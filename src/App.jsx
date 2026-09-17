@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const BackgroundScene = lazy(() => import('./three/BackgroundScene'))
 import Sidebar, { NAV_ITEMS } from './components/Sidebar'
 import TopBar from './components/TopBar'
+import { useBackendStatus } from './hooks/useBackendStatus'
 import Dashboard from './pages/Dashboard'
 import LiveMonitor from './pages/LiveMonitor'
 import Logs from './pages/Logs'
@@ -22,6 +23,9 @@ const PAGES = {
 
 export default function App() {
   const [page, setPage] = useState('dashboard')
+  // Single shared connection signal for the shell; previously isLive was
+  // never passed to Sidebar, so the status pill always read "Demo Data".
+  const isLive = useBackendStatus()
   const Page = PAGES[page] ?? Dashboard
   const title = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard'
 
@@ -31,9 +35,9 @@ export default function App() {
         <BackgroundScene />
       </Suspense>
       <div className="app-shell">
-        <Sidebar active={page} onSelect={setPage} />
+        <Sidebar active={page} onSelect={setPage} isLive={isLive} />
         <div className="main-col">
-          <TopBar title={title} />
+          <TopBar title={title} isLive={isLive} />
           <main className="page-scroll">
             <AnimatePresence mode="wait">
               <motion.div
