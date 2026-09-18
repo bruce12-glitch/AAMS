@@ -1333,6 +1333,11 @@ body {
     gap: 0;
   }
   .sidebar .nav-item > span:not(.nav-glyph) { display: none; }
+  /* The label is a JSX text node (not a span), so the rule above can't
+     hide it. On the icon rail we want only the glyph visible; setting
+     the button's own color to transparent hides the text while leaving
+     the glyph (it has its own `color: var(--teal)` rule) untouched. */
+  .sidebar .nav-item { color: transparent; }
   .sidebar .sidebar-footer .contact-card { display: none; }
   .sidebar .conn-pill {
     font-size: 0;       /* hide label, keep the dot via flex */
@@ -1363,8 +1368,10 @@ body {
   /* Stats single-column on a phone */
   .grid-stats { grid-template-columns: 1fr; }
 
-  /* Topbar trims further: hide the breadcrumb, keep clock compact */
-  .topbar-title { font-size: var(--fs-base); }
+  /* The page's own <h1> already renders the page name ~60px below, so the
+     topbar repeating it is redundant and costs vertical space where there
+     is least. Keep the clock; drop the duplicated title. */
+  .topbar-title { display: none; }
   .topbar-crumb { display: none; }
 
   /* Page intro stacks the actions under the title via the page-row flex
