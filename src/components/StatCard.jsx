@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { useCountUp } from '../hooks/useCountUp'
 
-export default function StatCard({ label, value, icon, color = '#22d3ee', tint = 'rgba(34,211,238,0.12)', trend, trendDir = 'flat', index = 0 }) {
+export default function StatCard({ label, value, icon, color = '#0e7490', tint = '#ecfeff', trend, trendDir = 'flat', index = 0 }) {
   const shown = useCountUp(Number.isFinite(value) ? value : 0)
 
   return (

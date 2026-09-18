@@ -45,10 +45,10 @@ export default function Dashboard({ onNavigate }) {
       </div>
 
       <div className="grid-stats">
-        <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#22d3ee" tint="rgba(34,211,238,.12)" trend="+12%" trendDir="up" />
-        <StatCard index={1} label="Inside Now" value={s.inside_count} icon={<IconFace width={17} height={17} />} color="#34d399" tint="rgba(52,211,153,.12)" trend="live" trendDir="flat" />
-        <StatCard index={2} label="Open Alerts" value={s.alert_count} icon={<IconBell width={17} height={17} />} color="#f87171" tint="rgba(248,113,113,.12)" trend="-2" trendDir="down" />
-        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} height={17} />} color="#a78bfa" tint="rgba(167,139,250,.12)" trend="+3" trendDir="up" />
+        <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#0e7490" tint="#ecfeff" trend="+12%" trendDir="up" />
+        <StatCard index={1} label="Inside Now" value={s.inside_count} icon={<IconFace width={17} height={17} />} color="#047857" tint="#ecfdf5" trend="live" trendDir="flat" />
+        <StatCard index={2} label="Open Alerts" value={s.alert_count} icon={<IconBell width={17} height={17} />} color="#b91c1c" tint="#fef2f2" trend="-2" trendDir="down" />
+        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} height={17} />} color="#6d28d9" tint="#f5f3ff" trend="+3" trendDir="up" />
       </div>
 
       <div className="grid-main">

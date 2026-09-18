@@ -86,12 +86,12 @@ export class AppBoundary extends Component {
               fontFamily: "'Space Grotesk', system-ui, sans-serif",
               fontSize: 20,
               margin: '0 0 10px',
-              color: '#eef2ff'
+              color: '#111827'
             }}
           >
             Console error
           </h1>
-          <p style={{ color: '#9aa7c7', fontSize: 13.5, lineHeight: 1.6, margin: '0 0 18px' }}>
+          <p style={{ color: '#4b5563', fontSize: 13.5, lineHeight: 1.6, margin: '0 0 18px' }}>
             The interface hit an unexpected error and stopped rendering. The
             technical detail is in the browser console.
           </p>
@@ -99,9 +99,9 @@ export class AppBoundary extends Component {
             style={{
               fontFamily: "'JetBrains Mono', ui-monospace, monospace",
               fontSize: 11.5,
-              color: '#f87171',
-              background: 'rgba(248,113,113,.07)',
-              border: '1px solid rgba(248,113,113,.28)',
+              color: '#b91c1c',
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
               borderRadius: 10,
               padding: '10px 12px',
               textAlign: 'left',
