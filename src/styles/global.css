@@ -2,34 +2,98 @@
    FABLAB SRMIST — AAMS Console
    Light institutional theme. Cream surfaces, FABLAB teal accent,
    yellow highlight for primary actions.
+
+   Design tokens
+   ─────────────
+   Surfaces    --bg-0 page  · --bg-1 card  · --bg-2 inset
+   Borders     --border · --border-bright
+   Text        --text-hi primary · --text-mid body · --text-low meta
+   Brand       --teal · --teal-bright (FABLAB mark)
+   Actions     --accent (yellow) · --accent-strong
+   Signal      --green ok · --red danger · --cyan info · --violet
+   Type scale  --fs-xs..--fs-3xl + --fs-display (4px rhythm, ≥10.5px floor)
+   Spacing     --sp-1..--sp-7 (4px rhythm)
+   Radii       --r-sm 8 · --r-md 12 · --r-lg 16 · --r-xl 18 · --r-pill 999
+   Shadow      --shadow-sm / --shadow-md / --shadow-lg
    ============================================================ */
 
 :root {
-  --bg-0: #f4f5f7;          /* page surface */
-  --bg-1: #ffffff;          /* card / panel surface */
-  --bg-2: #f9fafb;          /* subtle inset */
-  --panel: #ffffff;
-  --panel-strong: #ffffff;
+  /* Surfaces */
+  --bg-0: #f4f5f7;
+  --bg-1: #ffffff;
+  --bg-2: #f9fafb;
+
+  /* Borders */
   --border: #e5e7eb;
   --border-bright: #d1d5db;
 
-  --text-hi: #111827;       /* primary text */
-  --text-mid: #4b5563;      /* body text */
-  --text-low: #6b7280;      /* muted / metadata */
+  /* Text */
+  --text-hi: #111827;
+  --text-mid: #4b5563;
+  --text-low: #6b7280;
 
+  /* Brand & action */
   --teal: #14b8a6;
   --teal-bright: #2dd4bf;
   --cyan: #22d3ee;
-  --accent: #fbbf24;         /* yellow primary action */
+  --accent: #fbbf24;
   --accent-strong: #f59e0b;
+
+  /* Signal */
   --green: #10b981;
   --red: #ef4444;
+  --violet: #a78bfa;
 
+  /* Gradients */
   --grad-accent: linear-gradient(135deg, #22d3ee 0%, #14b8a6 100%);
   --grad-fablab: linear-gradient(135deg, #22d3ee 0%, #14b8a6 60%, #2dd4bf 100%);
+
+  /* Signal tints (paired bg/border for status surfaces) */
+  --green-bg: #ecfdf5;  --green-line: #a7f3d0;
+  --red-bg:   #fef2f2;  --red-line:   #fecaca;
+  --amber-bg: #fffbeb;  --amber-line: #fde68a;
+  --teal-bg:  #f0fdfa;  --teal-line:  #99f6e4;
+  --cyan-bg:  #ecfeff;  --cyan-line:  #a5f3fc;
+
+  /* Spacing scale (4px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+  --sp-8: 40px;
+
+  /* Type scale — every label ≥10.5px (legibility floor) */
+  --fs-xs:      10.5px;  /* meta / mono caps */
+  --fs-sm:      12px;    /* small body */
+  --fs-base:    13.5px;  /* default body */
+  --fs-md:      15px;    /* emphasized body */
+  --fs-lg:      17px;    /* topbar title */
+  --fs-xl:      20px;    /* h2 */
+  --fs-2xl:     24px;    /* page title */
+  --fs-3xl:     30px;    /* display */
+  --fs-display: 34px;    /* stat value */
+
+  /* Radii */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 18px;
+  --r-pill: 999px;
+
+  /* Shadow */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
-  --radius: 14px;
+  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.14);
+  --glow-cyan: 0 0 0 4px rgba(34, 211, 238, 0.18);   /* focus ring */
+
+  /* Backwards-compat aliases so the legacy class blocks keep working */
+  --panel: var(--bg-1);
+  --panel-strong: var(--bg-1);
+  --radius: var(--r-lg);
+
   --font-ui: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
 }
@@ -57,14 +121,37 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.28); }
 
-/* ---------- App shell ---------- */
+/* Keyboard focus — applied via :focus-visible so mouse clicks stay quiet.
+   Covers buttons, chips, links, inputs and the nav rail without having
+   to set focus styles on every class individually. */
+:where(
+  .btn, .nav-item, .filter-chip, .scenario-chip, .mini-select,
+  .search-input, .form-grid input, .form-grid select,
+  .dropzone, .panel-link, a, button
+):focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+  box-shadow: var(--glow-cyan);
+}
+
+/* ---------- App shell ----------
+   Grid keeps the institutional header full-width on top while the
+   sidebar and main column sit side-by-side underneath. A plain flex
+   row collapsed the header to its content width and pushed the page
+   into the right two-thirds of the viewport. */
 
 .app-shell {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
   z-index: 1;
 }
+
+.institutional-header { grid-column: 1 / -1; grid-row: 1; }
+.sidebar            { grid-column: 1;       grid-row: 2; min-height: 0; }
+.main-col           { grid-column: 2;       grid-row: 2; min-height: 0; }
 
 .bg-canvas {
   position: fixed;
@@ -122,7 +209,7 @@ body {
 .inst-code {
   font-family: var(--font-ui);
   font-weight: 700;
-  font-size: 14px;
+  font-size: var(--fs-md);
   letter-spacing: 1.4px;
   color: var(--text-hi);
   line-height: 1;
@@ -130,7 +217,7 @@ body {
 
 .inst-tag {
   font-family: var(--font-mono);
-  font-size: 8.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.1px;
   text-transform: uppercase;
   color: var(--text-low);
@@ -184,14 +271,14 @@ body {
 }
 
 .brand-name {
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 700;
   letter-spacing: 0.4px;
 }
 
 .brand-sub {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 2px;
   color: var(--text-low);
   text-transform: uppercase;
@@ -201,14 +288,14 @@ body {
    undiscoverable (the enrollment endpoint rejects requests without it). */
 .field-hint {
   margin: 12px 0 0;
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   line-height: 1.55;
   color: var(--text-low);
 }
 
 .field-hint code {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   color: var(--cyan);
   background: rgba(34, 211, 238, 0.08);
   border: 1px solid rgba(34, 211, 238, 0.18);
@@ -241,7 +328,7 @@ body {
 
 .brand-inst {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 2px;
   color: var(--text-low);
@@ -250,7 +337,7 @@ body {
 
 .brand-dept {
   font-family: var(--font-ui);
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--text-mid);
   letter-spacing: 0.2px;
@@ -258,7 +345,7 @@ body {
 
 .nav-section-label {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 2.2px;
   text-transform: uppercase;
@@ -278,7 +365,7 @@ body {
   background: transparent;
   color: var(--text-mid);
   font: inherit;
-  font-size: 13.5px;
+  font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
   transition: color 0.2s ease, background 0.2s ease;
@@ -334,13 +421,13 @@ body {
   border-radius: 12px;
   padding: 12px 14px 14px;
   background: var(--bg-2);
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--text-mid);
 }
 
 .contact-title {
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 700;
   color: var(--text-hi);
   margin: 0 0 2px;
@@ -349,7 +436,7 @@ body {
 
 .contact-hours {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-low);
@@ -366,7 +453,7 @@ body {
 .contact-row-muted {
   color: var(--text-low);
   padding-left: 22px;
-  font-size: 11px;
+  font-size: var(--fs-sm);
 }
 
 .contact-row a {
@@ -391,7 +478,7 @@ body {
   align-items: center;
   gap: 8px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--text-mid);
@@ -441,7 +528,7 @@ body {
 }
 
 .topbar-title {
-  font-size: 18px;
+  font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: 0.2px;
   display: flex;
@@ -452,7 +539,7 @@ body {
 
 .topbar-crumb {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   color: var(--text-low);
   letter-spacing: 1.6px;
   text-transform: uppercase;
@@ -460,7 +547,7 @@ body {
 
 .topbar-clock {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-mid);
   letter-spacing: 1px;
   text-align: right;
@@ -468,7 +555,7 @@ body {
 
 .topbar-date {
   display: block;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   color: var(--text-low);
   margin-top: 2px;
 }
@@ -507,7 +594,7 @@ body {
 
 .panel-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--fs-base);
   font-weight: 600;
   letter-spacing: 0.3px;
   display: flex;
@@ -525,7 +612,7 @@ body {
 
 .panel-link {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.6px;
   text-transform: uppercase;
   color: var(--text-low);
@@ -577,7 +664,7 @@ body {
 
 .stat-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.8px;
   text-transform: uppercase;
   color: var(--text-mid);
@@ -594,7 +681,7 @@ body {
 }
 
 .stat-value {
-  font-size: 34px;
+  font-size: var(--fs-display);
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.5px;
@@ -606,27 +693,27 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   color: var(--text-low);
 }
 
 .trend-chip {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   padding: 3px 7px;
   border-radius: 6px;
   background: rgba(52, 211, 153, 0.14);
   color: var(--green);
 }
-.trend-chip.down { background: rgba(248, 113, 113, 0.14); color: var(--red); }
-.trend-chip.flat { background: rgba(154, 167, 199, 0.14); color: var(--text-mid); }
+.trend-chip.down { background: var(--red-bg); color: var(--red); }
+.trend-chip.flat { background: var(--bg-2); color: var(--text-mid); border: 1px solid var(--border); }
 
 /* ---------- Tables ---------- */
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--fs-base);
   color: var(--text-hi);
 }
 
@@ -634,7 +721,7 @@ body {
   text-align: left;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 10px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.4px;
   text-transform: uppercase;
   color: var(--text-low);
@@ -655,7 +742,7 @@ body {
 .data-table tbody tr { transition: background 0.15s ease; }
 .data-table tbody tr:hover { background: var(--bg-2); }
 
-.mono { font-family: var(--font-mono); font-size: 12px; }
+.mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .name-cell { color: var(--text-hi); font-weight: 600; }
 
 /* ---------- Badges ---------- */
@@ -665,7 +752,7 @@ body {
   align-items: center;
   gap: 6px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 1.2px;
   text-transform: uppercase;
@@ -694,7 +781,7 @@ body {
   justify-content: center;
   gap: 8px;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-base);
   font-weight: 600;
   padding: 9px 16px;
   border-radius: 10px;
@@ -733,7 +820,7 @@ body {
 }
 .btn.ghost:hover:not(:disabled) { color: var(--text-hi); background: var(--bg-2); }
 
-.btn.sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+.btn.sm { padding: 6px 12px; font-size: var(--fs-sm); border-radius: 8px; }
 
 /* Scenario chips (live monitor) */
 
@@ -741,14 +828,14 @@ body {
 
 .scenario-chip {
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   font-family: var(--font-mono);
   letter-spacing: 0.6px;
   padding: 8px 13px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   border: 1px solid var(--border-bright);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-1);
   color: var(--text-mid);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -757,7 +844,8 @@ body {
 .scenario-chip:hover:not(:disabled) {
   color: var(--text-hi);
   border-color: var(--cyan);
-  box-shadow: 0 0 14px rgba(34, 211, 238, 0.2);
+  background: var(--cyan-bg);
+  box-shadow: var(--glow-cyan);
 }
 
 .scenario-chip:disabled { opacity: 0.5; cursor: wait; }
@@ -776,15 +864,15 @@ body {
 }
 
 .decision-banner.granted {
-  border-color: rgba(52, 211, 153, 0.45);
-  background: linear-gradient(135deg, rgba(52, 211, 153, 0.12), rgba(52, 211, 153, 0.03));
-  box-shadow: 0 0 32px rgba(52, 211, 153, 0.12);
+  border-color: rgba(16, 185, 129, 0.45);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.03));
+  box-shadow: 0 0 32px rgba(16, 185, 129, 0.10);
 }
 
 .decision-banner.denied {
-  border-color: rgba(248, 113, 113, 0.45);
-  background: linear-gradient(135deg, rgba(248, 113, 113, 0.12), rgba(248, 113, 113, 0.03));
-  box-shadow: 0 0 32px rgba(248, 113, 113, 0.1);
+  border-color: rgba(239, 68, 68, 0.45);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.03));
+  box-shadow: 0 0 32px rgba(239, 68, 68, 0.10);
 }
 
 .decision-icon-ring {
@@ -795,18 +883,18 @@ body {
   flex-shrink: 0;
 }
 
-.decision-banner.granted .decision-icon-ring { background: rgba(52,211,153,.16); color: var(--green); }
-.decision-banner.denied .decision-icon-ring { background: rgba(248,113,113,.16); color: var(--red); }
+.decision-banner.granted .decision-icon-ring { background: rgba(16, 185, 129, 0.14); color: var(--green); }
+.decision-banner.denied  .decision-icon-ring { background: rgba(239, 68, 68, 0.14); color: var(--red); }
 
 .decision-title {
-  font-size: 19px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   letter-spacing: 0.4px;
   font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
-.decision-reason { color: var(--text-mid); font-size: 13px; margin-top: 3px; }
+.decision-reason { color: var(--text-mid); font-size: var(--fs-base); margin-top: 3px; }
 
 .decision-scanline {
   position: absolute;
@@ -832,7 +920,7 @@ body {
   padding: 9px 10px;
   border-radius: 9px;
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: var(--fs-sm);
   letter-spacing: 1px;
   color: var(--text-low);
   transition: all 0.3s ease;
@@ -841,7 +929,7 @@ body {
 .pipeline-step .step-node {
   width: 9px; height: 9px;
   border-radius: 3px;
-  background: rgba(255,255,255,0.12);
+  background: var(--border-bright);
   transition: all 0.3s ease;
   flex-shrink: 0;
 }
@@ -861,8 +949,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
 }
 .occupant-row:last-child { border-bottom: none; }
 
@@ -871,18 +959,18 @@ body {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: #071018;
   background: var(--grad-accent);
   flex-shrink: 0;
 }
 
-.avatar.dim { background: rgba(255,255,255,0.1); color: var(--text-mid); }
+.avatar.dim { background: var(--bg-2); color: var(--text-mid); border: 1px solid var(--border); }
 
-.occupant-name { font-size: 13px; font-weight: 600; color: var(--text-hi); }
-.occupant-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-low); margin-top: 2px; }
-.occupant-dur { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--cyan); }
+.occupant-name { font-size: var(--fs-base); font-weight: 600; color: var(--text-hi); }
+.occupant-meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-low); margin-top: 2px; }
+.occupant-dur { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--cyan); }
 
 /* ---------- Alert cards ---------- */
 
@@ -890,35 +978,39 @@ body {
   display: flex;
   gap: 13px;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  transition: border-color 0.2s ease;
+  background: var(--bg-2);
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.alert-card:hover { border-color: var(--border-bright); }
+.alert-card:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
 
-.alert-card.high { border-left: 3px solid var(--red); }
+.alert-card.high   { border-left: 3px solid var(--red); }
 .alert-card.medium { border-left: 3px solid var(--accent-strong); }
-.alert-card.low { border-left: 3px solid var(--cyan); }
+.alert-card.low    { border-left: 3px solid var(--cyan); }
 
 .alert-type {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 1.4px;
   text-transform: uppercase;
 }
 
-.alert-msg { font-size: 12.5px; color: var(--text-mid); margin-top: 4px; line-height: 1.45; }
-.alert-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-low); margin-top: 6px; }
+.alert-msg { font-size: var(--fs-base); color: var(--text-mid); margin-top: 4px; line-height: 1.45; }
+.alert-time { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-low); margin-top: 6px; }
 
 /* ---------- Filter chips ---------- */
 
 .filter-chip {
   font: inherit;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 1.2px;
   text-transform: uppercase;
   padding: 6px 12px;
@@ -935,18 +1027,20 @@ body {
 
 .search-input {
   font: inherit;
-  font-size: 13px;
-  padding: 9px 14px;
-  border-radius: 10px;
+  font-size: var(--fs-base);
+  padding: 10px 14px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-1);
   color: var(--text-hi);
   outline: none;
   width: 240px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  max-width: 100%;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
-.search-input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15); }
+.search-input:hover { border-color: var(--border-bright); }
+.search-input:focus { border-color: var(--teal); background: var(--bg-1); box-shadow: var(--glow-cyan); }
 .search-input::placeholder { color: var(--text-low); }
 
 /* ---------- Misc ---------- */
@@ -957,21 +1051,39 @@ body {
 
 .page-title {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
-  letter-spacing: 0.2px;
+  letter-spacing: -0.2px;
 }
 
-.page-sub { color: var(--text-mid); font-size: 13px; margin-top: 5px; }
+.page-sub { color: var(--text-mid); font-size: var(--fs-base); margin-top: 6px; }
 
 .empty-state {
-  padding: 34px 20px;
+  padding: 36px 20px;
   text-align: center;
   color: var(--text-low);
-  font-size: 13px;
+  font-size: var(--fs-base);
 }
 
-.empty-state .mono { display: block; margin-top: 6px; font-size: 11px; letter-spacing: 1.6px; }
+/* CSS-only empty-state glyph. A 36px dashed ring plus an inner solid
+   dot — drawn entirely with masks so it inherits currentColor and
+   stays light on the cream surface. */
+.empty-state::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  border: 1.5px dashed currentColor;
+  opacity: 0.55;
+  background:
+    radial-gradient(circle, currentColor 0 3px, transparent 3.5px) center / 100% 100% no-repeat;
+  -webkit-mask: none;
+          mask: none;
+}
+
+.empty-state .mono { display: block; margin-top: 6px; font-size: var(--fs-sm); letter-spacing: 1.6px; }
 
 .loading-bar {
   position: absolute;
@@ -1005,14 +1117,19 @@ body {
   display: flex;
   justify-content: space-between;
   padding: 10px 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--fs-base);
 }
 .kv-row:last-child { border-bottom: none; }
 .kv-key { color: var(--text-mid); }
 .kv-val { font-family: var(--font-mono); color: var(--text-hi); font-weight: 600; }
 
 /* ---------- Modal ---------- */
+
+/* ---------- Modal ----------
+   Was a dark surface (rgba(10,14,26,.97)) left over from the prior theme.
+   On a light page that left dark text invisible against a near-black
+   background. */
 
 .modal-backdrop {
   position: fixed;
@@ -1021,7 +1138,7 @@ body {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(3, 5, 10, 0.72);
+  background: rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(8px);
 }
 
@@ -1029,15 +1146,16 @@ body {
   width: min(620px, 100%);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
-  border-radius: 18px;
-  border: 1px solid var(--border-bright);
-  background: rgba(10, 14, 26, 0.97);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), var(--glow-cyan);
+  border-radius: var(--r-xl);
+  border: 1px solid var(--border);
+  background: var(--bg-1);
+  box-shadow: var(--shadow-lg);
   padding: 24px;
+  color: var(--text-hi);
 }
 
-.modal-title { margin: 0 0 4px; font-size: 18px; }
-.modal-sub { margin: 0 0 18px; font-size: 12.5px; color: var(--text-mid); }
+.modal-title { margin: 0 0 4px; font-size: var(--fs-lg); }
+.modal-sub { margin: 0 0 18px; font-size: var(--fs-base); color: var(--text-mid); }
 
 .form-grid {
   display: grid;
@@ -1047,7 +1165,7 @@ body {
 }
 
 .form-grid label, .consent-row {
-  font-size: 11px;
+  font-size: var(--fs-sm);
   font-family: var(--font-mono);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -1059,18 +1177,20 @@ body {
 
 .form-grid input, .form-grid select {
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-base);
   letter-spacing: normal;
   text-transform: none;
-  padding: 9px 12px;
-  border-radius: 9px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-1);
   color: var(--text-hi);
   outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.form-grid input:focus, .form-grid select:focus { border-color: var(--cyan); }
+.form-grid input:hover, .form-grid select:hover { border-color: var(--border-bright); }
+.form-grid input:focus, .form-grid select:focus { border-color: var(--teal); box-shadow: var(--glow-cyan); }
 
 .consent-row {
   flex-direction: row !important;
@@ -1079,10 +1199,10 @@ body {
   text-transform: none;
   letter-spacing: 0.2px;
   font-family: var(--font-ui) !important;
-  font-size: 12.5px !important;
+  font-size: var(--fs-base) !important;
   color: var(--text-mid) !important;
 }
-.consent-row input { width: 15px; height: 15px; accent-color: #22d3ee; }
+.consent-row input { width: 15px; height: 15px; accent-color: var(--teal); }
 
 .dropzone {
   display: flex;
@@ -1090,22 +1210,22 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 22px;
-  border-radius: 12px;
+  padding: 24px;
+  border-radius: var(--r-md);
   border: 1.5px dashed var(--border-bright);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--bg-2);
   color: var(--text-hi);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--fs-base);
   cursor: pointer;
   transition: all 0.2s ease;
   width: 100%;
 }
 
-.dropzone span { font-size: 11px; color: var(--text-low); font-family: var(--font-mono); }
-.dropzone:hover { border-color: var(--cyan); background: rgba(34, 211, 238, 0.05); }
+.dropzone span { font-size: var(--fs-xs); color: var(--text-low); font-family: var(--font-mono); }
+.dropzone:hover { border-color: var(--cyan); background: var(--cyan-bg); color: var(--text-hi); }
 .dropzone.slim { padding: 14px; margin-top: 4px; }
-.dropzone.has-files { border-style: solid; border-color: rgba(34, 211, 238, 0.4); }
+.dropzone.has-files { border-style: solid; border-color: var(--cyan); background: var(--cyan-bg); }
 
 .preview-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .preview-row img { height: 52px; border-radius: 7px; border: 1px solid var(--border-bright); }
@@ -1114,41 +1234,41 @@ body {
 .form-error {
   margin-top: 12px;
   padding: 10px 13px;
-  border-radius: 9px;
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  background: rgba(248, 113, 113, 0.09);
+  border-radius: var(--r-md);
+  border: 1px solid var(--red-line);
+  background: var(--red-bg);
   color: var(--red);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
 }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 
 .qr-wrap { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
 .qr-wrap img { width: 130px; height: 130px; border-radius: 10px; background: #fff; padding: 8px; }
-.qr-wrap span { font-size: 12px; color: var(--text-mid); }
+.qr-wrap span { font-size: var(--fs-sm); color: var(--text-mid); }
 
 .mini-select {
   font: inherit;
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  padding: 3px 6px;
-  border-radius: 6px;
+  font-size: var(--fs-xs);
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-1);
   color: var(--text-mid);
   outline: none;
   cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
+.mini-select:hover { border-color: var(--border-bright); }
+.mini-select:focus { border-color: var(--teal); box-shadow: var(--glow-cyan); }
 
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
-
-/* Demo-mode banner. Sits between the page title and the clock; pushed right
-   so the topbar's space-between layout is unaffected when absent. */
 .demo-banner {
   margin-left: auto;
   margin-right: 18px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--accent-strong);
@@ -1162,6 +1282,91 @@ body {
 @media (max-width: 900px) {
   /* The clock is the more useful signal on a narrow screen. */
   .demo-banner { display: none; }
+}
+
+/* ============================================================
+   Responsive — desktop → tablet → phone
+   Breakpoints are chosen for the shell, not the content:
+     ≤1180px  stats grid drops to 2 cols
+     ≤1080px  main grid stacks
+     ≤960px   sidebar becomes an icon rail, topbar compacts
+     ≤720px   single-col stats, topbar ultra-compact, tables scroll
+   ============================================================ */
+
+/* Tables overflow horizontally inside their panel on narrow widths.
+   Using :has() so panels without a table keep their shadow unclipped. */
+@media (max-width: 1180px) {
+  .panel:has(.data-table) { overflow-x: auto; }
+  .panel:has(.data-table) .data-table { min-width: 640px; }
+}
+
+@media (max-width: 960px) {
+  /* Sidebar collapses to an icon rail. Labels, sections and the
+     contact card are hidden; the connection dot stays so live/demo
+     status is still readable. */
+  .app-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .sidebar {
+    /* The base rule sets a fixed 252px width, which would overflow the
+       64px grid track and overlap the main column. Let the track decide. */
+    width: auto;
+    min-width: 0;
+    padding: 16px 8px;
+    align-items: center;
+  }
+  .sidebar .brand { padding: 4px 0 16px; justify-content: center; }
+  .sidebar .brand-lockup .brand-text,
+  .sidebar .brand-lockup .brand-mark { display: none; }
+  .sidebar .nav-section-label { display: none; }
+  .sidebar .nav-item {
+    justify-content: center;
+    padding: 10px;
+    gap: 0;
+  }
+  .sidebar .nav-item > span:not(.nav-glyph) { display: none; }
+  .sidebar .sidebar-footer .contact-card { display: none; }
+  .sidebar .conn-pill {
+    font-size: 0;       /* hide label, keep the dot via flex */
+    padding: 6px;
+    gap: 0;
+  }
+  .sidebar .conn-pill .conn-dot { margin: 0; }
+
+  /* Topbar + page padding tighten */
+  .topbar { height: 56px; padding: 0 16px; }
+  .topbar-title { font-size: var(--fs-md); gap: 8px; }
+  .topbar-clock { font-size: var(--fs-sm); }
+  .topbar-date { display: none; }
+  .page-scroll { padding: 16px; }
+  .page-intro { margin-bottom: 16px; }
+
+  /* Stats grid: 2 columns at this width */
+  .grid-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+
+  /* Institutional header: tighter gaps, allow wrap, smaller font */
+  .institutional-header { padding: 0 16px; height: 56px; }
+  .institutional-strip { gap: 14px; flex-wrap: wrap; }
+  .inst-slot { min-width: 64px; padding: 4px 10px; }
+  .inst-code { font-size: var(--fs-sm); }
+}
+
+@media (max-width: 720px) {
+  /* Stats single-column on a phone */
+  .grid-stats { grid-template-columns: 1fr; }
+
+  /* Topbar trims further: hide the breadcrumb, keep clock compact */
+  .topbar-title { font-size: var(--fs-base); }
+  .topbar-crumb { display: none; }
+
+  /* Page intro stacks the actions under the title via the page-row flex
+     pattern in Users.jsx. Force-wrap here for safety. */
+  .page-intro { flex-wrap: wrap; }
+  .page-intro > div:last-child { width: 100%; }
+
+  /* Institutional header: keep just the primary SRM slot + search */
+  .institutional-strip .inst-slot:nth-child(n+2):nth-child(-n+3) { display: none; }
+  .inst-search { padding: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
