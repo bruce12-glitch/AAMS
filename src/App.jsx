@@ -5,6 +5,7 @@ const BackgroundScene = lazy(() => import('./three/BackgroundScene'))
 import Sidebar, { NAV_ITEMS } from './components/Sidebar'
 import TopBar from './components/TopBar'
 import BackgroundBoundary, { AppBoundary } from './components/BackgroundBoundary'
+import { InstitutionalLogos } from './components/Logo'
 import { useBackendStatus } from './hooks/useBackendStatus'
 import Dashboard from './pages/Dashboard'
 import LiveMonitor from './pages/LiveMonitor'
@@ -67,6 +68,9 @@ export default function App() {
         </Suspense>
       </BackgroundBoundary>
       <div className="app-shell">
+        <header className="institutional-header">
+          <InstitutionalLogos />
+        </header>
         <Sidebar active={page} onSelect={navigate} isLive={isLive} />
         <div className="main-col">
           <TopBar title={title} isLive={isLive} />
