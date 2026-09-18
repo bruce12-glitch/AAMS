@@ -104,6 +104,21 @@
   --panel-strong: var(--bg-1);
   --radius: var(--r-lg);
 
+  /* Display serif — titles, brand, stat numerals. EB Garamond first
+     (webfont), then the system Garamonds, then a serif fallback so the
+     page never degrades to a sans if the webfont is blocked. */
+  --font-display: 'EB Garamond', 'Garamond', 'Adobe Garamond Pro',
+                  'Apple Garamond', Georgia, 'Times New Roman', serif;
+
+  /* Garamond's x-height is roughly 15% smaller than the UI sans, so the
+     same px value reads noticeably smaller. These are the serif display
+     sizes, nudged up to match the sans scale optically:
+       --fs-title 28 ≈ 24px sans   (page title)
+       --fs-heading 15 ≈ 13.5px sans (panel title)
+       --fs-stat 38 ≈ 34px sans    (stat numeral) */
+  --fs-title: 28px;
+  --fs-heading: 15px;
+  --fs-stat: 38px;
   --font-ui: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace;
 }
@@ -116,7 +131,7 @@ body {
   margin: 0;
   background: var(--bg-0);
   color: var(--text-hi);
-  font-family: var(--font-ui);
+  font-family: var(--font-display);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -345,8 +360,8 @@ body {
 }
 
 .brand-dept {
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--text-mid);
   letter-spacing: 0.2px;
@@ -373,7 +388,7 @@ body {
   border-radius: var(--r-sm);
   background: transparent;
   color: var(--text-mid);
-  font: inherit;
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
@@ -537,8 +552,9 @@ body {
 }
 
 .topbar-title {
+  font-family: var(--font-display);
   font-size: var(--fs-lg);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.2px;
   display: flex;
   align-items: baseline;
@@ -603,7 +619,8 @@ body {
 
 .panel-title {
   margin: 0;
-  font-size: var(--fs-base);
+  font-family: var(--font-display);
+  font-size: var(--fs-heading);
   font-weight: 600;
   letter-spacing: 0.3px;
   display: flex;
@@ -690,8 +707,9 @@ body {
 }
 
 .stat-value {
-  font-size: var(--fs-display);
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: var(--fs-stat);
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
@@ -743,6 +761,7 @@ body {
   padding: var(--sp-3) var(--sp-3);
   border-bottom: 1px solid var(--border);
   color: var(--text-hi);
+  font-family: var(--font-ui);
   white-space: nowrap;
 }
 
@@ -789,7 +808,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--sp-2);
-  font: inherit;
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
   font-weight: 600;
   padding: var(--sp-2) var(--sp-4);
@@ -1035,7 +1054,7 @@ body {
 .filter-chip.on { border-color: var(--cyan-text); color: var(--cyan-text); background: rgba(34,211,238,.08); }
 
 .search-input {
-  font: inherit;
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md);
@@ -1060,9 +1079,10 @@ body {
 
 .page-title {
   margin: 0;
-  font-size: var(--fs-2xl);
-  font-weight: 700;
-  letter-spacing: -0.2px;
+  font-family: var(--font-display);
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .page-sub { color: var(--text-mid); font-size: var(--fs-base); margin-top: 6px; }
@@ -1162,7 +1182,7 @@ body {
   color: var(--text-hi);
 }
 
-.modal-title { margin: 0 0 4px; font-size: var(--fs-lg); }
+.modal-title { margin: 0 0 4px; font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; }
 .modal-sub { margin: 0 0 18px; font-size: var(--fs-base); color: var(--text-mid); }
 
 .form-grid {
@@ -1184,7 +1204,7 @@ body {
 }
 
 .form-grid input, .form-grid select {
-  font: inherit;
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
   letter-spacing: normal;
   text-transform: none;
@@ -1223,7 +1243,7 @@ body {
   border: 1.5px dashed var(--border-bright);
   background: var(--bg-2);
   color: var(--text-hi);
-  font: inherit;
+  font-family: var(--font-ui);
   font-size: var(--fs-base);
   cursor: pointer;
   transition: all 0.2s ease;
