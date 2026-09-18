@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const BackgroundScene = lazy(() => import('./three/BackgroundScene'))
@@ -22,8 +22,33 @@ const PAGES = {
   reports: Reports
 }
 
+/** Read the initial page from the URL hash, e.g. #/live. */
+function pageFromHash() {
+  const raw = window.location.hash.replace(/^#\/?/, '')
+  return raw in PAGES ? raw : 'dashboard'
+}
+
 export default function App() {
-  const [page, setPage] = useState('dashboard')
+  const [page, setPage] = useState(pageFromHash)
+
+  // Sync the URL with the current page, and react to back/forward.
+  //
+  // Navigation used to be pure React state, so a refresh always dumped you
+  // back on the Dashboard and no page had a shareable URL. Hash routing needs
+  // no server cooperation — important here, because this build is served as
+  // static files where a history-route would 404 on refresh.
+  useEffect(() => {
+    const onHashChange = () => setPage(pageFromHash())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
+
+  const navigate = useCallback((next) => {
+    setPage(next)
+    const target = `#/${next}`
+    if (window.location.hash !== target) window.location.hash = target
+  }, [])
+
   // Single shared connection signal for the shell; previously isLive was
   // never passed to Sidebar, so the status pill always read "Demo Data".
   const isLive = useBackendStatus()
@@ -42,7 +67,7 @@ export default function App() {
         </Suspense>
       </BackgroundBoundary>
       <div className="app-shell">
-        <Sidebar active={page} onSelect={setPage} isLive={isLive} />
+        <Sidebar active={page} onSelect={navigate} isLive={isLive} />
         <div className="main-col">
           <TopBar title={title} isLive={isLive} />
           <main className="page-scroll">
@@ -54,7 +79,7 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
               >
-                <Page onNavigate={setPage} />
+                <Page onNavigate={navigate} />
               </motion.div>
             </AnimatePresence>
           </main>
