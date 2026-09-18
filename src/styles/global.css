@@ -28,9 +28,9 @@
   --border-bright: #d1d5db;
 
   /* Text */
-  --text-hi: #111827;
-  --text-mid: #4b5563;
-  --text-low: #6b7280;
+  --text-hi: #111827;    /* 17.74 : 1 on white */
+  --text-mid: #4b5563;   /*  7.56 : 1 */
+  --text-low: #646b78;   /*  4.92 : 1 on --bg-0 (was #6b7280 = 4.43, failed) */
 
   /* Brand & action */
   --teal: #14b8a6;
@@ -39,10 +39,20 @@
   --accent: #fbbf24;
   --accent-strong: #f59e0b;
 
-  /* Signal */
+  /* Signal — bright values. Good for fills, borders and focus rings;
+     they fail WCAG AA as text on light surfaces (cyan is 1.81:1), so use
+     the *-text variants below wherever these are applied as `color`. */
   --green: #10b981;
   --red: #ef4444;
   --violet: #a78bfa;
+
+  /* Text-safe variants — all ≥4.5:1 on white, --bg-2 and their own tint */
+  --teal-text:   #0f766e;   /* 5.24 */
+  --cyan-text:   #0e7490;   /* 5.13 */
+  --green-text:  #047857;   /* 5.21 */
+  --red-text:    #b91c1c;   /* 5.91 */
+  --amber-text:  #b45309;   /* 4.81 */
+  --violet-text: #6d28d9;   /* 6.80 */
 
   /* Gradients */
   --grad-accent: linear-gradient(135deg, #22d3ee 0%, #14b8a6 100%);
@@ -129,7 +139,7 @@ body {
   .search-input, .form-grid input, .form-grid select,
   .dropzone, .panel-link, a, button
 ):focus-visible {
-  outline: 2px solid var(--teal);
+  outline: 2px solid var(--teal-text);
   outline-offset: 2px;
   box-shadow: var(--glow-cyan);
 }
@@ -237,7 +247,7 @@ body {
   background: transparent;
 }
 
-.inst-search:hover { color: var(--teal); border-color: var(--teal); }
+.inst-search:hover { color: var(--teal-text); border-color: var(--teal); }
 
 /* ---------- Sidebar ---------- */
 
@@ -295,7 +305,7 @@ body {
 .field-hint code {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  color: var(--cyan);
+  color: var(--cyan-text);
   background: rgba(34, 211, 238, 0.08);
   border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: 4px;
@@ -384,7 +394,7 @@ body {
   display: grid;
   place-items: center;
   opacity: 0.6;
-  color: var(--teal);
+  color: var(--teal-text);
   transition: opacity 0.2s ease;
 }
 
@@ -462,12 +472,12 @@ body {
 }
 
 .contact-row a:hover {
-  color: var(--teal);
+  color: var(--teal-text);
   border-bottom-color: var(--teal);
 }
 
 .contact-icon {
-  color: var(--teal);
+  color: var(--teal-text);
   flex: none;
   margin-top: var(--sp-1);
 }
@@ -621,7 +631,7 @@ body {
   padding: var(--sp-1);
   transition: color 0.2s;
 }
-.panel-link:hover { color: var(--cyan); }
+.panel-link:hover { color: var(--cyan-text); }
 
 .grid-stats {
   display: grid;
@@ -702,9 +712,9 @@ body {
   padding: var(--sp-1) var(--sp-2);
   border-radius: var(--r-sm);
   background: rgba(52, 211, 153, 0.14);
-  color: var(--green);
+  color: var(--green-text);
 }
-.trend-chip.down { background: var(--red-bg); color: var(--red); }
+.trend-chip.down { background: var(--red-bg); color: var(--red-text); }
 .trend-chip.flat { background: var(--bg-2); color: var(--text-mid); border: 1px solid var(--border); }
 
 /* ---------- Tables ---------- */
@@ -760,10 +770,10 @@ body {
   border: 1px solid;
 }
 
-.badge.granted, .badge.active, .badge.inside { color: var(--green); border-color: rgba(16,185,129,.30); background: rgba(16,185,129,.10); }
-.badge.denied, .badge.proxy, .badge.spoof, .badge.expired { color: var(--red); border-color: rgba(239,68,68,.30); background: rgba(239,68,68,.10); }
-.badge.unpaid, .badge.unknown, .badge.tailgate { color: var(--accent-strong); border-color: rgba(245,158,11,.32); background: rgba(245,158,11,.10); }
-.badge.noface { color: var(--teal); border-color: rgba(20,184,166,.32); background: rgba(20,184,166,.10); }
+.badge.granted, .badge.active, .badge.inside { color: var(--green-text); border-color: rgba(16,185,129,.30); background: rgba(16,185,129,.10); }
+.badge.denied, .badge.proxy, .badge.spoof, .badge.expired { color: var(--red-text); border-color: rgba(239,68,68,.30); background: rgba(239,68,68,.10); }
+.badge.unpaid, .badge.unknown, .badge.tailgate { color: var(--amber-text); border-color: rgba(245,158,11,.32); background: rgba(245,158,11,.10); }
+.badge.noface { color: var(--teal-text); border-color: rgba(20,184,166,.32); background: rgba(20,184,166,.10); }
 .badge.neutral { color: var(--text-mid); border-color: var(--border-bright); background: var(--bg-2); }
 
 .badge-dot {
@@ -882,8 +892,8 @@ body {
   flex-shrink: 0;
 }
 
-.decision-banner.granted .decision-icon-ring { background: rgba(16, 185, 129, 0.14); color: var(--green); }
-.decision-banner.denied  .decision-icon-ring { background: rgba(239, 68, 68, 0.14); color: var(--red); }
+.decision-banner.granted .decision-icon-ring { background: rgba(16, 185, 129, 0.14); color: var(--green-text); }
+.decision-banner.denied  .decision-icon-ring { background: rgba(239, 68, 68, 0.14); color: var(--red-text); }
 
 .decision-title {
   font-size: var(--fs-xl);
@@ -934,7 +944,7 @@ body {
 }
 
 .pipeline-step.hot {
-  color: var(--cyan);
+  color: var(--cyan-text);
   background: rgba(34, 211, 238, 0.07);
 }
 .pipeline-step.hot .step-node {
@@ -969,7 +979,7 @@ body {
 
 .occupant-name { font-size: var(--fs-base); font-weight: 600; color: var(--text-hi); }
 .occupant-meta { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-low); margin-top: 2px; }
-.occupant-dur { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--cyan); }
+.occupant-dur { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--cyan-text); }
 
 /* ---------- Alert cards ---------- */
 
@@ -1022,7 +1032,7 @@ body {
 }
 
 .filter-chip:hover { border-color: var(--border-bright); color: var(--text-hi); }
-.filter-chip.on { border-color: var(--cyan); color: var(--cyan); background: rgba(34,211,238,.08); }
+.filter-chip.on { border-color: var(--cyan-text); color: var(--cyan-text); background: rgba(34,211,238,.08); }
 
 .search-input {
   font: inherit;
@@ -1039,7 +1049,7 @@ body {
 }
 
 .search-input:hover { border-color: var(--border-bright); }
-.search-input:focus { border-color: var(--teal); background: var(--bg-1); box-shadow: var(--glow-cyan); }
+.search-input:focus { border-color: var(--teal-text); background: var(--bg-1); box-shadow: var(--glow-cyan); }
 .search-input::placeholder { color: var(--text-low); }
 
 /* ---------- Misc ---------- */
@@ -1188,7 +1198,7 @@ body {
 }
 
 .form-grid input:hover, .form-grid select:hover { border-color: var(--border-bright); }
-.form-grid input:focus, .form-grid select:focus { border-color: var(--teal); box-shadow: var(--glow-cyan); }
+.form-grid input:focus, .form-grid select:focus { border-color: var(--teal-text); box-shadow: var(--glow-cyan); }
 
 .consent-row {
   flex-direction: row !important;
@@ -1235,7 +1245,7 @@ body {
   border-radius: var(--r-md);
   border: 1px solid var(--red-line);
   background: var(--red-bg);
-  color: var(--red);
+  color: var(--red-text);
   font-size: var(--fs-sm);
 }
 
@@ -1259,7 +1269,7 @@ body {
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .mini-select:hover { border-color: var(--border-bright); }
-.mini-select:focus { border-color: var(--teal); box-shadow: var(--glow-cyan); }
+.mini-select:focus { border-color: var(--teal-text); box-shadow: var(--glow-cyan); }
 
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
 .demo-banner {
@@ -1269,7 +1279,7 @@ body {
   font-size: var(--fs-xs);
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--accent-strong);
+  color: var(--amber-text);
   border: 1px solid rgba(245, 158, 11, 0.4);
   background: rgba(245, 158, 11, 0.10);
   border-radius: var(--r-pill);
