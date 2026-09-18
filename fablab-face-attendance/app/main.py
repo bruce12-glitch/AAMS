@@ -110,11 +110,31 @@ async def startup_event():
     except Exception as e:
         logger.warning(f'Scheduler initialization skipped: {e}')
 
+    # Continuous capture is opt-in (config capture.enabled). It owns the
+    # process-wide camera handle, so it must start after the scheduler and
+    # never be started twice.
+    try:
+        from app.config import get_config
+        if get_config().get('capture', {}).get('enabled', False):
+            from app.capture_service import get_capture_service
+            get_capture_service().start()
+        else:
+            logger.info('Capture service disabled (capture.enabled=false)')
+    except Exception as e:
+        logger.warning(f'Capture service not started: {e}')
+
 
 @app.on_event('shutdown')
 async def shutdown_event():
     """Cleanup on shutdown."""
     logger.info('Shutting down FacePass FabLab API...')
+
+    # Release the camera, or the device stays locked until the process exits.
+    try:
+        from app.capture_service import get_capture_service
+        get_capture_service().stop()
+    except Exception as e:
+        logger.warning(f'Capture service shutdown skipped: {e}')
 
 
 if __name__ == '__main__':

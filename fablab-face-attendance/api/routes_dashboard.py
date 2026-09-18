@@ -62,16 +62,33 @@ async def get_activity():
 
 @router.get('/live')
 async def get_live_status():
-    """Get live camera status, current event, steps."""
-    from app.camera import CameraManager
-    
-    camera = CameraManager()
-    camera_status = camera.get_status()
-    
+    """Get live camera status, current event, steps.
+
+    Previously this constructed a brand-new CameraManager and read its status
+    without ever calling start(), so `running` was always False and the
+    console permanently showed "camera standby" even with a working camera.
+    Now it reports the shared capture service, which owns the real device.
+    """
+    from app.capture_service import get_capture_service
+
+    status = get_capture_service().get_status()
+    last = status.get('last_event')
+
+    steps = ['IDLE']
+    if last:
+        steps = ['FACE_DETECTED', 'MATCHED', 'DECISION_MADE']
+
     return {
-        'camera': camera_status,
-        'current_event': None,
-        'steps': ['IDLE']
+        'camera': {
+            # The console keys off `status == 'online'` or fps > 0.
+            'status': 'online' if status['online'] else 'offline',
+            'source': status.get('source'),
+            'fps': status.get('fps') or 0,
+            'resolution': status.get('resolution'),
+            'frames_processed': status.get('frames_processed', 0),
+        },
+        'current_event': last,
+        'steps': steps,
     }
 
 @router.get('/research')

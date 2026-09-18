@@ -8,6 +8,14 @@ camera:
   fps: 5
   resolution: [1280, 720]
 
+# Unattended capture: watch the entrance and record entries automatically.
+# Off by default — enable on the lab host where a real camera is fixed at the
+# door. On a laptop it would happily log whoever happens to be sitting there.
+capture:
+  enabled: true
+  interval_seconds: 2.0      # how often to analyse a frame
+  cooldown_seconds: 45.0     # min gap between entries for the same person
+
 face:
   detection_model: "scrfd"
   recognition_model: "arcface"
