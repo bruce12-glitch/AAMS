@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 
 const BackgroundScene = lazy(() => import('./three/BackgroundScene'))
 import Sidebar, { NAV_ITEMS } from './components/Sidebar'
@@ -57,7 +57,15 @@ export default function App() {
   const title = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard'
 
   return (
-    <AppBoundary>
+    /* reducedMotion="user" makes every framer-motion animation in the tree
+       honour the OS "reduce motion" setting. The CSS block in global.css
+       only neutralises CSS transitions/animations — framer-motion drives
+       its animations from JS and ignored the preference entirely, so
+       reduced-motion users still got the full route transition, the
+       staggered stat cards and the animated table rows. One wrapper here
+       covers all 11 components that use motion. */
+    <MotionConfig reducedMotion="user">
+      <AppBoundary>
       {/* Decorative only. The boundary must sit INSIDE Suspense's sibling
           position so a failed chunk or missing WebGL cannot unmount the app.
           Previously this was a bare Suspense with fallback={null} and no
@@ -81,7 +89,7 @@ export default function App() {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               >
                 <Page onNavigate={navigate} />
               </motion.div>
@@ -89,6 +97,7 @@ export default function App() {
           </main>
         </div>
       </div>
-    </AppBoundary>
+      </AppBoundary>
+    </MotionConfig>
   )
 }

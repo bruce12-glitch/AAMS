@@ -99,6 +99,23 @@
   --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.14);
   --glow-cyan: 0 0 0 4px rgba(34, 211, 238, 0.18);   /* focus ring */
 
+  /* Motion
+     One duration scale and two curves, so every transition in the sheet
+     speaks the same language. Before this there were five ad-hoc
+     durations (0.15 / 0.18 / 0.2 / 0.25 / 0.3s) all using `ease`, while
+     the route transition in App.jsx used cubic-bezier(.22,1,.36,1) — CSS
+     and JS were animating on different curves.
+
+     --ease-out is deliberately the same curve framer-motion uses, so a
+     CSS hover and a JS route change feel like one system. Use it for
+     anything entering or responding (hover, focus, reveal).
+     --ease-in-out is for looping/continuous motion only. */
+  --dur-1: 120ms;   /* micro: hover, focus ring, colour shifts */
+  --dur-2: 200ms;   /* standard: buttons, chips, inputs */
+  --dur-3: 320ms;   /* larger: panels, modals, expanding rows */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
   /* Backwards-compat aliases so the legacy class blocks keep working */
   --panel: var(--bg-1);
   --panel-strong: var(--bg-1);
@@ -143,8 +160,26 @@ body {
 ::-webkit-scrollbar-thumb {
   background: rgba(15, 23, 42, 0.18);
   border-radius: var(--r-sm);
+  transition: background var(--dur-1) var(--ease-out);
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(15, 23, 42, 0.28); }
+
+/* Firefox ignores ::-webkit-scrollbar entirely, so the same treatment
+   has to be expressed with the standard properties or the console gets
+   the default chunky scrollbars there. */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
+  }
+}
+
+/* Stop scroll chaining. Without this, scrolling to the end of the table's
+   own scroller starts scrolling the page behind it, which reads as the
+   interface sliding around under the cursor. */
+.page-scroll,
+.panel:has(.data-table),
+.sidebar { overscroll-behavior: contain; }
 
 /* Keyboard focus — applied via :focus-visible so mouse clicks stay quiet.
    Covers buttons, chips, links, inputs and the nav rail without having
@@ -222,7 +257,7 @@ body {
   border-radius: var(--r-sm);
   background: var(--bg-2);
   min-width: 76px;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 
 .inst-slot:hover {
@@ -392,7 +427,7 @@ body {
   font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
-  transition: color 0.2s ease, background 0.2s ease;
+  transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 
 .nav-item:hover {
@@ -410,7 +445,7 @@ body {
   place-items: center;
   opacity: 0.6;
   color: var(--teal-text);
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur-2) var(--ease-out);
 }
 
 .nav-item.active .nav-glyph,
@@ -601,7 +636,7 @@ body {
   background: var(--bg-1);
   padding: var(--sp-5);
   box-shadow: var(--shadow-sm);
-  transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
 .panel.hoverable:hover {
@@ -646,7 +681,7 @@ body {
   border: none;
   cursor: pointer;
   padding: var(--sp-1);
-  transition: color 0.2s;
+  transition: color var(--dur-1) var(--ease-out);
 }
 .panel-link:hover { color: var(--cyan-text); }
 
@@ -767,7 +802,7 @@ body {
 
 .data-table tr:last-child td { border-bottom: none; }
 
-.data-table tbody tr { transition: background 0.15s ease; }
+.data-table tbody tr { transition: background var(--dur-1) var(--ease-out); }
 .data-table tbody tr:hover { background: var(--bg-2); }
 
 .mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
@@ -817,7 +852,7 @@ body {
   background: var(--bg-2);
   color: var(--text-hi);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
 
 .btn:hover:not(:disabled) {
@@ -866,7 +901,7 @@ body {
   background: var(--bg-1);
   color: var(--text-mid);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
 .scenario-chip:hover:not(:disabled) {
@@ -951,14 +986,14 @@ body {
   font-size: var(--fs-sm);
   letter-spacing: 1px;
   color: var(--text-low);
-  transition: all 0.3s ease;
+  transition: background var(--dur-3) var(--ease-out), border-color var(--dur-3) var(--ease-out), color var(--dur-3) var(--ease-out);
 }
 
 .pipeline-step .step-node {
   width: 9px; height: 9px;
   border-radius: 3px;
   background: var(--border-bright);
-  transition: all 0.3s ease;
+  transition: background var(--dur-3) var(--ease-out), border-color var(--dur-3) var(--ease-out), box-shadow var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out);
   flex-shrink: 0;
 }
 
@@ -1009,7 +1044,7 @@ body {
   border-radius: var(--r-md);
   border: 1px solid var(--border);
   background: var(--bg-2);
-  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
 .alert-card:hover {
@@ -1047,7 +1082,7 @@ body {
   background: transparent;
   color: var(--text-mid);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
 .filter-chip:hover { border-color: var(--border-bright); color: var(--text-hi); }
@@ -1064,7 +1099,7 @@ body {
   outline: none;
   width: 240px;
   max-width: 100%;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 
 .search-input:hover { border-color: var(--border-bright); }
@@ -1214,7 +1249,7 @@ body {
   background: var(--bg-1);
   color: var(--text-hi);
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
 .form-grid input:hover, .form-grid select:hover { border-color: var(--border-bright); }
@@ -1246,7 +1281,7 @@ body {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
   width: 100%;
 }
 
@@ -1286,7 +1321,7 @@ body {
   color: var(--text-mid);
   outline: none;
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 .mini-select:hover { border-color: var(--border-bright); }
 .mini-select:focus { border-color: var(--teal-text); box-shadow: var(--glow-cyan); }
@@ -1415,4 +1450,8 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001s !important;
   }
+  /* Smooth scrolling is itself a motion effect and a known trigger for
+     motion sickness, so it has to be switched off here too — the blanket
+     rule above only covers animation and transition. */
+  html { scroll-behavior: auto !important; }
 }
