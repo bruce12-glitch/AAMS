@@ -1394,12 +1394,17 @@ body {
   .topbar-title { display: none; }
   .topbar-crumb { display: none; }
 
-  /* Page intro stacks the actions under the title via the page-row flex
-     pattern in Users.jsx. Force-wrap here for safety. */
+  /* Page intro stacks the actions under the title. The actions row is
+     full-width here, but .search-input has a fixed 240px width, so
+     input + button (240 + gap + ~90) overran the ~294px available and
+     the primary button was clipped off the right edge. Let the input
+     shrink instead of overflowing. */
   .page-intro { flex-wrap: wrap; }
-  .page-intro > div:last-child { width: 100%; }
+  .page-intro > div:last-child { width: 100%; flex-wrap: wrap; }
+  .page-intro .search-input { width: auto; flex: 1 1 8rem; min-width: 0; }
 
-  /* Institutional header: keep just the primary SRM slot + search */
+  /* Institutional header: the four slots do not fit at this width, so
+     hide the middle two (SRM, MRC) and keep the outer pair (DEI, BIRAC). */
   .institutional-strip .inst-slot:nth-child(n+2):nth-child(-n+3) { display: none; }
   .inst-search { padding: 6px; }
 }
