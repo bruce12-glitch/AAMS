@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
@@ -16,6 +16,9 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const fileRef = useRef(null)
+  const dialogRef = useRef(null)
+  const lastFocused = useRef(null)
+  const titleId = 'enroll-modal-title'
 
   const set = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }))
@@ -77,6 +80,54 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     onClose()
   }
 
+  // Focus management. Without this the dialog opened visually but focus
+  // stayed on the Enroll button behind the overlay, so a keyboard user was
+  // typing into a page they could not see, and Tab walked straight out of
+  // the dialog into the content underneath it.
+  useEffect(() => {
+    if (!open) return
+    lastFocused.current = document.activeElement
+    const node = dialogRef.current
+    const first = node?.querySelector(
+      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+    )
+    ;(first ?? node)?.focus()
+    return () => {
+      // Hand focus back to whatever opened the dialog, not to <body>.
+      const prev = lastFocused.current
+      if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus()
+    }
+  }, [open])
+
+  // Escape to dismiss, and keep Tab inside the dialog while it is open.
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        close()
+        return
+      }
+      if (e.key !== 'Tab') return
+      const node = dialogRef.current
+      if (!node) return
+      const focusables = node.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), ' +
+        'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+      if (!focusables.length) return
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])   // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <AnimatePresence>
       {open && (
@@ -86,7 +137,12 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
           onClick={close}
         >
           <motion.div
+            ref={dialogRef}
             className="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, y: 24, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -95,7 +151,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
           >
             {!result ? (
               <>
-                <h3 className="modal-title">Enroll Member</h3>
+                <h3 className="modal-title" id={titleId}>Enroll Member</h3>
                 <p className="modal-sub">
                   Photos are processed server-side — quality-gated ArcFace embeddings (§17).
                 </p>
