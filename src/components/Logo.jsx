@@ -110,8 +110,8 @@ export function LogoLockup({ markSize = 120 }) {
         <FablabMark size={markSize} />
       </span>
       <span className="brand-text">
-        <span className="brand-inst">SRMIST</span>
-        <span className="brand-dept">Kattankulathur Campus</span>
+        <span className="brand-inst">FacePass Fab Lab</span>
+        <span className="brand-dept">FAB LAB · AAMS</span>
       </span>
     </div>
   )

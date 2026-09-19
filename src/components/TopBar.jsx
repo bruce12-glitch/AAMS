@@ -10,7 +10,7 @@ export default function TopBar({ title, isLive }) {
     <header className="topbar">
       <div className="topbar-title">
         {title}
-        <span className="topbar-crumb">/ SRMIST Fab Lab</span>
+        <span className="topbar-crumb">/ FacePass Fab Lab</span>
       </div>
       {isLive === false && (
         <span className="demo-banner" role="status">
