@@ -9,13 +9,11 @@
   <!-- Inline SVG favicon: an emblem instead of a generic blank tab. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2338bdf8'/%3E%3Cstop offset='55%25' stop-color='%2322d3ee'/%3E%3Cstop offset='100%25' stop-color='%23a78bfa'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M24 3.5 41 8.5v14.2c0 10.4-6.9 17.6-17 21.8-10.1-4.2-17-11.4-17-21.8V8.5z' fill='url(%23g)' fill-opacity='.2' stroke='url(%23g)' stroke-width='1.8'/%3E%3Ctext x='24' y='27.5' text-anchor='middle' font-family='Segoe UI,system-ui,sans-serif' font-size='14' font-weight='700' fill='url(%23g)'%3ESRM%3C/text%3E%3C/svg%3E">
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- EB Garamond: an open Garamond revival, used for display type
-       (titles, brand, stat numerals). It renders far more consistently
-       across machines than the bundled "Garamond" and carries true
-       bold/semibold cuts, which the system font often lacks. -->
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Fonts are self-hosted (see src/styles/fonts.css + src/assets/fonts).
+       They were previously pulled from fonts.googleapis.com, which is a
+       network dependency the lab host may not have — and a failed font
+       request degrades silently to Georgia, i.e. the console would stop
+       looking like the signed-off design with no visible error. -->
 </head>
 <body>
   <div id="root"></div>
