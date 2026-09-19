@@ -60,3 +60,10 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Unrelated project cloned into this working tree.
+# Notin/ is its own repository (remote: bruce12-glitch/Notin) with its own
+# .git. Without this line it shows as untracked clutter and `git add -A`
+# here would try to record it as a submodule gitlink, which is not what
+# anyone wants and fails confusingly on push.
+Notin/
