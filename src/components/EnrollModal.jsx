@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
+import { useDialog } from '../hooks/useDialog'
 
 const EMPTY = {
   user_id: '', name: '', phone: '',
@@ -16,8 +17,6 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
   const fileRef = useRef(null)
-  const dialogRef = useRef(null)
-  const lastFocused = useRef(null)
   const titleId = 'enroll-modal-title'
 
   const set = (k) => (e) =>
@@ -80,53 +79,9 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     onClose()
   }
 
-  // Focus management. Without this the dialog opened visually but focus
-  // stayed on the Enroll button behind the overlay, so a keyboard user was
-  // typing into a page they could not see, and Tab walked straight out of
-  // the dialog into the content underneath it.
-  useEffect(() => {
-    if (!open) return
-    lastFocused.current = document.activeElement
-    const node = dialogRef.current
-    const first = node?.querySelector(
-      'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
-    )
-    ;(first ?? node)?.focus()
-    return () => {
-      // Hand focus back to whatever opened the dialog, not to <body>.
-      const prev = lastFocused.current
-      if (prev && typeof prev.focus === 'function' && document.contains(prev)) prev.focus()
-    }
-  }, [open])
-
-  // Escape to dismiss, and keep Tab inside the dialog while it is open.
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        close()
-        return
-      }
-      if (e.key !== 'Tab') return
-      const node = dialogRef.current
-      if (!node) return
-      const focusables = node.querySelectorAll(
-        'a[href], button:not([disabled]), input:not([disabled]), ' +
-        'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
-      if (!focusables.length) return
-      const first = focusables[0]
-      const last = focusables[focusables.length - 1]
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus()
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus()
-      }
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Focus in on open, back on close; Escape dismisses; Tab stays inside.
+  // See src/hooks/useDialog.js — the QR Pass dialog shares this.
+  const dialogRef = useDialog(open, close)
 
   return (
     <AnimatePresence>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
+import { useDialog } from '../hooks/useDialog'
 import { toArray, adminPost, apiPut, apiDelete, apiGet } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_USERS } from '../api/mock'
@@ -21,6 +22,8 @@ export default function Users() {
   const [showEnroll, setShowEnroll] = useState(false)
   const [busyId, setBusyId] = useState(null)
   const [qrView, setQrView] = useState(null)   // {name, dataUri}
+  const qrDialogRef = useDialog(!!qrView, () => setQrView(null))
+  const qrTitleId = 'qr-pass-title'
   const [qrError, setQrError] = useState('')
   const [rowError, setRowError] = useState('')
 
@@ -190,8 +193,9 @@ export default function Users() {
           <motion.div className="modal-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setQrView(null)}>
             <motion.div className="modal" style={{ width: 'min(420px, 100%)' }} onClick={(e) => e.stopPropagation()}
+              ref={qrDialogRef} role="dialog" aria-modal="true" aria-labelledby={qrTitleId} tabIndex={-1}
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}>
-              <h3 className="modal-title">QR Pass — {qrView.name}</h3>
+              <h3 className="modal-title" id={qrTitleId}>QR Pass — {qrView.name}</h3>
               {qrError && <div className="form-error">{qrError}</div>}
               {qrView.dataUri && (
                 <div className="qr-wrap">
