@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -135,6 +135,32 @@ function ParallaxRig({ children }) {
 }
 
 export default function BackgroundScene() {
+  // Render only as often as the scene actually changes.
+  //
+  // This is a decorative field. With the default frameloop="always" r3f
+  // issues a frame every rAF forever — including while the tab is in the
+  // background, where it burns battery drawing pixels nobody can see, and
+  // under reduced-motion, where the scene is frozen and every frame is
+  // byte-identical to the last.
+  //
+  //   hidden tab        -> 'never'   stop entirely
+  //   reduced motion    -> 'demand'  draw once, then only on invalidate
+  //   normal            -> 'always'  continuous animation
+  //
+  // Hooks sit above the WebGL probe below: that probe throws, and a throw
+  // before a hook would make the hook order conditional between mounts.
+  const [frameloop, setFrameloop] = useState(REDUCED ? 'demand' : 'always')
+
+  useEffect(() => {
+    const sync = () => {
+      if (document.hidden) setFrameloop('never')
+      else setFrameloop(REDUCED ? 'demand' : 'always')
+    }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => document.removeEventListener('visibilitychange', sync)
+  }, [])
+
   // Cheap capability probe. If WebGL is unavailable there is no point
   // mounting <Canvas> at all - bail early and let the boundary render nothing.
   if (!hasWebGL()) throw new Error('WebGL not available')
@@ -142,6 +168,7 @@ export default function BackgroundScene() {
   return (
     <div className="bg-canvas" aria-hidden="true">
       <Canvas
+        frameloop={frameloop}
         dpr={[1, 1.75]}
         camera={{ position: [0, 0, 7], fov: 55 }}
         // 'default' rather than 'high-performance': this is a decorative
