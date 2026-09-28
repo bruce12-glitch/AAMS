@@ -4,11 +4,6 @@
 
 Two components:
 
-| Directory | What it is |
-|---|---|
-| `fablab-face-attendance/` | FastAPI backend — InsightFace (SCRFD + ArcFace) recognition, SQLite, HMAC-signed QR tokens, Telegram alerts, APScheduler daily reports, pytest suite |
-| `src/` + `index.html` | React 19 console (Vite) — Three.js animated scene, Framer Motion transitions, live-polling dashboard with offline fallback |
-
 ## Quick start — backend
 
 ```bash
@@ -139,14 +134,6 @@ fablab-face-attendance/
 cd fablab-face-attendance
 python -m pytest tests/ -v
 ```
-
-## Known gaps / next work
-
-1. **Human-in-the-loop only:** physically run webcam enrollment with volunteers (`python -m enrollment.enroll_user`) or use the Members → ＋ Enroll modal with photos
-2. Calibrate blink-liveness thresholds against a real webcam frame burst
-3. Threshold calibration study (RQ1) once real users are enrolled
-4. Set real secrets in `.env` before any live demo (Telegram, QR secret, admin password)
-
 ## Pilot kit
 
 Everything needed to run the one-week field pilot lives in `docs/pilot/`:
