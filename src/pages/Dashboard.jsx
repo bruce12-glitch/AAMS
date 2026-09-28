@@ -105,10 +105,10 @@ export default function Dashboard({ onNavigate }) {
             )}
             {occList.slice(0, 6).map((o, i) => (
               <div className="occupant-row" key={o.user_id ?? i}>
-                <div className={`avatar ${i % 2 ? 'dim' : ''}`}>{initials(o.user_id)}</div>
+                <div className={`avatar ${i % 2 ? 'dim' : ''}`}>{initials(o.name ?? o.user_id)}</div>
                 <div>
-                  <div className="occupant-name mono">{o.user_id}</div>
-                  <div className="occupant-meta">In at {fmtTime(o.entry_time)}</div>
+                  <div className="occupant-name">{o.name ?? o.user_id}</div>
+                  <div className="occupant-meta">{o.name ? `${o.user_id} · ` : ''}In at {fmtTime(o.entry_time)}</div>
                 </div>
                 <span className="occupant-dur">{Math.round(o.duration_minutes ?? 0)}m</span>
               </div>

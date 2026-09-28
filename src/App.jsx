@@ -15,6 +15,7 @@ import Logs from './pages/Logs'
 import Alerts from './pages/Alerts'
 import Users from './pages/Users'
 import Reports from './pages/Reports'
+import Communicate from './pages/Communicate'
 
 const PAGES = {
   dashboard: Dashboard,
@@ -22,7 +23,8 @@ const PAGES = {
   logs: Logs,
   alerts: Alerts,
   users: Users,
-  reports: Reports
+  reports: Reports,
+  communicate: Communicate
 }
 
 /** Read the initial page from the URL hash, e.g. #/live. */

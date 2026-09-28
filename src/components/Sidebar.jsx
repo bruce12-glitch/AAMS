@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport } from './icons'
+import { IconGauge, IconScan, IconList, IconBell, IconUsers, IconReport, IconSend } from './icons'
 import { LogoLockup } from './Logo'
 
 const CONTACT = {
@@ -16,7 +16,8 @@ export const NAV_ITEMS = [
   { id: 'logs', label: 'Entry Logs', icon: IconList, section: 'Operations' },
   { id: 'alerts', label: 'Alerts', icon: IconBell, section: 'Operations' },
   { id: 'users', label: 'Members', icon: IconUsers, section: 'Admin' },
-  { id: 'reports', label: 'Reports', icon: IconReport, section: 'Admin' }
+  { id: 'reports', label: 'Reports', icon: IconReport, section: 'Admin' },
+  { id: 'communicate', label: 'Communicate', icon: IconSend, section: 'Admin' }
 ]
 
 export default function Sidebar({ active, onSelect, isLive }) {

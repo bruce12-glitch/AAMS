@@ -85,6 +85,13 @@ export const IconDoor = (p) => (
   </svg>
 )
 
+export const IconSend = (p) => (
+  <svg {...base} {...p}>
+    <path d="M21 3L10.5 13.5" />
+    <path d="M21 3l-6.8 18-3.7-7.5L3 9.8z" />
+  </svg>
+)
+
 export const IconFace = (p) => (
   <svg {...base} {...p}>
     <circle cx="12" cy="11" r="6.5" />
