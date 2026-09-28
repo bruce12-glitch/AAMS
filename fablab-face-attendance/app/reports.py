@@ -214,7 +214,7 @@ class ReportGenerator:
                 SELECT COUNT(*) as occupant_count
                 FROM occupants
                 WHERE DATE(entry_time) = ?
-                GROUP BY HOUR(entry_time)
+                GROUP BY strftime('%H', entry_time)
             )
         ''', (today,))
         
