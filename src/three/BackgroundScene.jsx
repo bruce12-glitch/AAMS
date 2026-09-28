@@ -11,10 +11,8 @@ const REDUCED = prefersReducedMotion()
 
 /**
  * Feature-detect WebGL before touching react-three-fiber.
- * Some environments (headless browsers, VMs, locked-down or remote sessions)
- * have no usable WebGL context. Detecting this up front lets the error
- * boundary skip the scene cleanly rather than throwing from deep inside the
- * renderer during context creation.
+ * Headless browsers / VMs / locked-down sessions may have no usable
+ * WebGL context. Bail early so the boundary renders nothing cleanly.
  */
 function hasWebGL() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return false
@@ -30,28 +28,38 @@ function hasWebGL() {
   }
 }
 
-/** Drifting particle field — cyan/violet dust. */
-function ParticleField({ count = 1300 }) {
+/**
+ * Classic entrepreneurial backdrop — NOT neon sci-fi.
+ *
+ * Design intent (classic, clear, smooth):
+ *  - Light ivory page, so everything here is faint and warm.
+ *  - One soft teal mist + one soft gold mist, very low opacity.
+ *  - One hairline architectural grid, barely visible.
+ *  - Fine slate dust, slow drift, no additive glow, no wireframes.
+ * Motion is deliberately slow (0.02–0.05 rad/s) so it reads as
+ * premium / calm, not "trash" busy animation.
+ */
+
+/** Fine, slow dust — slate + muted teal, normal blending. */
+function ClassicDust({ count = 380 }) {
   const ref = useRef()
 
   const { positions, colors } = useMemo(() => {
-    // Named `pos`/`col` rather than `positions`/`colors` to avoid shadowing
-    // the destructured outer bindings of the same name.
     const pos = new Float32Array(count * 3)
     const col = new Float32Array(count * 3)
-    const cA = new THREE.Color('#22d3ee')
-    const cB = new THREE.Color('#a78bfa')
+    const cA = new THREE.Color('#94a3b8') // slate
+    const cB = new THREE.Color('#5fa8a0') // muted teal
     const mixed = new THREE.Color()
 
     for (let i = 0; i < count; i++) {
-      const r = 6 + Math.random() * 14
+      const r = 5 + Math.random() * 13
       const theta = Math.random() * Math.PI * 2
-      const y = (Math.random() - 0.5) * 12
+      const y = (Math.random() - 0.5) * 11
       pos[i * 3] = Math.cos(theta) * r
       pos[i * 3 + 1] = y
       pos[i * 3 + 2] = Math.sin(theta) * r - 4
 
-      mixed.copy(cA).lerp(cB, Math.random())
+      mixed.copy(cA).lerp(cB, Math.random() * 0.55)
       col[i * 3] = mixed.r
       col[i * 3 + 1] = mixed.g
       col[i * 3 + 2] = mixed.b
@@ -62,8 +70,9 @@ function ParticleField({ count = 1300 }) {
   useFrame((state) => {
     if (!ref.current || REDUCED) return
     const t = state.clock.elapsedTime
-    ref.current.rotation.y = t * 0.02
-    ref.current.position.y = Math.sin(t * 0.25) * 0.35
+    // Barely-there drift: one slow rotation + gentle breathing.
+    ref.current.rotation.y = t * 0.018
+    ref.current.position.y = Math.sin(t * 0.18) * 0.22
   })
 
   return (
@@ -73,47 +82,83 @@ function ParticleField({ count = 1300 }) {
         <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.055}
+        size={0.042}
         vertexColors
         transparent
-        opacity={0.65}
+        opacity={0.38}
         sizeAttenuation
         depthWrite={false}
-        blending={THREE.AdditiveBlending}
       />
     </points>
   )
 }
 
-/** Slow-rotating wireframe core — the "face mesh" motif. */
-function WireCore() {
-  const outerRef = useRef()
-  const innerRef = useRef()
+/** Two soft institutional mists — teal (left) + gold (right). */
+function SoftMists() {
+  const tealRef = useRef()
+  const goldRef = useRef()
 
   useFrame((state) => {
     if (REDUCED) return
     const t = state.clock.elapsedTime
-    if (outerRef.current) {
-      outerRef.current.rotation.y = t * 0.08
-      outerRef.current.rotation.x = Math.sin(t * 0.11) * 0.18
+    if (tealRef.current) {
+      tealRef.current.position.y = Math.sin(t * 0.16) * 0.35
+      tealRef.current.position.x = -3.4 + Math.sin(t * 0.1) * 0.25
     }
-    if (innerRef.current) {
-      innerRef.current.rotation.y = -t * 0.14
-      innerRef.current.rotation.z = Math.cos(t * 0.09) * 0.22
+    if (goldRef.current) {
+      goldRef.current.position.y = Math.cos(t * 0.13) * 0.35
+      goldRef.current.position.x = 3.4 + Math.cos(t * 0.09) * 0.25
     }
   })
 
   return (
-    <group position={[0, 0, -2]}>
-      <mesh ref={outerRef}>
-        <icosahedronGeometry args={[3.1, 1]} />
-        <meshBasicMaterial wireframe color="#22d3ee" transparent opacity={0.075} />
+    <group position={[0, 0.4, -3.5]}>
+      <mesh ref={tealRef} position={[-3.4, 0, 0]}>
+        <sphereGeometry args={[2.6, 32, 32]} />
+        <meshBasicMaterial color="#14b8a6" transparent opacity={0.05} depthWrite={false} />
       </mesh>
-      <mesh ref={innerRef}>
-        <octahedronGeometry args={[1.7, 0]} />
-        <meshBasicMaterial wireframe color="#a78bfa" transparent opacity={0.09} />
+      <mesh ref={goldRef} position={[3.4, 0.3, -1]}>
+        <sphereGeometry args={[2.2, 32, 32]} />
+        <meshBasicMaterial color="#c9a86a" transparent opacity={0.055} depthWrite={false} />
       </mesh>
     </group>
+  )
+}
+
+/** Hairline architectural grid — classic ledger feel. */
+function ClassicGrid() {
+  const ref = useRef()
+  const grid = useMemo(() => {
+    const g = new THREE.GridHelper(34, 34, 0xd4cfc2, 0xe7e2d4)
+    g.material.transparent = true
+    g.material.opacity = 0.32
+    g.material.depthWrite = false
+    return g
+  }, [])
+  useFrame((state) => {
+    if (!ref.current || REDUCED) return
+    // Almost static; a whisper of movement so it feels alive, not frozen.
+    ref.current.position.x = Math.sin(state.clock.elapsedTime * 0.05) * 0.15
+  })
+  return (
+    <group ref={ref} position={[0, -3.4, -4]} rotation={[Math.PI / 2.35, 0, 0]}>
+      <primitive object={grid} />
+    </group>
+  )
+}
+
+/** Thin gold horizon line — the single "entrepreneurial" accent. */
+function HorizonLine() {
+  const ref = useRef()
+  useFrame((state) => {
+    if (!ref.current || REDUCED) return
+    ref.current.position.y = -1.9 + Math.sin(state.clock.elapsedTime * 0.2) * 0.04
+  })
+  return (
+    <mesh ref={ref} position={[0, -1.9, -2.5]}>
+      <planeGeometry args={[16, 0.012]} />
+      <meshBasicMaterial color="#c9a86a" transparent opacity={0.35} depthWrite={false} />
+    </mesh>
   )
 }
 
@@ -124,31 +169,19 @@ function ParallaxRig({ children }) {
 
   useFrame((state) => {
     if (!ref.current) return
-    target.current.x = (state.pointer.x || 0) * 0.12
-    target.current.y = (state.pointer.y || 0) * 0.08
+    target.current.x = (state.pointer.x || 0) * 0.06
+    target.current.y = (state.pointer.y || 0) * 0.04
     if (REDUCED) return
-    ref.current.rotation.y += (target.current.x - ref.current.rotation.y) * 0.04
-    ref.current.rotation.x += (-target.current.y - ref.current.rotation.x) * 0.04
+    ref.current.rotation.y += (target.current.x - ref.current.rotation.y) * 0.03
+    ref.current.rotation.x += (-target.current.y - ref.current.rotation.x) * 0.03
   })
 
   return <group ref={ref}>{children}</group>
 }
 
 export default function BackgroundScene() {
-  // Render only as often as the scene actually changes.
-  //
-  // This is a decorative field. With the default frameloop="always" r3f
-  // issues a frame every rAF forever — including while the tab is in the
-  // background, where it burns battery drawing pixels nobody can see, and
-  // under reduced-motion, where the scene is frozen and every frame is
-  // byte-identical to the last.
-  //
-  //   hidden tab        -> 'never'   stop entirely
-  //   reduced motion    -> 'demand'  draw once, then only on invalidate
-  //   normal            -> 'always'  continuous animation
-  //
-  // Hooks sit above the WebGL probe below: that probe throws, and a throw
-  // before a hook would make the hook order conditional between mounts.
+  // Decorative only: hidden tab -> 'never', reduced motion -> 'demand',
+  // normal -> 'always'. Keeps battery + motion-sensitive users safe.
   const [frameloop, setFrameloop] = useState(REDUCED ? 'demand' : 'always')
 
   useEffect(() => {
@@ -161,34 +194,28 @@ export default function BackgroundScene() {
     return () => document.removeEventListener('visibilitychange', sync)
   }, [])
 
-  // Cheap capability probe. If WebGL is unavailable there is no point
-  // mounting <Canvas> at all - bail early and let the boundary render nothing.
   if (!hasWebGL()) throw new Error('WebGL not available')
 
   return (
     <div className="bg-canvas" aria-hidden="true">
       <Canvas
         frameloop={frameloop}
-        dpr={[1, 1.75]}
-        camera={{ position: [0, 0, 7], fov: 55 }}
-        // 'default' rather than 'high-performance': this is a decorative
-        // particle field, not a game. Requesting a discrete GPU can fail
-        // outright where no such adapter exists (integrated-only machines,
-        // VMs, remote/virtualised browsers), and a failed context here used
-        // to take the whole console down. 'default' lets the browser choose.
+        dpr={[1, 1.5]}
+        camera={{ position: [0, 0, 7], fov: 52 }}
         gl={{
-          antialias: false,
+          antialias: true,
           powerPreference: 'default',
           alpha: true,
           failIfMajorPerformanceCaveat: false
         }}
-        // If WebGL cannot initialise, render nothing instead of throwing.
         fallback={null}
         style={{ background: 'transparent' }}
       >
         <ParallaxRig>
-          <ParticleField />
-          <WireCore />
+          <SoftMists />
+          <ClassicGrid />
+          <HorizonLine />
+          <ClassicDust />
         </ParallaxRig>
       </Canvas>
       <div className="bg-vignette" />
