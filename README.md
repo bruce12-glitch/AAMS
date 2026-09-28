@@ -1,154 +1,189 @@
 # AAMS — FacePass FabLab
 
-> 🌐 **Live website (direct preview): https://bruce12-glitch.github.io/AAMS/**
-> Local preview: `npm run dev` → http://localhost:3000 (run backend first for live data: `python run.py` in `fablab-face-attendance/`)
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_the_Site-14b8a6?style=for-the-badge)](https://bruce12-glitch.github.io/AAMS/)
+[![CI](https://github.com/bruce12-glitch/AAMS/actions/workflows/ci.yml/badge.svg)](https://github.com/bruce12-glitch/AAMS/actions/workflows/ci.yml)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](fablab-face-attendance/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](src/)
 
-**Smart Anti-Proxy Facial Access and Attendance Management System** for the SRMIST Fab Lab.
-Classic, calm, entrepreneurial console — subtle 3D, SRMIST-only sign-in, camera path as the single remaining step.
+> ### 🌐 Visit the live website: [bruce12-glitch.github.io/AAMS](https://bruce12-glitch.github.io/AAMS/)
+> Interactive demo of the console (sample data, no backend needed).
+> Sign in with any `@srmist.edu.in` address to explore.
 
-Two components:
+**Smart Anti-Proxy Facial Access and Attendance Management System** for the
+SRMIST Fab Lab — face recognition at the door, live occupancy, security
+alerts over Telegram, and a calm, classic console designed for daily
+operations.
 
-## Quick start — backend
+| Component | Description |
+|---|---|
+| `fablab-face-attendance/` | FastAPI backend — InsightFace recognition, SQLite, signed QR passes, Telegram alerts, scheduled reports, pytest suite |
+| `src/` + `index.html` | React 19 console (Vite) — subtle classic 3D backdrop, motion-respecting transitions, live data with offline demo fallback |
+
+## ✨ Features
+
+- **Face-based entry** — server-side detect → quality gate → ArcFace match → policy decision, with token+face and face-only modes
+- **Anti-proxy & liveness** — blink (EAR) and head-motion checks over frame bursts, spoof/tailgate/unknown detection
+- **SRMIST-only access** — console sign-in and member enrollment accept only `@srmist.edu.in` mail IDs; mutating APIs additionally require an admin token
+- **Live occupancy** — who is inside right now, with names, entry times and automatic timeout exits
+- **Telegram communication portal** — send announcements to the lab group from the console, with delivery status and a full audit trail
+- **Reports & audit** — daily/weekly/proxy/unpaid/occupancy reports, filterable entry logs, severity-graded alerts, retention enforcement
+- **Signed QR passes** — HMAC-signed 24 h passes with lost-token revoke-and-reissue
+
+## 🖥️ Console pages
+
+| Page | Purpose |
+|---|---|
+| Dashboard | KPIs, recent activity, occupants inside (with names), latest alerts |
+| Live Monitor | Camera/pipeline status, snapshot entry test, scenario simulator |
+| Entry Logs | Filterable trail of every access attempt |
+| Alerts | Security alerts by severity, with acknowledge action |
+| Members | Enrolled users — payment, consent and QR-pass management |
+| Reports | Daily summary, security events, occupancy, retention policy |
+| Communicate | Telegram announcements with channel status and delivery outcome |
+
+## 🚀 Quick start
+
+### Backend (FastAPI)
 
 ```bash
 cd fablab-face-attendance
 python -m venv venv
-venv\Scripts\activate        # Windows (or source venv/bin/activate)
+venv\Scripts\activate        # Windows (or: source venv/bin/activate)
 pip install -r requirements.txt
-copy .env.example .env       # then edit secrets
+copy .env.example .env       # then set real secrets (see below)
 python -m scripts.create_db
 python -m scripts.seed_demo_data   # optional demo data
 python run.py                # API on http://localhost:8000 (docs at /docs)
 ```
 
-First run downloads InsightFace `buffalo_l` models (~500 MB) into `models/insightface/`.
+> First run downloads the InsightFace `buffalo_l` models (~500 MB) into
+> `models/insightface/`. The CV engine loads lazily — the API boots and
+> serves immediately; image endpoints warm it up on first use.
 
-## Quick start — frontend
+### Frontend (React console)
 
 ```bash
 npm install
-npm run dev                  # Vite dev server on http://localhost:3000
+npm run dev                  # dev server on http://localhost:3000
 npm run lint                 # ESLint — must be clean before committing
 ```
 
-The dev server proxies `/api/*` to `http://localhost:8000`, so run the backend first for live data.
-Without a backend the console still renders fully populated sample data ("Demo Data" badge).
+The dev server proxies `/api/*` to `http://localhost:8000`, so run the
+backend first for live data. Without a backend the console renders
+populated sample data (badged "Demo Data").
 
-### Two build targets
-
-One environment flag separates the on-premises deployment from the public demo:
-
-```bash
-npm run build                # lab target  — base '/', API proxy, health probe active
-npm run build:pages          # Pages target — base '/AAMS/', no backend, no network calls
-```
-
-`VITE_TARGET=pages` compiles out the API health probe and disables every data
-hook, so the static site issues **zero** backend requests. Actions that need
-the API (enrolment, payment changes, re-keying, snapshot CV, alert acks) report
-that they are unavailable instead of failing with an opaque network error.
-
-> **Base path note.** The Pages target hardcodes `/AAMS/` in `vite.config.js`.
-> That must be an absolute path — with a relative base, the SPA fallback
-> served for a deep link like `/AAMS/alerts` resolves `./assets/x.js` against
-> `/AAMS/alerts/` and 404s, blanking the page. If the repository is ever
-> renamed, update `PAGES_BASE` to match.
-
-### Run the test-case simulator safely
-
-`Live Monitor` → *Scenario Simulator* exercises the decision pipeline without a
-camera. With no backend it falls back to the local simulation constants in
-`src/api/client.js`.
-
-### Quick start — Docker (API + console, one command)
+### Docker (API + console, one command)
 
 ```bash
 docker compose up --build
-# API  -> http://localhost:8000  (/health is orchestrator-safe)
-# Web  -> http://localhost:8090  (nginx serves console + proxies /api)
+# API -> http://localhost:8000   (/health is orchestrator-safe)
+# Web -> http://localhost:8090   (nginx serves the console + proxies /api)
 ```
 
-Volumes persist the SQLite database, evidence photos and the InsightFace model
-cache across rebuilds. TLS termination guidance: see `SECURITY.md`.
+Volumes persist the SQLite database, evidence photos and the model cache
+across rebuilds. TLS guidance: see [`SECURITY.md`](SECURITY.md).
 
-### Frontend stack
+### Build targets
 
-- React 19 + Vite 8
-- `three` + `@react-three/fiber` — particle field / wireframe background (lazy-loaded, DPR-capped)
-- `framer-motion` — page transitions, staggered lists, animated counters
-- No CSS framework — design tokens in `src/styles/global.css`
+```bash
+npm run build                # lab target   — base '/', live API + health probe
+npm run build:pages          # Pages target — base '/AAMS/', static demo, zero backend calls
+```
 
-### Why the console has an ESLint config
+> The Pages target hardcodes `/AAMS/` in `vite.config.js` (must stay an
+> absolute path for deep links). If the repository is renamed, update
+> `PAGES_BASE` to match.
 
-`react/jsx-no-undef` is load-bearing, not decoration. Vite does not resolve JSX
-identifiers, so an unimported component — `<IconFace />` used without an
-`import` — compiles successfully and only throws at runtime, unmounting the
-React tree to a blank page. That exact fault shipped once. `npm run lint` now
-fails the build in both CI and the Pages deploy workflow.
+## 🔐 Authentication
 
-The console also carries two error boundaries (`AppBoundary` for the shell,
-`BackgroundBoundary` for the decorative WebGL scene) so a single component
-fault shows a readable message instead of a black rectangle.
+- Console sign-in, member enrollment and `POST /api/auth/login` accept
+  **only `@srmist.edu.in`** addresses — every other domain is rejected
+  with a clear message, on both frontend and backend.
+- Mutating API routes require the `X-Admin-Token` header matching
+  `API_ADMIN_PASSWORD` in `fablab-face-attendance/.env`. With no password
+  configured the API runs in loudly-logged dev-open mode.
 
-### Public demo
+## 📷 Connecting the camera
 
-`https://bruce12-glitch.github.io/AAMS/` — static build, placeholder data only.
+The only step needed to go live on the lab host:
 
-> **Never put real student data in `src/api/mock.js`.** It is compiled into the
-> public JavaScript bundle. Sample records use obviously synthetic identifiers
-> (`SAMPLE-0001`) for exactly this reason. Real data belongs in the database
-> behind the API.
+1. Set `camera.source` (USB index `0`, or an RTSP URL) and
+   `capture.enabled: true` in `fablab-face-attendance/config.yaml`
+2. Restart the API (`python run.py`)
 
-### Console pages
+Recognized members are then recorded automatically with their names, and
+the dashboard occupancy updates in real time. The Live Monitor page shows
+this guidance while the camera is offline; the snapshot test and scenario
+simulator work without any camera.
 
-| Page | Purpose |
-|---|---|
-| Dashboard | KPIs, recent activity, occupants inside, latest alerts |
-| Live Monitor | Camera/pipeline status + entry-scenario simulator (`POST /api/entry/simulate`) |
-| Entry Logs | Filterable trail of every access attempt |
-| Alerts | Security alerts by severity with acknowledge action |
-| Members | Enrolled users with payment/consent status |
-| Reports | Daily summary, security events, retention policy |
+## 💬 Telegram setup
 
-## Backend architecture
+1. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in
+   `fablab-face-attendance/.env`, and `alerts.telegram_enabled: true`
+   in `config.yaml`
+2. Restart the API — the Communicate page reports the channel as ready
+
+Until then, announcements are stored in the alerts table with the reason
+shown, so nothing is ever silently dropped. A daily summary is delivered
+at 20:00 via the scheduler.
+
+## 🧱 Backend architecture
 
 ```
 fablab-face-attendance/
 ├── app/                     # Core modules
 │   ├── main.py              # FastAPI app + CORS + startup wiring
+│   ├── auth.py              # SRMIST-only email rule (single source of truth)
 │   ├── config.py            # config.yaml + .env loader
-│   ├── database.py          # SQLite schema (6 tables) + helpers
-│   ├── face_engine.py       # InsightFace SCRFD + ArcFace, quality checks, 1:N search
-│   ├── liveness.py          # Blink detection via Eye Aspect Ratio (EAR)
-│   ├── identity.py          # Token+face (1:1) and face-only (1:N) verification
-│   ├── access_policy.py     # §11.2 decision matrix (9 rows)
+│   ├── database.py          # SQLite schema + helpers
+│   ├── face_engine.py       # InsightFace SCRFD + ArcFace, quality checks
+│   ├── liveness.py          # Blink (EAR) + head-motion detection
+│   ├── identity.py          # Token+face (1:1) and face-only (1:N) matching
+│   ├── access_policy.py     # Decision matrix
 │   ├── occupancy.py         # Inside/outside tracking with timeout
-│   ├── alerts.py            # Telegram bot integration
+│   ├── alerts.py            # Telegram bot + announcements
 │   ├── qr_manager.py        # HMAC-signed QR passes
+│   ├── capture_service.py   # Background camera loop (owns the device)
 │   └── scheduler.py         # APScheduler — 20:00 daily report
-├── api/                     # Route modules (entry, users, alerts, occupants, reports, dashboard, admin)
-├── enrollment/              # CLI enrollment (capture → quality check → embeddings)
+├── api/                     # Routes: entry, users, alerts, occupants,
+│                            # reports, dashboard, admin, auth, notify
+├── enrollment/              # CLI enrollment (capture → quality → embeddings)
 ├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
-└── tests/                   # pytest suite
+└── tests/                   # pytest suite (41 tests)
 ```
 
-## Testing
+Frontend: React 19 + Vite 8 · `three` + `@react-three/fiber` (lazy,
+DPR-capped classic backdrop) · `framer-motion` (reduced-motion aware) ·
+no CSS framework — design tokens in `src/styles/global.css`.
+
+## ✅ Testing
 
 ```bash
 cd fablab-face-attendance
 python -m pytest tests/ -v
 ```
-## Pilot kit
 
-Everything needed to run the one-week field pilot lives in `docs/pilot/`:
+CI runs the backend suite plus frontend lint and both build targets on
+every push to `main`; the Pages demo redeploys automatically.
+
+## 🧪 Field pilot
+
+Everything for the one-week pilot lives in [`docs/pilot/`](docs/pilot/):
 
 | File | Purpose |
 |---|---|
 | `PILOT_RUNBOOK.md` | Day-by-day plan from approvals to report |
-| `CONSENT_FORM_TEMPLATE.md` | Printable §26.2 consent form |
-| `GO_LIVE_CHECKLIST.md` | Secrets/TLS/AI sanity gates before opening the door |
-| `TEST_REPORT_TEMPLATE.md` | RQ1–RQ6 results tables for the final report |
+| `CONSENT_FORM_TEMPLATE.md` | Printable biometric consent form |
+| `GO_LIVE_CHECKLIST.md` | Secrets / TLS / AI sanity gates before opening the door |
+| `TEST_REPORT_TEMPLATE.md` | Results tables for the final report |
 
-See also: `SECURITY.md` (threat model + TLS), `CHANGELOG.md`.
+See also [`SECURITY.md`](SECURITY.md) (threat model + TLS) and
+[`CHANGELOG.md`](CHANGELOG.md).
 
-Everything else is implemented and verified: image-based entry (server-side detect/embed/match), signed-QR verification, blink **and** head-motion liveness over frame bursts, offline alert retry, retention enforcement, latency metrics (`/api/dashboard/latency`), lost-token re-keying, data-export endpoint, CORS restriction, admin token auth.
+> ⚠️ **Privacy:** never put real student data in `src/api/mock.js` — it
+> ships in the public JavaScript bundle. Samples use synthetic IDs
+> (`SAMPLE-0001`). Real data belongs in the database behind the API.
+
+## 📄 License
+
+See [`LICENSE`](LICENSE).
