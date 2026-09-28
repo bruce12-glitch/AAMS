@@ -46,6 +46,7 @@ from api.routes_reports import router as reports_router
 from api.routes_dashboard import router as dashboard_router
 from api.routes_admin import router as admin_router
 from api.routes_auth import router as auth_router
+from api.routes_notify import router as notify_router
 
 app.include_router(entry_router)
 app.include_router(users_router)
@@ -55,6 +56,7 @@ app.include_router(reports_router)
 app.include_router(dashboard_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(notify_router)
 
 
 @app.get('/')

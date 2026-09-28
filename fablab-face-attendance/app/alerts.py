@@ -93,6 +93,29 @@ class AlertService:
             # Fallback to text-only
             await self.bot.send_message(chat_id=self.chat_id, text=caption)
     
+    async def send_announcement(self, message: str) -> tuple:
+        """
+        Send a free-text announcement to the Telegram group (communication
+        portal). Unlike send_alert, this is never severity-gated — an
+        explicit send from the console always attempts delivery.
+
+        Returns (sent: bool, reason: str).
+        """
+        text = (message or '').strip()
+        if not text:
+            return False, 'message is empty'
+        if not self.enabled or not self.bot:
+            return False, 'telegram not configured'
+        if not self.chat_id or str(self.chat_id).startswith('YOUR_'):
+            return False, 'telegram chat not configured'
+        try:
+            await self.bot.send_message(chat_id=self.chat_id, text=text)
+            logger.info('Announcement sent (%d chars)', len(text))
+            return True, 'sent'
+        except Exception as e:
+            logger.error(f'Failed to send announcement: {e}')
+            return False, f'send failed: {e}'
+
     async def send_daily_report(self, report_text: str):
         """Send the 8:00 PM daily summary report."""
         if not self.enabled or not self.bot:
