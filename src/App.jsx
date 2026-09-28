@@ -4,8 +4,10 @@ import { motion, AnimatePresence, MotionConfig } from 'framer-motion'
 const BackgroundScene = lazy(() => import('./three/BackgroundScene'))
 import Sidebar, { NAV_ITEMS } from './components/Sidebar'
 import TopBar from './components/TopBar'
+import Login from './components/Login'
 import BackgroundBoundary, { AppBoundary } from './components/BackgroundBoundary'
 import { InstitutionalLogos } from './components/Logo'
+import { useAuth } from './auth/AuthContext'
 import { useBackendStatus } from './hooks/useBackendStatus'
 import Dashboard from './pages/Dashboard'
 import LiveMonitor from './pages/LiveMonitor'
@@ -30,6 +32,7 @@ function pageFromHash() {
 }
 
 export default function App() {
+  const { isAuthed } = useAuth()
   const [page, setPage] = useState(pageFromHash)
 
   // Sync the URL with the current page, and react to back/forward.
@@ -55,6 +58,24 @@ export default function App() {
   const isLive = useBackendStatus()
   const Page = PAGES[page] ?? Dashboard
   const title = NAV_ITEMS.find((n) => n.id === page)?.label ?? 'Dashboard'
+
+  // SRMIST gate: nothing inside the console renders until a valid
+  // @srmist.edu.in session exists. Keeps the auth rule unmissable and
+  // means every feature behind here is already operating as an authed user.
+  if (!isAuthed) {
+    return (
+      <MotionConfig reducedMotion="user">
+        <AppBoundary>
+          <BackgroundBoundary>
+            <Suspense fallback={null}>
+              <BackgroundScene />
+            </Suspense>
+          </BackgroundBoundary>
+          <Login />
+        </AppBoundary>
+      </MotionConfig>
+    )
+  }
 
   return (
     /* reducedMotion="user" makes every framer-motion animation in the tree

@@ -2,10 +2,11 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
+import { SRMIST_SUFFIX, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { useDialog } from '../hooks/useDialog'
 
 const EMPTY = {
-  user_id: '', name: '', phone: '',
+  user_id: '', name: '', phone: '', email: '',
   payment_status: 'active', payment_expiry: '', consent: false
 }
 
@@ -47,6 +48,11 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   const submit = async () => {
     setError('')
     if (!form.user_id.trim() || !form.name.trim()) return setError('User ID and Name are required')
+    const cleanMail = normalizeEmail(form.email)
+    if (!cleanMail) return setError(`SRMIST email is required (e.g. you${SRMIST_SUFFIX})`)
+    if (!isSrmistEmail(cleanMail)) {
+      return setError(`Only ${SRMIST_SUFFIX} mail IDs can be enrolled — other domains are rejected.`)
+    }
     if (!previews.length) return setError('Add at least one face photo')
     if (!form.consent) return setError('Consent is required for biometric enrollment')
     // Enrollment writes to the database and computes ArcFace embeddings
@@ -114,6 +120,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                 <div className="form-grid">
                   <label>User ID *<input value={form.user_id} onChange={set('user_id')} placeholder="e.g. SAMPLE-0001" /></label>
                   <label>Full name *<input value={form.name} onChange={set('name')} placeholder="Member full name" /></label>
+                  <label>SRMIST email *<input value={form.email} onChange={set('email')} placeholder={`you${SRMIST_SUFFIX}`} type="email" /></label>
                   <label>Phone<input value={form.phone} onChange={set('phone')} placeholder="Optional contact number" /></label>
                   <label>Payment status
                     <select value={form.payment_status} onChange={set('payment_status')}>
@@ -128,10 +135,10 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                 </div>
 
                 <p className="field-hint">
-                  Admin token is required — it protects the enrollment endpoint.
-                  Set it as <code>API_ADMIN_PASSWORD</code> in{' '}
-                  <code>fablab-face-attendance/.env</code>. If it is left unset the
-                  API runs in dev-open mode and the field can stay empty.
+                  Only <code>{SRMIST_SUFFIX}</code> mail IDs can be enrolled — other domains are rejected
+                  automatically (frontend + backend). Admin token protects the endpoint:
+                  set <code>API_ADMIN_PASSWORD</code> in <code>fablab-face-attendance/.env</code>.
+                  If unset the API runs dev-open and the field can stay empty.
                 </p>
 
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>
