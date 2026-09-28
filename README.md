@@ -1,6 +1,10 @@
 # AAMS — FacePass FabLab
 
+> 🌐 **Live website (direct preview): https://bruce12-glitch.github.io/AAMS/**
+> Local preview: `npm run dev` → http://localhost:3000 (run backend first for live data: `python run.py` in `fablab-face-attendance/`)
+
 **Smart Anti-Proxy Facial Access and Attendance Management System** for the SRMIST Fab Lab.
+Classic, calm, entrepreneurial console — subtle 3D, SRMIST-only sign-in, camera path as the single remaining step.
 
 Two components:
 
