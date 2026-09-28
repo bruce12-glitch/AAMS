@@ -76,6 +76,14 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
     from app.utils import save_frame
     from app.vision import VisionUnavailableError, analyze_frame, decode_image
 
+    # SRMIST-only rule: no other mail domain is evaluated or enrolled.
+    if req.email:
+        from app.auth import reject_non_srmist
+        try:
+            req.email = reject_non_srmist(req.email)
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+
     if not req.consent_given:
         raise HTTPException(status_code=400,
                             detail='Consent is required before biometric enrollment (§26)')
@@ -185,7 +193,13 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
 
 @router.post('')
 async def create_user(user: UserCreate, _: None = Depends(require_admin)):
-    """Add user record only (no biometrics)."""
+    """Add user record only (no biometrics). SRMIST mail only."""
+    if user.email:
+        from app.auth import reject_non_srmist
+        try:
+            user.email = reject_non_srmist(user.email)
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
     from app.database import get_connection
 
     conn = get_connection()
