@@ -224,8 +224,12 @@ body {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: radial-gradient(1200px 700px at 75% -10%, rgba(20, 184, 166, 0.06), transparent 60%),
-    radial-gradient(1000px 600px at -10% 110%, rgba(34, 211, 238, 0.05), transparent 60%);
+  /* Classic entrepreneurial wash: warm ivory + whisper of teal/gold.
+     Replaces the old neon cyan glow — calm, premium, readable. */
+  background:
+    radial-gradient(1100px 620px at 78% -10%, rgba(201, 168, 106, 0.10), transparent 60%),
+    radial-gradient(1000px 640px at -8% 108%, rgba(20, 184, 166, 0.07), transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 30%);
 }
 
 /* ---------- Institutional header ---------- */
@@ -1444,8 +1448,8 @@ body {
   .inst-search { padding: 6px; }
 }
 
-/* Demo-mode banner. Sits between the page title and the clock; pushed right
-   so the topbar's space-between layout is unaffected when absent. */
+/* Demo-mode banner (upstream). Sits between the page title and the clock;
+   pushed right so the topbar's space-between layout is unaffected. */
 .demo-banner {
   margin-left: auto;
   margin-right: 18px;
@@ -1453,7 +1457,7 @@ body {
   font-size: 10.5px;
   letter-spacing: 0.8px;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--amber-text, #b45309);
   border: 1px solid rgba(251, 191, 36, 0.35);
   background: rgba(251, 191, 36, 0.08);
   border-radius: 999px;
@@ -1464,6 +1468,147 @@ body {
 @media (max-width: 900px) {
   /* The clock is the more useful signal on a narrow screen. */
   .demo-banner { display: none; }
+}
+
+/* ---------- Classic sign-in (SRMIST gate) ---------- */
+
+.login-wrap {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6);
+}
+
+.login-card {
+  width: min(460px, 100%);
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--sp-7) var(--sp-6);
+  text-align: center;
+}
+
+.login-card::before {
+  content: '';
+  display: block;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--teal), #c9a86a);
+  margin: calc(var(--sp-6) * -1) calc(var(--sp-6) * -1) var(--sp-5);
+}
+
+.login-brand { margin-bottom: var(--sp-5); }
+.login-inst {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--text-low);
+  margin-top: var(--sp-3);
+}
+.login-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 600;
+  margin: var(--sp-2) 0 0;
+}
+.login-sub { color: var(--text-mid); font-size: var(--fs-base); margin: var(--sp-2) 0 0; }
+.login-form { text-align: left; margin-top: var(--sp-4); }
+.login-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--text-low);
+  display: block;
+  margin-bottom: var(--sp-2);
+}
+.login-input { width: 100%; }
+.login-hint { font-size: var(--fs-sm); color: var(--text-low); line-height: 1.55; }
+.login-hint strong { color: var(--teal-text); }
+.login-btn { width: 100%; margin-top: var(--sp-3); }
+.login-foot {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-xs);
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text-low);
+}
+
+/* ---------- Topbar signed-in user ---------- */
+
+.topbar-user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--text-mid);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  border-radius: var(--r-pill);
+  padding: 4px 6px 4px 12px;
+  max-width: 340px;
+}
+.topbar-user .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.topbar-user-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 8px rgba(20, 184, 166, 0.55);
+  flex: none;
+}
+
+/* ---------- Classic camera panel (remaining step) ---------- */
+
+.camera-classic {
+  aspect-ratio: 16 / 8.2;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background:
+    repeating-linear-gradient(0deg, rgba(17, 24, 39, 0.035) 0 1px, transparent 1px 5px),
+    radial-gradient(480px 220px at 50% 38%, rgba(201, 168, 106, 0.10), transparent 70%),
+    radial-gradient(420px 200px at 50% 120%, rgba(20, 184, 166, 0.08), transparent 70%),
+    #fbfaf7;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.camera-classic::after {
+  content: '';
+  position: absolute;
+  left: 8%; right: 8%;
+  bottom: 18%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9a86a 50%, transparent);
+  opacity: 0.55;
+}
+.camera-path-hint {
+  margin-top: 12px;
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--border-bright);
+  background: var(--bg-2);
+  font-size: var(--fs-sm);
+  color: var(--text-mid);
+  line-height: 1.6;
+}
+.camera-path-hint code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--teal-text);
+  background: rgba(20, 184, 166, 0.08);
+  border: 1px solid rgba(20, 184, 166, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 
 @media (prefers-reduced-motion: reduce) {
