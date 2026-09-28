@@ -89,6 +89,13 @@ async def get_live_status():
         },
         'current_event': last,
         'steps': steps,
+        # Only remaining step for a live deployment: point the app at the
+        # physical camera. Everything else already works end-to-end.
+        'camera_setup': {
+            'remaining_step': 'connect camera ↔ application path',
+            'application_path': 'fablab-face-attendance/config.yaml → camera.source (0 / RTSP URL), capture.enabled=true',
+            'restart': 'python run.py',
+        },
     }
 
 @router.get('/research')

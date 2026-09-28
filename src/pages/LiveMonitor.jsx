@@ -122,37 +122,35 @@ export default function LiveMonitor() {
               </span>
             </div>
 
-            <div
-              style={{
-                aspectRatio: '16 / 8.2',
-                borderRadius: 12,
-                border: '1px solid var(--border)',
-                background:
-                  'repeating-linear-gradient(0deg, rgba(34,211,238,.03) 0 1px, transparent 1px 4px), radial-gradient(420px 200px at 50% 40%, rgba(34,211,238,.06), transparent 70%), rgba(255,255,255,.02)',
-                display: 'grid',
-                placeItems: 'center',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-            >
+            <div className="camera-classic">
               <motion.div
                 animate={REDUCED_SCAN ? {} : { y: ['-100%', '400%'] }}
-                transition={{ duration: 3.2, repeat: Infinity, ease: 'linear' }}
+                transition={{ duration: 4.2, repeat: Infinity, ease: 'linear' }}
                 style={{
-                  position: 'absolute', left: 0, right: 0, height: 56,
-                  background: 'linear-gradient(180deg, transparent, rgba(34,211,238,.07), transparent)',
+                  position: 'absolute', left: 0, right: 0, height: 44,
+                  background: 'linear-gradient(180deg, transparent, rgba(201,168,106,.10), transparent)',
                   pointerEvents: 'none'
                 }}
               />
-              <div style={{ textAlign: 'center' }}>
+              <div style={{ textAlign: 'center', position: 'relative' }}>
                 <div className="mono" style={{ color: 'var(--text-low)', fontSize: 11, letterSpacing: 3 }}>
-                  {camOnline ? `CAM 0 · ${camera.fps} FPS · 1280×720` : 'CAMERA STANDBY'}
+                  {camOnline ? `CAM ${camera.source ?? 0} · ${camera.fps} FPS · 1280×720` : 'CAMERA LINK — REMAINING STEP'}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-mid)' }}>
-                  {camOnline ? 'Monitoring entrance…' : 'Test entry with a snapshot below'}
+                  {camOnline ? 'Monitoring entrance…' : 'Connect the lab camera to enable live capture'}
                 </div>
               </div>
             </div>
+
+            {!camOnline && (
+              <div className="camera-path-hint">
+                <strong>Only remaining step — camera ↔ application path.</strong><br />
+                Everything else in this console already works (dashboard, logs, alerts, members, reports, SRMIST sign-in).
+                To go live on the lab host: set <code>camera.source</code> (USB index <code>0</code> / RTSP URL) and{' '}
+                <code>capture.enabled: true</code> in <code>fablab-face-attendance/config.yaml</code>, then restart the API
+                (<code>python run.py</code>). The snapshot test below keeps working without a camera.
+              </div>
+            )}
 
             <div className="pipeline" style={{ marginTop: 16 }}>
               {PIPELINE.map((step) => (
