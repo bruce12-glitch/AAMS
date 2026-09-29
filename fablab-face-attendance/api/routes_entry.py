@@ -2,16 +2,17 @@
 Entry Processing API Routes for FacePass FabLab.
 Implements POST /api/entry/process, /api/entry/face-only, /api/entry/simulate.
 
-Preferred mode (Â§9 pipeline, server-side CV):
-  client sends base64 image(s); server decodes â†’ detects faces â†’
-  quality-checks â†’ extracts embedding â†’ (optional) blink liveness over
-  a frame burst â†’ matches identity â†’ evaluates policy â†’ logs + alerts.
+Preferred mode (§9 pipeline, server-side CV):
+  client sends base64 image(s); server decodes → detects faces →
+  quality-checks → extracts embedding → (optional) blink liveness over
+  a frame burst → matches identity → evaluates policy → logs + alerts.
 
 Legacy compatibility: clients may still send a raw `face_embedding`
 array (useful for tests); it bypasses detection but everything
 downstream is identical.
 """
 
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -77,8 +78,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
+        # analyze_frame is CPU-bound (InsightFace, seconds on this host):
+        # run it in a worker thread so the event loop — and every other
+        # request, including Telegram sends — stays responsive.
         try:
-            analysis = analyze_frame(frame)
+            analysis = await asyncio.to_thread(analyze_frame, frame)
         except VisionUnavailableError as exc:
             raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
@@ -125,8 +129,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         if len(frames) >= 2:
             engine = get_engine()
             checker = LivenessChecker()
-            live = checker.check_liveness(frames_sequence=frames,
-                                          face_engine=engine)
+            live = await asyncio.to_thread(
+                checker.check_liveness,
+                frames_sequence=frames,
+                face_engine=engine,
+            )
             liveness_status = live['status']
         else:
             liveness_status = 'unknown'
@@ -134,7 +141,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     # ---- 3. Identity ------------------------------------------------- #
     # Normalize the claimed token: accept either the raw user_id or a full
-    # signed QR payload (Â§27.3) â€” the latter is verified server-side here.
+    # signed QR payload (§27.3) — the latter is verified server-side here.
     token_value = request.token_value
     if mode == 'token_face':
         if not token_value:
@@ -156,10 +163,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     verifier = IdentityVerifier()
     if mode == 'token_face':
-        result = verifier.verify_token_face(token_value, embedding)
+        result = await asyncio.to_thread(
+            verifier.verify_token_face, token_value, embedding)
         payment_user = result.get('claimed_user') or {}
     else:
-        result = verifier.verify_face_only(embedding)
+        result = await asyncio.to_thread(verifier.verify_face_only, embedding)
         payment_user = result.get('user') or {}
 
     detected_user = result.get('detected_user') or (

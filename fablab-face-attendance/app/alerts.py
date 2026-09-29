@@ -25,12 +25,22 @@ class AlertService:
         self.chat_id = config.get('chat_id', '')
         self.send_photo = config.get('send_photo', True)
         
-        # Initialize Telegram bot if enabled
+        # Initialize Telegram bot if enabled.
+        # Generous network timeouts: on the demo host the event loop can be
+        # busy for seconds at a time, and the default 5 s read timeout turned
+        # slow-but-fine deliveries into 'Timed out' failures.
         self.bot = None
         if self.enabled and self.bot_token:
             try:
                 from telegram import Bot
-                self.bot = Bot(token=self.bot_token)
+                from telegram.request import HTTPXRequest
+                request = HTTPXRequest(
+                    connect_timeout=30.0,
+                    read_timeout=30.0,
+                    write_timeout=30.0,
+                    pool_timeout=10.0,
+                )
+                self.bot = Bot(token=self.bot_token, request=request)
             except Exception as e:
                 logger.error(f"Failed to initialize Telegram bot: {e}")
     

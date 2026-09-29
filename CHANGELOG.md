@@ -25,6 +25,12 @@ Format follows Keep a Changelog; versioning is SemVer-ish (0.x while prototype).
   tables/inputs/modals; subtle film-grain texture on the background layer
 
 ### Fixed
+- Entry pipeline blocked the API event loop for 6–30 s per request ( timeouts
+  on unrelated calls, Telegram sends dying with 'Timed out'): detection,
+  liveness and identity matching now run in worker threads via
+  `asyncio.to_thread`; Telegram client timeouts raised to 30 s
+- Telegram authority alert text carried an `â€”` mojibake; comment blocks in
+  `routes_entry.py` had `â†’`/`Â§` garble from the same encoding slip
 - Header magnifier did nothing when clicked: it now focuses the current
   page's search field (brass flash ring), or jumps to Entry Logs and focuses
   that one on pages without a search field
