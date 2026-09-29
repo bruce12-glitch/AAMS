@@ -25,6 +25,9 @@ Format follows Keep a Changelog; versioning is SemVer-ish (0.x while prototype).
   tables/inputs/modals; subtle film-grain texture on the background layer
 
 ### Fixed
+- Header magnifier did nothing when clicked: it now focuses the current
+  page's search field (brass flash ring), or jumps to Entry Logs and focuses
+  that one on pages without a search field
 - Institutional header pills truncated their labels ("DIRECTORATE OF
   ENTRE…"): short display names with full names as tooltips, horizontal
   lockup with brass–teal spine, strip scrolls instead of clipping

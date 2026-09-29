@@ -69,6 +69,34 @@ export function FablabMark({ size = 140, className = '', id = 'fablab-mark' }) {
  * institutional assets are available. The grid, hover treatment, and
  * sizing will still work.
  */
+/**
+ * Header magnifier behaviour: every list page (Members, Entry Logs, …) has
+ * its own `.search-input` that filters as you type, but the header icon did
+ * nothing when clicked. It now focuses the current page's search field (with
+ * a brief brass flash so you can see which field caught it); on pages with
+ * no search field it jumps to Entry Logs and focuses that one instead.
+ */
+function focusPageSearch() {
+  const focusIt = (el) => {
+    if (!el) return false
+    el.focus({ preventScroll: true })
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('search-flash')
+    window.setTimeout(() => el.classList.remove('search-flash'), 900)
+    return true
+  }
+  if (focusIt(document.querySelector('.page-wrap .search-input'))) return
+  if (window.location.hash !== '#/logs') window.location.hash = '#/logs'
+  // The Logs page animates in; retry until its search field exists.
+  let tries = 0
+  const timer = window.setInterval(() => {
+    tries += 1
+    if (focusIt(document.querySelector('.page-wrap .search-input')) || tries > 10) {
+      window.clearInterval(timer)
+    }
+  }, 250)
+}
+
 export function InstitutionalLogos({ className = '' }) {
   // `short` is what renders in the pill (must fit — ~20 chars max);
   // `label` is the full name, kept as the hover tooltip.
@@ -86,12 +114,18 @@ export function InstitutionalLogos({ className = '' }) {
           <span className="inst-tag">{short}</span>
         </div>
       ))}
-      <div className="inst-slot inst-search" aria-hidden="true">
+      <button
+        className="inst-slot inst-search"
+        type="button"
+        title="Search this page"
+        aria-label="Search this page"
+        onClick={focusPageSearch}
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="11" cy="11" r="7" />
           <line x1="20" y1="20" x2="16.65" y2="16.65" />
         </svg>
-      </div>
+      </button>
     </div>
   )
 }

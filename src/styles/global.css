@@ -342,16 +342,30 @@ body {
 
 .inst-search {
   margin-left: auto;
-  padding: var(--sp-2);
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-mid);
   cursor: pointer;
   min-width: 0;
   background: transparent;
+  font: inherit;
 }
 
 .inst-search:hover { color: var(--teal-text); border-color: var(--teal); }
+
+/* Brief brass ring on the search field the header magnifier just focused. */
+.search-flash {
+  border-color: var(--accent-strong) !important;
+  box-shadow: 0 0 0 3px rgba(230, 169, 47, 0.35) !important;
+  transition: box-shadow 0.25s ease-out, border-color 0.25s ease-out;
+}
 
 /* ---------- Sidebar ---------- */
 
