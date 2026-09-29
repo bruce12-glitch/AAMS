@@ -18,6 +18,12 @@ Format follows Keep a Changelog; versioning is SemVer-ish (0.x while prototype).
 - Telegram communication portal (`Communicate` page + `POST /api/notify/send`)
 - Occupant names on the dashboard; single documented camera handoff step
 
+### Changed — Design
+- Warm institutional theme across the console: ivory/paper backgrounds, brass
+  accent, teal→brass rules under headers and titles, gradient primary buttons,
+  paper sidebar with raised active nav, colour-bar stat cards, redesigned
+  tables/inputs/modals; subtle film-grain texture on the background layer
+
 ### Fixed
 - Occupancy report `GROUP BY HOUR()` → `strftime('%H', …)` (was HTTP 500)
 - Members table showed every member as face-less: `enrolled` was derived

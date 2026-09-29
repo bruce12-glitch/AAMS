@@ -1,43 +1,46 @@
 /* ============================================================
    FABLAB SRMIST — AAMS Console
-   Light institutional theme. Cream surfaces, FABLAB teal accent,
-   yellow highlight for primary actions.
+   Classic institutional theme. Ivory/paper surfaces, brass and teal
+   accents, Garamond display type over a geometric UI sans.
 
    Design tokens
    ─────────────
-   Surfaces    --bg-0 page  · --bg-1 card  · --bg-2 inset
-   Borders     --border · --border-bright
-   Text        --text-hi primary · --text-mid body · --text-low meta
-   Brand       --teal · --teal-bright (FABLAB mark)
-   Actions     --accent (yellow) · --accent-strong
-   Signal      --green ok · --red danger · --cyan info · --violet
+   Surfaces    --bg-0 page (ivory) › --bg-1 card (paper) › --bg-2 inset
+   Borders     --border › --border-bright › --rule-gold (hairline flourish)
+   Text        --text-hi primary › --text-mid body › --text-low meta
+   Brand       --teal › --teal-bright (FABLAB mark)
+   Actions     --accent (brass) › --accent-strong
+   Signal      --green ok › --red danger › --cyan info › --violet
    Type scale  --fs-xs..--fs-3xl + --fs-display (4px rhythm, ≥10.5px floor)
    Spacing     --sp-1..--sp-7 (4px rhythm)
-   Radii       --r-sm 8 · --r-md 12 · --r-lg 16 · --r-xl 18 · --r-pill 999
-   Shadow      --shadow-sm / --shadow-md / --shadow-lg
+   Radii       --r-sm 8 › --r-md 12 › --r-lg 16 › --r-xl 18 › --r-pill 999
+   Shadow      --shadow-sm / --shadow-md / --shadow-lg (warm-toned)
    ============================================================ */
 
 :root {
-  /* Surfaces */
-  --bg-0: #f4f5f7;
-  --bg-1: #ffffff;
-  --bg-2: #f9fafb;
+  /* Surfaces — warm ivory / paper. The old cool grays read as generic
+     SaaS; these give the console the feel of printed institutional
+     stationery, which is the "classic" direction the product wants. */
+  --bg-0: #f4f0e7;   /* page — warm ivory */
+  --bg-1: #fffdf8;   /* card — paper white */
+  --bg-2: #faf6ee;   /* inset — cream */
 
   /* Borders */
-  --border: #e5e7eb;
-  --border-bright: #d1d5db;
+  --border: #e8e0d0;
+  --border-bright: #d9cfba;
 
   /* Text */
-  --text-hi: #111827;    /* 17.74 : 1 on white */
-  --text-mid: #4b5563;   /*  7.56 : 1 */
-  --text-low: #646b78;   /*  4.92 : 1 on --bg-0 (was #6b7280 = 4.43, failed) */
+  --text-hi: #17150f;    /* 17.4 : 1 on paper */
+  --text-mid: #4a463d;   /*  9.0 : 1 */
+  --text-low: #6b6558;   /*  4.8 : 1 on --bg-0 */
 
   /* Brand & action */
   --teal: #14b8a6;
   --teal-bright: #2dd4bf;
   --cyan: #22d3ee;
-  --accent: #fbbf24;
-  --accent-strong: #f59e0b;
+  --accent: #e6a92f;      /* brass gold — deeper than the old #fbbf24 */
+  --accent-strong: #c98a18;
+  --rule-gold: #c9a86a;   /* hairlines and flourishes */
 
   /* Signal — bright values. Good for fills, borders and focus rings;
      they fail WCAG AA as text on light surfaces (cyan is 1.81:1), so use
@@ -93,10 +96,11 @@
   --r-xl: 18px;
   --r-pill: 999px;
 
-  /* Shadow */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.14);
+  /* Shadow — warmed to match the ivory surfaces (a blue-black shadow on
+     cream reads dirty). The lg step carries the card lift. */
+  --shadow-sm: 0 1px 2px rgba(38, 32, 18, 0.07);
+  --shadow-md: 0 6px 18px -8px rgba(38, 32, 18, 0.22);
+  --shadow-lg: 0 24px 60px -24px rgba(38, 32, 18, 0.35);
   --glow-cyan: 0 0 0 4px rgba(34, 211, 238, 0.18);   /* focus ring */
 
   /* Motion
@@ -153,7 +157,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(251, 191, 36, 0.35); }
+::selection { background: rgba(230, 169, 47, 0.35); }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -227,21 +231,49 @@ body {
   /* Classic entrepreneurial wash: warm ivory + whisper of teal/gold.
      Replaces the old neon cyan glow — calm, premium, readable. */
   background:
-    radial-gradient(1100px 620px at 78% -10%, rgba(201, 168, 106, 0.10), transparent 60%),
-    radial-gradient(1000px 640px at -8% 108%, rgba(20, 184, 166, 0.07), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 30%);
+    radial-gradient(1100px 620px at 78% -10%, rgba(201, 168, 106, 0.16), transparent 60%),
+    radial-gradient(1000px 640px at -8% 108%, rgba(20, 184, 166, 0.09), transparent 60%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.45) 0%, transparent 30%);
+}
+
+/* Paper grain. Purely decorative: a fractal-noise SVG at ~4% multiplied
+   over the wash stops large flat areas of ivory from looking plastic.
+   Fixed + pointer-events:none, so it can never intercept a click. */
+.bg-vignette::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
 }
 
 /* ---------- Institutional header ---------- */
 
 .institutional-header {
+  position: relative;
   height: 64px;
-  background: var(--bg-1);
+  background: linear-gradient(180deg, #fffefb 0%, var(--bg-1) 100%);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   padding: 0 var(--sp-5);
   flex-shrink: 0;
+}
+
+/* Teal → brass rule under the masthead: the one piece of pure ornament
+   in the shell, and what makes the header read as a letterhead rather
+   than a toolbar. */
+.institutional-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--teal) 0%, var(--rule-gold) 42%, rgba(201, 168, 106, 0) 100%);
+  pointer-events: none;
 }
 
 .institutional-strip {
@@ -259,14 +291,16 @@ body {
   padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-3);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, #ffffff, var(--bg-2));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, var(--shadow-sm);
   min-width: 76px;
-  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
 
 .inst-slot:hover {
-  border-color: var(--teal);
+  border-color: var(--rule-gold);
   background: #ffffff;
+  transform: translateY(-1px);
 }
 
 .inst-code {
@@ -312,7 +346,10 @@ body {
   flex-direction: column;
   padding: var(--sp-5) var(--sp-3) var(--sp-4);
   border-right: 1px solid var(--border);
-  background: var(--bg-1);
+  /* A shade darker than the page so the rail reads as bound edge of the
+     stationery, not another content panel. */
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-2) 62%, #f7f2e7 100%);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.7);
 }
 
 .brand {
@@ -407,6 +444,9 @@ body {
 }
 
 .nav-section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   font-weight: 700;
@@ -414,6 +454,14 @@ body {
   text-transform: uppercase;
   color: var(--text-low);
   padding: var(--sp-3) var(--sp-3) var(--sp-2);
+}
+
+/* Hairline trailing the section label — the classic index-page rhythm. */
+.nav-section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
 }
 
 .nav-item {
@@ -424,24 +472,28 @@ body {
   width: 100%;
   padding: var(--sp-2) var(--sp-3);
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-mid);
   font-family: var(--font-ui);
   font-size: var(--fs-base);
   font-weight: 500;
   cursor: pointer;
-  transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+  transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
 .nav-item:hover {
-  background: var(--bg-2);
+  background: rgba(255, 255, 255, 0.85);
   color: var(--text-hi);
 }
 
 .nav-item.active {
   color: var(--text-hi);
-  background: var(--bg-2);
+  font-weight: 600;
+  background: linear-gradient(180deg, #ffffff, var(--bg-1));
+  /* Inset ring instead of a border: a real border would shift the label
+     by 1px the moment it becomes active. */
+  box-shadow: inset 0 0 0 1px var(--border), var(--shadow-sm);
 }
 
 .nav-item .nav-glyph {
@@ -455,16 +507,19 @@ body {
 .nav-item.active .nav-glyph,
 .nav-item:hover .nav-glyph { opacity: 1; }
 
-/* Yellow underline on the active item, like the reference site. */
+/* Brass edge on the active item — the tab-marker of a bound register.
+   (Was a bottom underline; the raised card state gives the same signal
+   with more weight, so the marker moved to the spine.) */
 .nav-item.active::after {
   content: '';
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 4px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--accent);
+  left: -1px;
+  top: 7px;
+  bottom: 7px;
+  width: 3px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(180deg, var(--accent), var(--rule-gold));
+  box-shadow: 0 0 8px rgba(230, 169, 47, 0.5);
 }
 
 .nav-indicator { display: none; }
@@ -483,10 +538,25 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: var(--sp-3) var(--sp-3) var(--sp-3);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, #fffdf8, var(--bg-2));
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   font-size: var(--fs-sm);
   line-height: 1.45;
   color: var(--text-mid);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Brass hairline across the top of the card, like a printed rule. */
+.contact-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--rule-gold), transparent);
+  opacity: 0.8;
 }
 
 .contact-title {
@@ -563,7 +633,7 @@ body {
   box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
   animation: pulse-dot 2s ease-in-out infinite;
 }
-.conn-dot.demo { background: var(--accent); box-shadow: 0 0 10px rgba(251, 191, 36, 0.55); }
+.conn-dot.demo { background: var(--accent); box-shadow: 0 0 10px rgba(230, 169, 47, 0.6); }
 
 @keyframes pulse-dot {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -580,6 +650,7 @@ body {
 }
 
 .topbar {
+  position: relative;
   height: 64px;
   flex-shrink: 0;
   display: flex;
@@ -587,7 +658,21 @@ body {
   justify-content: space-between;
   padding: 0 var(--sp-6);
   border-bottom: 1px solid var(--border);
-  background: var(--bg-1);
+  background: linear-gradient(180deg, #fffefb 0%, var(--bg-1) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
+/* Faint continuation of the masthead rule, dimmed so it does not
+   compete with it where the two bars stack on a narrow screen. */
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(201, 168, 106, 0.45), rgba(201, 168, 106, 0) 55%);
+  pointer-events: none;
 }
 
 .topbar-title {
@@ -637,16 +722,37 @@ body {
   position: relative;
   border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--bg-1);
+  background: linear-gradient(180deg, #fffefb 0%, var(--bg-1) 100%);
   padding: var(--sp-5);
-  box-shadow: var(--shadow-sm);
+  /* Three layers: an inner highlight so the card looks lit from above,
+     a tight contact shadow, and a wide soft one for lift. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    var(--shadow-sm),
+    0 14px 30px -24px rgba(38, 32, 18, 0.5);
   transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
+/* Brass hairline under the top edge of every content panel. Stat cards
+   opt out — they carry their own colour bar instead. */
+.panel:not(.stat-card)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 18px;
+  right: 18px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 168, 106, 0.6), transparent);
+  pointer-events: none;
+}
+
 .panel.hoverable:hover {
-  border-color: var(--teal);
+  border-color: var(--rule-gold);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    var(--shadow-md),
+    0 22px 44px -28px rgba(38, 32, 18, 0.55);
 }
 
 .panel-head {
@@ -702,6 +808,9 @@ body {
   grid-template-columns: 1.9fr 1fr;
   gap: var(--sp-4);
   margin-top: var(--sp-4);
+  /* Content-driven heights: equalising them stretched a half-empty panel
+     to match a taller neighbour, which reads as an unfinished box. */
+  align-items: start;
 }
 
 @media (max-width: 1080px) { .grid-main { grid-template-columns: 1fr; } }
@@ -712,11 +821,25 @@ body {
 
 .stat-card { overflow: hidden; }
 
+/* Colour bar across the top — identifies the metric at a glance and
+   replaces the generic panel hairline for this card type. */
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--stat-color, var(--teal)) 0%, transparent 92%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
 .stat-card::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(220px 120px at 85% -20%, var(--stat-tint, rgba(34,211,238,0.12)), transparent 70%);
+  background: radial-gradient(240px 140px at 88% -24%, var(--stat-tint, rgba(34,211,238,0.12)), transparent 70%);
   pointer-events: none;
 }
 
@@ -752,10 +875,14 @@ body {
   line-height: 1;
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
+  /* A whisper of brass under the numeral, echoing the masthead rule. */
+  display: inline-block;
+  padding-bottom: 6px;
+  border-bottom: 2px solid rgba(201, 168, 106, 0.55);
 }
 
 .stat-foot {
-  margin-top: var(--sp-3);
+  margin-top: var(--sp-2);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
@@ -792,8 +919,9 @@ body {
   text-transform: uppercase;
   color: var(--text-low);
   padding: var(--sp-2) var(--sp-3);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-2);
+  border-bottom: 1px solid var(--border-bright);
+  background: linear-gradient(180deg, var(--bg-2), #f6f1e6);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .data-table td {
@@ -807,7 +935,11 @@ body {
 .data-table tr:last-child td { border-bottom: none; }
 
 .data-table tbody tr { transition: background var(--dur-1) var(--ease-out); }
-.data-table tbody tr:hover { background: var(--bg-2); }
+.data-table tbody tr:hover {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.07), rgba(20, 184, 166, 0) 55%);
+}
+/* Brass tick on the hovered row's first cell — where the eye already is. */
+.data-table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--rule-gold); }
 
 .mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .name-cell { color: var(--text-hi); font-weight: 600; }
@@ -850,34 +982,38 @@ body {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
   font-weight: 600;
+  letter-spacing: 0.2px;
   padding: var(--sp-2) var(--sp-4);
-  border-radius: var(--r-sm);
+  border-radius: 10px;
   border: 1px solid var(--border-bright);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, #ffffff, var(--bg-2));
   color: var(--text-hi);
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--shadow-sm);
   transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--bg-1);
-  border-color: var(--teal);
+  background: linear-gradient(180deg, #ffffff, #fffdf8);
+  border-color: var(--rule-gold);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--shadow-md);
 }
 
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn.primary {
-  background: var(--accent);
+  background: linear-gradient(180deg, #f0bd52 0%, var(--accent) 55%, var(--accent-strong) 100%);
   border: 1px solid var(--accent-strong);
   color: #1f1300;
-  box-shadow: 0 1px 2px rgba(245, 158, 11, 0.25);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(201, 138, 24, 0.35);
 }
 .btn.primary:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: linear-gradient(180deg, #f5c664 0%, var(--accent) 55%, var(--accent-strong) 100%);
   border-color: var(--accent-strong);
-  filter: brightness(1.05);
+  filter: brightness(1.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 16px -8px rgba(201, 138, 24, 0.7);
 }
 
 .btn.ghost {
@@ -1028,8 +1164,9 @@ body {
   place-items: center;
   font-size: var(--fs-sm);
   font-weight: 700;
-  color: #071018;
-  background: var(--grad-accent);
+  color: #2a1d00;
+  background: linear-gradient(135deg, #f6e3b4 0%, var(--rule-gold) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
   flex-shrink: 0;
 }
 
@@ -1089,25 +1226,35 @@ body {
   transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out), color var(--dur-1) var(--ease-out);
 }
 
-.filter-chip:hover { border-color: var(--border-bright); color: var(--text-hi); }
-.filter-chip.on { border-color: var(--cyan-text); color: var(--cyan-text); background: rgba(34,211,238,.08); }
+.filter-chip:hover { border-color: var(--rule-gold); color: var(--text-hi); }
+.filter-chip.on {
+  border-color: var(--rule-gold);
+  color: var(--amber-text);
+  background: rgba(230, 169, 47, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
 
 .search-input {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  background: #ffffff;
   color: var(--text-hi);
   outline: none;
   width: 240px;
   max-width: 100%;
+  box-shadow: inset 0 1px 2px rgba(38, 32, 18, 0.05);
   transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
 }
 
-.search-input:hover { border-color: var(--border-bright); }
-.search-input:focus { border-color: var(--teal-text); background: var(--bg-1); box-shadow: var(--glow-cyan); }
+.search-input:hover { border-color: var(--rule-gold); }
+.search-input:focus {
+  border-color: var(--teal-text);
+  background: #ffffff;
+  box-shadow: var(--glow-cyan), inset 0 1px 2px rgba(38, 32, 18, 0.04);
+}
 .search-input::placeholder { color: var(--text-low); }
 
 /* ---------- Misc ---------- */
@@ -1122,9 +1269,22 @@ body {
   font-size: var(--fs-title);
   font-weight: 600;
   letter-spacing: 0;
+  display: inline-block;
 }
 
-.page-sub { color: var(--text-mid); font-size: var(--fs-base); margin-top: 6px; }
+/* Teal → brass rule under every page heading: the flourish that makes
+   each page feel typeset rather than rendered. */
+.page-title::after {
+  content: '';
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--teal) 0%, var(--rule-gold) 100%);
+}
+
+.page-sub { color: var(--text-mid); font-size: var(--fs-base); margin-top: 12px; }
 
 .empty-state {
   padding: var(--sp-7) var(--sp-5);
@@ -1205,7 +1365,7 @@ body {
   display: grid;
   place-items: center;
   padding: var(--sp-6);
-  background: rgba(15, 23, 42, 0.45);
+  background: rgba(30, 26, 18, 0.42);
   backdrop-filter: blur(8px);
 }
 
@@ -1215,8 +1375,8 @@ body {
   overflow-y: auto;
   border-radius: var(--r-xl);
   border: 1px solid var(--border);
-  background: var(--bg-1);
-  box-shadow: var(--shadow-lg);
+  background: linear-gradient(180deg, #fffefb 0%, var(--bg-1) 100%);
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 106, 0.2), var(--shadow-lg);
   padding: var(--sp-6);
   color: var(--text-hi);
 }
@@ -1249,15 +1409,19 @@ body {
   text-transform: none;
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--r-md);
-  border: 1px solid var(--border);
-  background: var(--bg-1);
+  border: 1px solid var(--border-bright);
+  background: #ffffff;
   color: var(--text-hi);
   outline: none;
+  box-shadow: inset 0 1px 2px rgba(38, 32, 18, 0.05);
   transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
 
-.form-grid input:hover, .form-grid select:hover { border-color: var(--border-bright); }
-.form-grid input:focus, .form-grid select:focus { border-color: var(--teal-text); box-shadow: var(--glow-cyan); }
+.form-grid input:hover, .form-grid select:hover { border-color: var(--rule-gold); }
+.form-grid input:focus, .form-grid select:focus {
+  border-color: var(--teal-text);
+  box-shadow: var(--glow-cyan), inset 0 1px 2px rgba(38, 32, 18, 0.04);
+}
 
 .consent-row {
   flex-direction: row !important;
@@ -1339,8 +1503,8 @@ body {
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--amber-text);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  background: rgba(245, 158, 11, 0.10);
+  border: 1px solid rgba(230, 169, 47, 0.45);
+  background: rgba(230, 169, 47, 0.12);
   border-radius: var(--r-pill);
   padding: var(--sp-1) var(--sp-3);
   white-space: nowrap;
@@ -1458,8 +1622,8 @@ body {
   letter-spacing: 0.8px;
   text-transform: uppercase;
   color: var(--amber-text, #b45309);
-  border: 1px solid rgba(251, 191, 36, 0.35);
-  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(230, 169, 47, 0.45);
+  background: rgba(230, 169, 47, 0.12);
   border-radius: 999px;
   padding: 5px 12px;
   white-space: nowrap;
@@ -1482,11 +1646,14 @@ body {
 }
 
 .login-card {
-  width: min(460px, 100%);
-  background: var(--bg-1);
+  position: relative;
+  width: min(470px, 100%);
+  background: linear-gradient(180deg, #fffefb 0%, var(--bg-1) 55%, #fdfaf3 100%);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    inset 0 0 0 1px rgba(201, 168, 106, 0.22),
+    var(--shadow-lg);
   padding: var(--sp-7) var(--sp-6);
   text-align: center;
 }
@@ -1496,11 +1663,21 @@ body {
   display: block;
   height: 3px;
   border-radius: var(--r-pill);
-  background: linear-gradient(90deg, var(--teal), #c9a86a);
+  background: linear-gradient(90deg, var(--teal), var(--rule-gold));
   margin: calc(var(--sp-6) * -1) calc(var(--sp-6) * -1) var(--sp-5);
 }
 
-.login-brand { margin-bottom: var(--sp-5); }
+/* Faint brass corner marks — a certificate edge, nothing more. */
+.login-card::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: calc(var(--r-xl) - 6px);
+  border: 1px solid rgba(201, 168, 106, 0.25);
+  pointer-events: none;
+}
+
+.login-brand { margin-bottom: var(--sp-5); position: relative; z-index: 1; }
 .login-inst {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
@@ -1511,12 +1688,24 @@ body {
 }
 .login-title {
   font-family: var(--font-display);
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-3xl);
   font-weight: 600;
+  letter-spacing: 0.2px;
   margin: var(--sp-2) 0 0;
+  position: relative;
+  display: inline-block;
 }
-.login-sub { color: var(--text-mid); font-size: var(--fs-base); margin: var(--sp-2) 0 0; }
-.login-form { text-align: left; margin-top: var(--sp-4); }
+.login-title::after {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 2px;
+  margin: 10px auto 0;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--teal), var(--rule-gold));
+}
+.login-sub { color: var(--text-mid); font-size: var(--fs-base); margin: var(--sp-3) 0 0; }
+.login-form { text-align: left; margin-top: var(--sp-5); position: relative; z-index: 1; }
 .login-label {
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
@@ -1526,10 +1715,16 @@ body {
   display: block;
   margin-bottom: var(--sp-2);
 }
-.login-input { width: 100%; }
+.login-input {
+  width: 100%;
+  padding: 11px var(--sp-3);
+  background: #ffffff;
+  border-color: var(--border-bright);
+}
+.login-input:focus { background: #ffffff; }
 .login-hint { font-size: var(--fs-sm); color: var(--text-low); line-height: 1.55; }
 .login-hint strong { color: var(--teal-text); }
-.login-btn { width: 100%; margin-top: var(--sp-3); }
+.login-btn { width: 100%; margin-top: var(--sp-4); padding-top: 10px; padding-bottom: 10px; }
 .login-foot {
   margin-top: var(--sp-5);
   font-size: var(--fs-xs);
@@ -1547,7 +1742,8 @@ body {
   font-size: var(--fs-sm);
   color: var(--text-mid);
   border: 1px solid var(--border);
-  background: var(--bg-2);
+  background: linear-gradient(180deg, #ffffff, var(--bg-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), var(--shadow-sm);
   border-radius: var(--r-pill);
   padding: 4px 6px 4px 12px;
   max-width: 340px;
