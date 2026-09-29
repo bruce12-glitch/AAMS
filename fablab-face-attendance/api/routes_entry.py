@@ -249,7 +249,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
             'UNKNOWN': 'medium', 'UNPAID': 'medium', 'TAILGATE': 'medium',
         }.get(alert_type, 'medium')
         who = (user or {}).get('name') or claimed or 'unidentified person'
-        message = f'{alert_type} at Fab Lab entrance â€” {who}. {reason}'
+        message = f'{alert_type} at Fab Lab entrance — {who}. {reason}'
         alert_row_id = service.save_alert_to_db(alert_type, message,
                                                 image_path=evidence,
                                                 severity=severity)
