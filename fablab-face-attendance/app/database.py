@@ -47,6 +47,7 @@ def init_db():
             face_embedding_2 BLOB,
             face_embedding_3 BLOB,
             face_image_path TEXT,
+            password_hash TEXT,
             consent_given INTEGER DEFAULT 0,
             active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -142,6 +143,9 @@ def _ensure_columns():
     migrations = {
         'entry_logs': {
             'latency_ms': 'REAL',          # §23.3 decision-time tracking
+        },
+        'users': {
+            'password_hash': 'TEXT',       # console sign-in (email + password)
         },
     }
     conn = get_connection()

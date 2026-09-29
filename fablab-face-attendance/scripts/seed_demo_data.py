@@ -8,6 +8,8 @@ Run: python -m scripts.seed_demo_data
 import sys
 sys.path.insert(0, '..')
 
+import os
+
 import numpy as np
 from app.database import get_connection
 
@@ -42,14 +44,26 @@ def main():
         ('RA2111003010128', 'Karthik N', '9876543215', 'karthik@srmist.edu.in', 'student', 'pending', '2026-12-31'),
     ]
     
+    # Optional demo sign-in password for all seeded users
+    # (console login needs email + password). Set SEED_MEMBER_PASSWORD
+    # in the environment to enable it; otherwise seeded users can only
+    # sign in after an admin sets their password.
+    pwd_hash = None
+    seed_password = os.getenv('SEED_MEMBER_PASSWORD', '')
+    if seed_password:
+        from app.auth import hash_password
+
+        pwd_hash = hash_password(seed_password)
+
     for user in users:
         embedding = generate_random_embedding()
         cursor.execute('''
-            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, face_embedding)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (*user, embedding))
-    
-    print(f"[OK] Created {len(users)} users")
+            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, face_embedding, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (*user, embedding, pwd_hash))
+
+    print(f"[OK] Created {len(users)} users"
+          + (" (with demo password)" if pwd_hash else " (no password — set via reset endpoint)"))
     
     # Generate tokens for users
     import time

@@ -32,6 +32,7 @@ class UserCreate(BaseModel):
     user_type: str = 'student'
     payment_status: str = 'inactive'
     payment_expiry: Optional[str] = None
+    password: Optional[str] = None  # plain text once; only its hash is stored
 
 
 class EnrollRequest(UserCreate):
@@ -50,11 +51,12 @@ async def list_users():
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    # Never ship binary embeddings to the client
+    # Never ship binary embeddings or password hashes to the client
     for user in users:
         user['face_embedding'] = None
         user['face_embedding_2'] = None
         user['face_embedding_3'] = None
+        user['password_hash'] = None
         user['enrolled'] = any(
             user.get(k) for k in ('face_embedding', 'face_embedding_2', 'face_embedding_3')
         ) or False
@@ -83,6 +85,13 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
             req.email = reject_non_srmist(req.email)
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc))
+
+    # Console sign-in needs email + password, so enrollment sets both.
+    from app.auth import hash_password
+    try:
+        pwd_hash = hash_password(req.password or '')
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if not req.consent_given:
         raise HTTPException(status_code=400,
@@ -138,24 +147,24 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
                 UPDATE users SET name=?, phone=?, email=?, user_type=?,
                     payment_status=?, payment_expiry=?,
                     face_embedding=?, face_embedding_2=?, face_embedding_3=?,
-                    face_image_path=?, consent_given=?, active=1,
-                    updated_at=CURRENT_TIMESTAMP
+                    face_image_path=?, password_hash=?, consent_given=?,
+                    active=1, updated_at=CURRENT_TIMESTAMP
                 WHERE user_id=?
             ''', (req.name, req.phone, req.email, req.user_type,
                   req.payment_status, req.payment_expiry,
                   emb_bytes[0], emb_bytes[1], emb_bytes[2],
-                  photo_rel, int(req.consent_given), req.user_id))
+                  photo_rel, pwd_hash, int(req.consent_given), req.user_id))
         else:
             cursor.execute('''
                 INSERT INTO users (user_id, name, phone, email, user_type,
                     payment_status, payment_expiry, face_embedding,
                     face_embedding_2, face_embedding_3, face_image_path,
-                    consent_given, active)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    password_hash, consent_given, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             ''', (req.user_id, req.name, req.phone, req.email, req.user_type,
                   req.payment_status, req.payment_expiry,
                   emb_bytes[0], emb_bytes[1], emb_bytes[2],
-                  photo_rel, int(req.consent_given)))
+                  photo_rel, pwd_hash, int(req.consent_given)))
 
         # Issue active token (replace old ones).
         #
@@ -200,6 +209,13 @@ async def create_user(user: UserCreate, _: None = Depends(require_admin)):
             user.email = reject_non_srmist(user.email)
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc))
+    pwd_hash = None
+    if user.password:
+        from app.auth import hash_password
+        try:
+            pwd_hash = hash_password(user.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     from app.database import get_connection
 
     conn = get_connection()
@@ -207,16 +223,46 @@ async def create_user(user: UserCreate, _: None = Depends(require_admin)):
     try:
         cursor.execute('''
             INSERT INTO users (user_id, name, phone, email, user_type,
-                               payment_status, payment_expiry)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                               payment_status, payment_expiry, password_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (user.user_id, user.name, user.phone, user.email, user.user_type,
-              user.payment_status, user.payment_expiry))
+              user.payment_status, user.payment_expiry, pwd_hash))
         conn.commit()
         return {'success': True, 'user_id': user.user_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:
         conn.close()
+
+
+class PasswordReset(BaseModel):
+    password: str = ''
+
+
+@router.post('/{user_id}/password')
+async def reset_password(user_id: str, req: PasswordReset,
+                         _: None = Depends(require_admin)):
+    """Set or reset a member's console password (admin only)."""
+    from app.auth import hash_password
+    try:
+        pwd_hash = hash_password(req.password or '')
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    from app.database import get_connection
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE users SET password_hash=?, updated_at=CURRENT_TIMESTAMP
+        WHERE user_id=?
+    ''', (pwd_hash, user_id))
+    conn.commit()
+    affected = cursor.rowcount
+    conn.close()
+
+    if affected == 0:
+        raise HTTPException(status_code=404, detail='User not found')
+    return {'success': True}
 
 
 @router.put('/{user_id}')
@@ -334,6 +380,7 @@ async def export_user_data(user_id: str, _: None = Depends(require_admin)):
     profile['face_embedding'] = '[biometric vector withheld]'
     profile['face_embedding_2'] = '[biometric vector withheld]'
     profile['face_embedding_3'] = '[biometric vector withheld]'
+    profile['password_hash'] = '[credential withheld]'
 
     cursor.execute(
         'SELECT event_time, decision, reason, tag, similarity FROM entry_logs '
