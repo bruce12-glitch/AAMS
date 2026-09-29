@@ -124,7 +124,11 @@ Leave the secret unset (or delete it) to return to the zero-backend demo.
   console; real 400/403 verdicts from an API are always honoured.
 - Mutating API routes require the `X-Admin-Token` header matching
   `API_ADMIN_PASSWORD` in `fablab-face-attendance/.env`. With no password
-  configured the API runs in loudly-logged dev-open mode.
+  configured the API runs in loudly-logged dev-open mode. The console
+  prompts for the token on a 401 and remembers it.
+- Sign-in is rate limited (10 attempts/min per mail ID, 50/min per IP) and
+  every guarded route answers `401` without the token — see
+  [`SECURITY.md`](SECURITY.md) for the full control list.
 
 ## 📷 Connecting the camera
 
@@ -172,7 +176,7 @@ fablab-face-attendance/
 │                            # reports, dashboard, admin, auth, notify
 ├── enrollment/              # CLI enrollment (capture → quality → embeddings)
 ├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
-└── tests/                   # pytest suite (47 tests)
+└── tests/                   # pytest suite (75 tests)
 ```
 
 Frontend: React 19 + Vite 8 · `three` + `@react-three/fiber` (lazy,

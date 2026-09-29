@@ -54,7 +54,9 @@ async function request(path, options = {}, timeoutMs) {
         const body = await res.json()
         if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
       } catch { /* non-json error body */ }
-      throw new Error(detail)
+      const err = new Error(detail)
+      err.status = res.status
+      throw err
     }
     // 204 No Content (common for DELETE / ack) has no JSON body to parse.
     if (res.status === 204) return null
@@ -68,6 +70,11 @@ export function apiGet(path, timeoutMs) {
   return request(path, { method: 'GET' }, timeoutMs)
 }
 
+/** GET carrying the admin token header (guarded read endpoints, e.g. QR). */
+export function adminGet(path, timeoutMs) {
+  return request(path, { method: 'GET', headers: adminHeaders() }, timeoutMs)
+}
+
 export function apiPost(path, body, timeoutMs) {
   return request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }, timeoutMs)
 }
@@ -75,6 +82,23 @@ export function apiPost(path, body, timeoutMs) {
 /** POST carrying the admin token header (mutating endpoints). */
 export function adminPost(path, body, timeoutMs) {
   return request(path, { method: 'POST', headers: adminHeaders(), body: JSON.stringify(body ?? {}) }, timeoutMs)
+}
+
+/**
+ * Run an admin request; if the API answers 401 (token missing or stale),
+ * ask for it once, remember it, and retry. Returns the first successful
+ * result or rethrows the original error when the operator cancels.
+ */
+export async function withAdminPrompt(run) {
+  try {
+    return await run()
+  } catch (err) {
+    if (err?.status !== 401 || typeof window === 'undefined') throw err
+    const entered = window.prompt('Lab admin token required for this action:')
+    if (!entered || !entered.trim()) throw err
+    setAdminToken(entered)
+    return run()
+  }
 }
 
 export function apiPut(path, body, timeoutMs) {

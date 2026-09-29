@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { toArray, apiPost } from '../api/client'
+import { toArray, adminPost, withAdminPrompt } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_ALERTS } from '../api/mock'
 
@@ -23,20 +23,28 @@ export default function Alerts() {
   )
   const [sev, setSev] = useState('all')
   const [acked, setAcked] = useState({})
+  const [ackError, setAckError] = useState('')
 
   const list = toArray(data, 'alerts').filter((a) => sev === 'all' || String(a.severity ?? '').toLowerCase() === sev)
 
   const ack = async (id) => {
+    setAckError('')
     // Update the UI first so the click always feels responsive.
     setAcked((m) => ({ ...m, [id]: true }))
     // In the static demo there is no endpoint to call; stop here rather than
     // firing a request that can only fail.
     if (IS_STATIC_DEMO) return
     try {
-      await apiPost(`/alerts/${id}/ack`)
+      // Acknowledging is an admin action (otherwise anyone could clear the
+      // board); withAdminPrompt collects the token on a 401.
+      await withAdminPrompt(() => adminPost(`/alerts/${id}/ack`))
       refresh()
-    } catch {
-      /* optimistic — stays acked in UI; server state refreshes on next poll */
+    } catch (err) {
+      // The server never saw it — put the button back and say why.
+      setAcked((m) => { const next = { ...m }; delete next[id]; return next })
+      setAckError(err.status === 401
+        ? 'Admin token required to acknowledge alerts.'
+        : (err.message || 'Could not acknowledge this alert'))
     }
   }
 
@@ -57,6 +65,13 @@ export default function Alerts() {
       </div>
 
       <div className="report-grid">
+        {ackError && (
+          <div className="form-error" style={{ gridColumn: '1 / -1' }} role="alert">
+            {ackError}
+            <button className="btn sm ghost" type="button" style={{ marginLeft: 10 }}
+              onClick={() => setAckError('')}>Dismiss</button>
+          </div>
+        )}
         <AnimatePresence mode="popLayout">
           {list.map((a, i) => {
             const isAcked = a.acked === 1 || acked[a.id]

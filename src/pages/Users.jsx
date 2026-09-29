@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { useDialog } from '../hooks/useDialog'
-import { toArray, adminPost, apiPut, apiDelete, apiGet } from '../api/client'
+import { toArray, adminPost, adminGet, apiPut, apiDelete, withAdminPrompt } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_USERS } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
@@ -15,6 +15,10 @@ const initials = (name) =>
 // mutating endpoints; the demo has no database behind it, so we say so rather
 // than letting the call fail with an opaque network error.
 const DEMO_MSG = 'Not available in the static demo build — these actions need the backend API and its database.'
+
+// A 401 means the admin token was never stored (or was rotated): the code
+// above already prompted for it, so this is the "they cancelled" message.
+const TOKEN_MSG = 'Admin token required — run any admin action, enter the token when asked, and try again.'
 
 export default function Users() {
   const { data, loading, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
@@ -32,13 +36,16 @@ export default function Users() {
     setRowError('')
     if (IS_STATIC_DEMO) return setRowError(DEMO_MSG)
     try {
-      const res = await apiGet(`/users/${encodeURIComponent(u.user_id)}/qr`)
+      // The QR is a bearer credential for door entry, so the API demands
+      // the admin token; withAdminPrompt collects it if we have none yet.
+      const res = await withAdminPrompt(() =>
+        adminGet(`/users/${encodeURIComponent(u.user_id)}/qr`))
       setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
     } catch (err) {
       // Previously this set state that was only rendered inside the QR modal,
       // which never opened on failure - so the error was invisible. Surface it
       // in the table instead.
-      setRowError(err.message || 'Could not load QR pass')
+      setRowError(err.status === 401 ? TOKEN_MSG : (err.message || 'Could not load QR pass'))
     }
   }
 
@@ -48,11 +55,12 @@ export default function Users() {
     setQrError('')
     if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
-      const res = await adminPost(`/users/${encodeURIComponent(u.user_id)}/tokens/revoke`)
+      const res = await withAdminPrompt(() =>
+        adminPost(`/users/${encodeURIComponent(u.user_id)}/tokens/revoke`))
       setQrView({ name: u.name ?? u.user_id, dataUri: res.qr_data_uri })
       refresh()
     } catch (err) {
-      setQrError(err.message || 'Re-key failed')
+      setQrError(err.status === 401 ? TOKEN_MSG : (err.message || 'Re-key failed'))
     } finally {
       setBusyId(null)
     }
@@ -74,12 +82,12 @@ export default function Users() {
     setRowError('')
     if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
-      await apiPut(`/users/${encodeURIComponent(u.user_id)}?payment_status=${status}`)
+      await withAdminPrompt(() => apiPut(`/users/${encodeURIComponent(u.user_id)}?payment_status=${status}`))
       refresh()
     } catch (err) {
       // Was silently swallowed, leaving the dropdown showing a value the
       // server never accepted. Tell the user instead.
-      setRowError(err.message || 'Could not update payment status')
+      setRowError(err.status === 401 ? TOKEN_MSG : (err.message || 'Could not update payment status'))
     }
     finally { setBusyId(null) }
   }
@@ -90,10 +98,10 @@ export default function Users() {
     setRowError('')
     if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
-      await apiDelete(`/users/${encodeURIComponent(u.user_id)}`)
+      await withAdminPrompt(() => apiDelete(`/users/${encodeURIComponent(u.user_id)}`))
       refresh()
     } catch (err) {
-      setRowError(err.message || 'Could not delete member')
+      setRowError(err.status === 401 ? TOKEN_MSG : (err.message || 'Could not delete member'))
     }
     finally { setBusyId(null) }
   }
