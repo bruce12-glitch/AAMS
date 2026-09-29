@@ -7,7 +7,7 @@
 
 > ### 🌐 Visit the live website: [bruce12-glitch.github.io/AAMS](https://bruce12-glitch.github.io/AAMS/)
 > Interactive demo of the console (sample data, no backend needed).
-> Sign in with any `@srmist.edu.in` address to explore.
+> Sign in with any `@srmist.edu.in` address + any 6-character password.
 
 **Smart Anti-Proxy Facial Access and Attendance Management System** for the
 SRMIST Fab Lab — face recognition at the door, live occupancy, security
@@ -94,11 +94,34 @@ npm run build:pages          # Pages target — base '/AAMS/', static demo, zero
 > absolute path for deep links). If the repository is renamed, update
 > `PAGES_BASE` to match.
 
+## 🔗 Linking the live site to the backend
+
+The Pages build is a self-contained demo by default. To run it against
+the real backend (sign-in verification, enrollment, live data):
+
+1. Host the API (lab machine, `docker compose`, or any HTTPS host) and
+   allow the Pages origin in CORS (`ALLOWED_ORIGINS` includes
+   `https://bruce12-glitch.github.io`)
+2. Repository **Settings → Secrets and variables → Actions** → add
+   `AAMS_API_URL` = `https://<your-api-host>` (no trailing slash)
+3. Push to `main` — the workflow injects it as `VITE_API_URL` and the
+   site switches from demo mode to live mode
+
+Leave the secret unset (or delete it) to return to the zero-backend demo.
+
 ## 🔐 Authentication
 
 - Console sign-in, member enrollment and `POST /api/auth/login` accept
   **only `@srmist.edu.in`** addresses — every other domain is rejected
   with a clear message, on both frontend and backend.
+- Sign-in is **email + password** (minimum 6 characters). The server
+  stores only a PBKDF2-SHA256 hash (200 000 iterations, random salt) in
+  `users.password_hash`; plain-text passwords are never logged, returned
+  or persisted. Wrong passwords are rejected by the API, never by a
+  frontend shortcut.
+- Without a backend (the public Pages demo) the same rule is enforced
+  locally: SRMIST address plus any 6-character password opens the
+  console; real 400/403 verdicts from an API are always honoured.
 - Mutating API routes require the `X-Admin-Token` header matching
   `API_ADMIN_PASSWORD` in `fablab-face-attendance/.env`. With no password
   configured the API runs in loudly-logged dev-open mode.
@@ -149,7 +172,7 @@ fablab-face-attendance/
 │                            # reports, dashboard, admin, auth, notify
 ├── enrollment/              # CLI enrollment (capture → quality → embeddings)
 ├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
-└── tests/                   # pytest suite (41 tests)
+└── tests/                   # pytest suite (47 tests)
 ```
 
 Frontend: React 19 + Vite 8 · `three` + `@react-three/fiber` (lazy,

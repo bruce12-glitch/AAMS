@@ -144,11 +144,9 @@ export default function LiveMonitor() {
 
             {!camOnline && (
               <div className="camera-path-hint">
-                <strong>Only remaining step — camera ↔ application path.</strong><br />
-                Everything else in this console already works (dashboard, logs, alerts, members, reports, SRMIST sign-in).
-                To go live on the lab host: set <code>camera.source</code> (USB index <code>0</code> / RTSP URL) and{' '}
-                <code>capture.enabled: true</code> in <code>fablab-face-attendance/config.yaml</code>, then restart the API
-                (<code>python run.py</code>). The snapshot test below keeps working without a camera.
+                <strong>Camera not linked.</strong> Set <code>camera.source</code> +{' '}
+                <code>capture.enabled: true</code> in <code>config.yaml</code>, restart the API.
+                Snapshot test below works without a camera.
               </div>
             )}
 

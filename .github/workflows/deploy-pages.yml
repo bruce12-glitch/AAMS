@@ -67,6 +67,12 @@ jobs:
           # Switches the Vite base to '/AAMS/' and compiles out the API health
           # probe, so the static site makes no backend requests at all.
           VITE_TARGET: pages
+          # Link the live site to the real backend + database: set the
+          # AAMS_API_URL repository secret to the API origin
+          # (e.g. https://your-api-host). Empty (default) keeps the
+          # zero-backend demo; set, the site signs in, enrolls and reads
+          # live data from that server. See README "Link the live site".
+          VITE_API_URL: ${{ secrets.AAMS_API_URL }}
         run: npm run build
 
       - name: Add .nojekyll
