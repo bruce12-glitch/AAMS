@@ -5,6 +5,7 @@
  */
 
 import { IS_STATIC_DEMO } from '../config/runtime'
+import { apiUrl } from '../api/client'
 
 export const SRMIST_SUFFIX = '@srmist.edu.in'
 
@@ -43,48 +44,55 @@ export function clearSession() {
   localStorage.removeItem(KEY)
 }
 
+export const MIN_PASSWORD_LEN = 6
+
 /**
- * Validate against the backend too — falls back to the local rule whenever
- * there is no usable backend (static Pages demo, dev without API).
+ * Sign in with SRMIST email + member password.
  *
- * Why the fallback is broad: on GitHub Pages /api/* answers 404 with an
- * HTML body, and res.json() on HTML throws a SyntaxError (not a TypeError).
- * Treating only TypeError as "offline" rejected VALID @srmist.edu.in mail
- * IDs on the live site. Only an explicit backend 403 is a real rejection —
- * everything else honours the local rule (the server re-checks on every
- * real API call anyway).
+ * - Static demo build (no backend by design): requires an SRMIST address
+ *   plus any password of MIN_PASSWORD_LEN+ chars, verified locally. The
+ *   demo holds no real data, so this is a gate, not a proof.
+ * - With a backend: the server verifies the password hash. A 400/403 with
+ *   a JSON verdict is always rethrown — a wrong password must never fall
+ *   back to local access. Only a missing/unreachable backend (404 HTML,
+ *   network error) honours the local rule.
  */
-export async function loginWithBackend(email) {
+export async function loginWithBackend(email, password) {
   const clean = normalizeEmail(email)
   if (!isSrmistEmail(clean)) {
     throw new Error(`Only ${SRMIST_SUFFIX} mail IDs are allowed`)
   }
+  if (!password || String(password).length < MIN_PASSWORD_LEN) {
+    throw new Error(`Password must be at least ${MIN_PASSWORD_LEN} characters`)
+  }
   // Static demo build ships with no backend by design — skip the network
   // call entirely instead of failing on the 404 HTML fallback page.
   if (IS_STATIC_DEMO) return saveSession(clean)
+  let res
   try {
-    const res = await fetch('/api/auth/login', {
+    res = await fetch(apiUrl('/api/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: clean })
+      body: JSON.stringify({ email: clean, password: String(password) })
     })
-    const contentType = res.headers.get('content-type') || ''
-    let body = null
-    if (contentType.includes('application/json')) {
-      try { body = await res.json() } catch { body = null }
-    }
-    if (res.status === 403) {
-      const rejection = new Error(body?.detail || `Only ${SRMIST_SUFFIX} mail IDs are allowed`)
-      rejection.isAuthRejection = true
-      throw rejection
-    }
-    // res.ok, or backend missing/misbehaving (404 HTML, 405, non-JSON):
-    // honour the local SRMIST rule. Genuine API calls re-validate server-side.
-    return saveSession(clean)
-  } catch (err) {
-    // A real backend 403 verdict stays rejected; everything else
-    // (offline, HTML fallback page, proxy error) falls back to local.
-    if (err?.isAuthRejection) throw err
+  } catch {
+    // Backend unreachable (dev without API): honour the local rule.
+    // (On the Pages live site this path is unreachable — IS_STATIC_DEMO
+    // covers it — but a misconfigured host falls back safely here.)
     return saveSession(clean)
   }
+  const contentType = res.headers.get('content-type') || ''
+  let body = null
+  if (contentType.includes('application/json')) {
+    try { body = await res.json() } catch { body = null }
+  }
+  if (res.ok) return saveSession(clean)
+  if (body?.detail && (res.status === 400 || res.status === 403)) {
+    // Genuine backend verdict (unknown mail, no password set, wrong
+    // password, non-SRMIST domain) — never bypass.
+    throw new Error(body.detail)
+  }
+  // Backend missing/misbehaving (404 HTML, 405, proxy error page):
+  // honour the local rule.
+  return saveSession(clean)
 }

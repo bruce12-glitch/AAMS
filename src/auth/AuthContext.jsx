@@ -6,8 +6,8 @@ const AuthCtx = createContext(null)
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(() => getSession())
 
-  const login = useCallback(async (email) => {
-    const s = await loginWithBackend(email)
+  const login = useCallback(async (email, password) => {
+    const s = await loginWithBackend(email, password)
     setSession(s)
     return s
   }, [])

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { IS_STATIC_DEMO } from '../config/runtime'
+import { apiUrl } from '../api/client'
 
 /**
  * Shared backend-connection signal for the shell (sidebar status pill).
@@ -36,7 +37,7 @@ export function useBackendStatus(intervalMs = 15000) {
 
     async function probe() {
       try {
-        const res = await fetch('/health', { method: 'GET' })
+        const res = await fetch(apiUrl('/health'), { method: 'GET' })
         if (mountedRef.current) setIsLive(res.ok)
       } catch {
         if (mountedRef.current) setIsLive(false)

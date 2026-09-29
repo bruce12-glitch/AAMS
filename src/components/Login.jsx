@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
-import { SRMIST_SUFFIX, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
+import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
+import { IS_STATIC_DEMO } from '../config/runtime'
 import { FablabMark } from './Logo'
 
 /**
  * Classic entrepreneurial sign-in — calm, centered, single purpose.
- * Only @srmist.edu.in is accepted; anything else is rejected inline
- * with a clear message. No animation clutter: one soft rise-in.
+ * SRMIST email + member password (set at enrollment). Only
+ * @srmist.edu.in is accepted; anything else is rejected inline.
+ * One soft rise-in — no animation clutter.
  */
 export default function Login() {
   const { login } = useAuth()
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -23,9 +26,12 @@ export default function Login() {
     if (!isSrmistEmail(clean)) {
       return setError(`Only ${SRMIST_SUFFIX} mail IDs are allowed — other domains cannot access this console.`)
     }
+    if (!password || password.length < MIN_PASSWORD_LEN) {
+      return setError(`Enter your password (min ${MIN_PASSWORD_LEN} characters).`)
+    }
     setBusy(true)
     try {
-      await login(clean)
+      await login(clean, password)
     } catch (err) {
       setError(err.message || 'Sign-in failed')
     } finally {
@@ -62,8 +68,21 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={busy}
           />
+          <label className="login-label" htmlFor="srm-password" style={{ marginTop: 12 }}>
+            Password
+          </label>
+          <input
+            id="srm-password"
+            className="search-input login-input"
+            type="password"
+            autoComplete="current-password"
+            placeholder={IS_STATIC_DEMO ? `Demo — any ${MIN_PASSWORD_LEN}+ characters` : 'Your member password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={busy}
+          />
           <p className="login-hint">
-            Only <strong>{SRMIST_SUFFIX}</strong> addresses are evaluated. Other mail IDs are rejected automatically.
+            Members sign in with their SRMIST mail + the password set at enrollment.
           </p>
           {error && (
             <div className="form-error" role="alert">
@@ -71,7 +90,7 @@ export default function Login() {
             </div>
           )}
           <button className="btn primary login-btn" type="submit" disabled={busy}>
-            {busy ? 'Verifying…' : 'Continue with SRMIST mail'}
+            {busy ? 'Verifying…' : 'Sign in'}
           </button>
         </form>
 

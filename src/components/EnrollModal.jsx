@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
-import { SRMIST_SUFFIX, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
+import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { useDialog } from '../hooks/useDialog'
 
 const EMPTY = {
   user_id: '', name: '', phone: '', email: '',
+  password: '', confirm: '',
   payment_status: 'active', payment_expiry: '', consent: false
 }
 
@@ -53,13 +54,17 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     if (!isSrmistEmail(cleanMail)) {
       return setError(`Only ${SRMIST_SUFFIX} mail IDs can be enrolled — other domains are rejected.`)
     }
+    if (!form.password || form.password.length < MIN_PASSWORD_LEN) {
+      return setError(`Set a sign-in password (min ${MIN_PASSWORD_LEN} characters).`)
+    }
+    if (form.password !== form.confirm) return setError('Passwords do not match.')
     if (!previews.length) return setError('Add at least one face photo')
     if (!form.consent) return setError('Consent is required for biometric enrollment')
     // Enrollment writes to the database and computes ArcFace embeddings
     // server-side. The static demo has neither, so be explicit.
     if (IS_STATIC_DEMO) {
       return setError(
-        'Enrollment needs the backend API and its database — not available in the static demo build.'
+        'Connect this site to the backend to enroll (see README “Link the live site”).'
       )
     }
 
@@ -67,7 +72,13 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     try {
       setAdminToken(token)
       const res = await adminPost('/users/enroll', {
-        ...form,
+        user_id: form.user_id.trim(),
+        name: form.name.trim(),
+        phone: form.phone.trim(),
+        email: cleanMail,
+        password: form.password,
+        payment_status: form.payment_status,
+        payment_expiry: form.payment_expiry || null,
         consent_given: form.consent,
         images: previews
       })
@@ -131,14 +142,14 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                     </select>
                   </label>
                   <label>Payment expiry<input type="date" value={form.payment_expiry} onChange={set('payment_expiry')} /></label>
-                  <label>Admin token<input value={token} onChange={(e) => setToken(e.target.value)} placeholder="X-Admin-Token" type="password" /></label>
+                  <label>Sign-in password *<input value={form.password} onChange={set('password')} placeholder={`Min ${MIN_PASSWORD_LEN} characters`} type="password" autoComplete="new-password" /></label>
+                  <label>Confirm password *<input value={form.confirm} onChange={set('confirm')} placeholder="Repeat password" type="password" autoComplete="new-password" /></label>
+                  <label>Admin token<input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Lab admin token" type="password" /></label>
                 </div>
 
                 <p className="field-hint">
-                  Only <code>{SRMIST_SUFFIX}</code> mail IDs can be enrolled — other domains are rejected
-                  automatically (frontend + backend). Admin token protects the endpoint:
-                  set <code>API_ADMIN_PASSWORD</code> in <code>fablab-face-attendance/.env</code>.
-                  If unset the API runs dev-open and the field can stay empty.
+                  SRMIST mail + password become the member console sign-in. Admin token is the{' '}
+                  <code>API_ADMIN_PASSWORD</code> from the backend <code>.env</code>.
                 </p>
 
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>

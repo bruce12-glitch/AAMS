@@ -1,4 +1,16 @@
-const BASE = '/api'
+import { API_URL } from '../config/runtime'
+
+/**
+ * API root. Relative '/api' in local dev (Vite proxies to the lab API);
+ * absolute when the site is linked to a hosted backend via VITE_API_URL,
+ * e.g. the GitHub Pages build talking to the team's database server.
+ */
+const BASE = `${API_URL}/api`
+
+/** Absolute URL helper for callers that fetch directly (auth, health). */
+export function apiUrl(path) {
+  return `${API_URL}${path}`
+}
 
 const ADMIN_KEY = 'aams_admin_token'
 
