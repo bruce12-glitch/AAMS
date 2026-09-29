@@ -99,13 +99,22 @@ npm run build:pages          # Pages target — base '/AAMS/', static demo, zero
 The Pages build is a self-contained demo by default. To run it against
 the real backend (sign-in verification, enrollment, live data):
 
-1. Host the API (lab machine, `docker compose`, or any HTTPS host) and
-   allow the Pages origin in CORS (`ALLOWED_ORIGINS` includes
-   `https://bruce12-glitch.github.io`)
-2. Repository **Settings → Secrets and variables → Actions** → add
+1. Host the API (lab machine, `docker compose`, or any HTTPS host) over
+   **HTTPS** — the site is served over TLS and a plain-HTTP API would be
+   blocked as mixed content. The GitHub Pages origin is already in the
+   default CORS allow-list; extra origins go in `ALLOWED_ORIGINS`.
+2. Give members a password, otherwise nobody can sign in:
+   `set SEED_MEMBER_PASSWORD=...` before `python -m scripts.seed_demo_data`,
+   or reset one later from **Members → ⟳** / `POST /api/users/{id}/password`.
+3. Repository **Settings → Secrets and variables → Actions** → add
    `AAMS_API_URL` = `https://<your-api-host>` (no trailing slash)
-3. Push to `main` — the workflow injects it as `VITE_API_URL` and the
+4. Push to `main` — the workflow injects it as `VITE_API_URL` and the
    site switches from demo mode to live mode
+5. Verify: reload the site and check the sidebar status pill turns
+   **Live**, sign in with a seeded `@srmist.edu.in` member (a wrong
+   password must be refused by the server, not by the page), then open
+   **Members** and confirm real rows load. The browser dev-tools Network
+   tab should show `/api/...` calls going to your API host.
 
 Leave the secret unset (or delete it) to return to the zero-backend demo.
 

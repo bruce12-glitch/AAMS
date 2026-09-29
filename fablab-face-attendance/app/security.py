@@ -66,7 +66,8 @@ async def require_admin(request: Request) -> None:
 def allowed_origins() -> list:
     """
     CORS origins. Set ALLOWED_ORIGINS env var (comma-separated) to override.
-    Defaults to the local Vite dev server + same-origin.
+    Defaults cover the local dev servers and the published GitHub Pages
+    console, so a hosted API works with the live site out of the box.
     """
     import os
     raw = os.getenv('ALLOWED_ORIGINS', '')
@@ -77,6 +78,7 @@ def allowed_origins() -> list:
         'http://127.0.0.1:3000',
         'http://localhost:8000',
         'http://127.0.0.1:8000',
+        'https://bruce12-glitch.github.io',
     ]
 
 
