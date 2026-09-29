@@ -278,23 +278,39 @@ body {
 
 .institutional-strip {
   display: flex;
-  align-items: center;
-  gap: var(--sp-6);
+  align-items: stretch;
+  gap: var(--sp-4);
   width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.institutional-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .inst-slot {
   display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-  align-items: flex-start;
-  padding: var(--sp-1) var(--sp-3) var(--sp-1) var(--sp-3);
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-3) 6px var(--sp-2);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   background: linear-gradient(180deg, #ffffff, var(--bg-2));
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, var(--shadow-sm);
-  min-width: 76px;
+  flex-shrink: 0;
   transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+
+/* Brass–teal spine: ties the pills to the stat cards and the masthead rule. */
+.inst-slot::before {
+  content: '';
+  align-self: stretch;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--teal) 0%, var(--rule-gold) 100%);
 }
 
 .inst-slot:hover {
@@ -310,6 +326,7 @@ body {
   letter-spacing: 1.4px;
   color: var(--text-hi);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .inst-tag {
@@ -319,9 +336,8 @@ body {
   text-transform: uppercase;
   color: var(--text-low);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
+  border-left: 1px solid var(--border);
+  padding-left: var(--sp-2);
 }
 
 .inst-search {
@@ -1580,10 +1596,10 @@ body {
   /* Stats grid: 2 columns at this width */
   .grid-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 
-  /* Institutional header: tighter gaps, allow wrap, smaller font */
+  /* Institutional header: tighter gaps, no wrapping (strip scrolls) */
   .institutional-header { padding: 0 16px; height: 56px; }
-  .institutional-strip { gap: 14px; flex-wrap: wrap; }
-  .inst-slot { min-width: 64px; padding: 4px 10px; }
+  .institutional-strip { gap: 14px; flex-wrap: nowrap; }
+  .inst-slot { padding: 4px 10px 4px 8px; }
   .inst-code { font-size: var(--fs-sm); }
 }
 

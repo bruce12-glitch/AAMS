@@ -25,6 +25,9 @@ Format follows Keep a Changelog; versioning is SemVer-ish (0.x while prototype).
   tables/inputs/modals; subtle film-grain texture on the background layer
 
 ### Fixed
+- Institutional header pills truncated their labels ("DIRECTORATE OF
+  ENTRE…"): short display names with full names as tooltips, horizontal
+  lockup with brass–teal spine, strip scrolls instead of clipping
 - Occupancy report `GROUP BY HOUR()` → `strftime('%H', …)` (was HTTP 500)
 - Members table showed every member as face-less: `enrolled` was derived
   after the embeddings were blanked

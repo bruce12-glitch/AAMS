@@ -70,18 +70,20 @@ export function FablabMark({ size = 140, className = '', id = 'fablab-mark' }) {
  * sizing will still work.
  */
 export function InstitutionalLogos({ className = '' }) {
+  // `short` is what renders in the pill (must fit — ~20 chars max);
+  // `label` is the full name, kept as the hover tooltip.
   const items = [
-    { code: 'DEI', label: 'Directorate of Entrepreneurship & Innovation' },
-    { code: 'SRM', label: 'SRM Institute of Science and Technology' },
-    { code: 'MRC', label: 'Moothstrapper Research Council' },
-    { code: 'BIRAC', label: 'Birac BioNEST — SRM MCH' },
+    { code: 'DEI', short: 'Entrepreneurship', label: 'Directorate of Entrepreneurship & Innovation' },
+    { code: 'SRM', short: 'SRMIST', label: 'SRM Institute of Science and Technology' },
+    { code: 'MRC', short: 'Moothstrapper', label: 'Moothstrapper Research Council' },
+    { code: 'BIRAC', short: 'BioNEST · SRM', label: 'Birac BioNEST — SRM MCH' },
   ]
   return (
     <div className={`institutional-strip ${className}`}>
-      {items.map(({ code, label }) => (
+      {items.map(({ code, short, label }) => (
         <div className="inst-slot" key={code} title={label}>
           <span className="inst-code">{code}</span>
-          <span className="inst-tag">{label.split('—')[0].trim()}</span>
+          <span className="inst-tag">{short}</span>
         </div>
       ))}
       <div className="inst-slot inst-search" aria-hidden="true">
