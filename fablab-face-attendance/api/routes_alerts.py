@@ -3,9 +3,11 @@ Alerts API Routes for FacePass FabLab.
 Implements GET/POST alerts, admin approve.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+
+from app.security import require_admin
 
 router = APIRouter(prefix='/api/alerts', tags=['alerts'])
 
@@ -37,7 +39,7 @@ async def list_alerts(severity: Optional[str] = None, alert_type: Optional[str] 
     return {'alerts': alerts}
 
 @router.post('/{alert_id}/approve')
-async def approve_alert(alert_id: int):
+async def approve_alert(alert_id: int, _: None = Depends(require_admin)):
     """Admin approve one-time entry."""
     from app.database import get_connection
     from datetime import datetime
@@ -59,8 +61,8 @@ async def approve_alert(alert_id: int):
     return {'success': True}
 
 @router.post('/{alert_id}/ack')
-async def acknowledge_alert(alert_id: int):
-    """Acknowledge alert."""
+async def acknowledge_alert(alert_id: int, _: None = Depends(require_admin)):
+    """Acknowledge alert (admin token: otherwise anyone could clear the board)."""
     from app.database import get_connection
     
     conn = get_connection()

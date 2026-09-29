@@ -63,12 +63,20 @@ def get_engine():
         raise VisionUnavailableError(str(exc)) from exc
 
 
+# Upload guards. The console downscales photos to 1280 px / JPEG q0.9, which
+# is well under 1 MB, so 8 MB of base64 (~6 MB binary) is already generous.
+MAX_IMAGE_BASE64_CHARS = 8 * 1024 * 1024
+# Decompression-bomb guard: nothing this system processes is anywhere near
+# 40 megapixels, and refusing early keeps a crafted PNG from eating RAM.
+MAX_IMAGE_PIXELS = 40_000_000
+
+
 def decode_image(data: str) -> np.ndarray:
     """
     Decode an image from a base64 string (raw or data-URI prefixed)
     or a raw byte string into a BGR numpy array.
 
-    Raises ValueError on undecodable input.
+    Raises ValueError on undecodable or oversized input.
     """
     if not data or not isinstance(data, str):
         raise ValueError("Empty image payload")
@@ -77,6 +85,10 @@ def decode_image(data: str) -> np.ndarray:
     if payload.startswith("data:"):
         # data:image/jpeg;base64,xxxx
         _, _, payload = payload.partition(",")
+
+    if len(payload) > MAX_IMAGE_BASE64_CHARS:
+        raise ValueError(
+            f"Image too large (max {MAX_IMAGE_BASE64_CHARS // (1024 * 1024)} MB)")
 
     try:
         img_bytes = base64.b64decode(payload, validate=False)
@@ -87,6 +99,8 @@ def decode_image(data: str) -> np.ndarray:
     frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if frame is None:
         raise ValueError("Could not decode image bytes")
+    if frame.shape[0] * frame.shape[1] > MAX_IMAGE_PIXELS:
+        raise ValueError("Image resolution is too high")
     return frame
 
 

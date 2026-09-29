@@ -10,6 +10,7 @@ dev-open mode and logs a warning — convenient locally, loud in logs.
 
 import hmac
 import logging
+import re
 from pathlib import Path
 
 from fastapi import HTTPException, Request
@@ -19,6 +20,21 @@ from app.config import get_security_config, BASE_DIR
 logger = logging.getLogger(__name__)
 
 _PLACEHOLDERS = {"", "CHANGE_THIS", "your_admin_password_here"}
+
+# Member IDs become file names (evidence photos) and SQL parameters. SQL is
+# parameterised, but the file name is not: '../x' would escape images/.
+_USER_ID_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+
+
+def validate_user_id(user_id: str) -> str:
+    """Return the ID if it is a plain identifier, else raise ValueError."""
+    value = (user_id or '').strip()
+    if not _USER_ID_RE.match(value):
+        raise ValueError(
+            'user_id must be 1-64 characters of letters, digits, dot, '
+            'dash or underscore (no spaces or slashes)'
+        )
+    return value
 
 
 def admin_password() -> str:

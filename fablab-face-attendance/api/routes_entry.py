@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/entry', tags=['entry'])
@@ -28,7 +28,9 @@ class EntryRequest(BaseModel):
     token_value: Optional[str] = None
     face_embedding: Optional[List[float]] = None   # legacy path
     image_b64: Optional[str] = None                # preferred path
-    liveness_frames_b64: Optional[List[str]] = None  # short burst for blink check
+    # Short burst for blink check — the console offers 4-10 frames; the cap
+    # stops an unauthenticated caller from pushing a huge list of payloads.
+    liveness_frames_b64: Optional[List[str]] = Field(default=None, max_length=12)
     skip_liveness: bool = False                    # single-snapshot testing
 
 

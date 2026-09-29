@@ -57,6 +57,9 @@ class MemoryBackend:
             return 1
         return max(1, int(window - (time.monotonic() - bucket[0])) + 1)
 
+    def clear(self) -> None:
+        self._hits.clear()
+
 
 class RedisBackend:
     """Shared fixed-window counter (INCR/EXPIRE). Fail-open to memory."""
@@ -84,6 +87,10 @@ class RedisBackend:
         except Exception:
             return self._memory.retry_after(key, window)
 
+    def clear(self) -> None:
+        """Drop the local mirror. Shared Redis keys simply age out (60 s)."""
+        self._memory.clear()
+
 
 _backend = None
 
@@ -100,6 +107,11 @@ def get_backend():
         else:
             _backend = MemoryBackend()
     return _backend
+
+
+def reset_rate_limits() -> None:
+    """Empty every counter — tests only, so one case never starves the next."""
+    get_backend().clear()
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):

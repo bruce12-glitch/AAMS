@@ -16,9 +16,9 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.security import require_admin
+from app.security import require_admin, validate_user_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/users', tags=['users'])
@@ -37,7 +37,15 @@ class UserCreate(BaseModel):
 
 class EnrollRequest(UserCreate):
     consent_given: bool = False
-    images: List[str] = []          # base64 / data-URI face photos
+    images: List[str] = Field(default_factory=list, max_length=10)  # base64 / data-URI face photos
+
+
+def _require_valid_user_id(user_id: str) -> str:
+    """Reject IDs that are not plain identifiers (file-name safety, clarity)."""
+    try:
+        return validate_user_id(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get('')
@@ -51,15 +59,17 @@ async def list_users():
     users = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    # Never ship binary embeddings or password hashes to the client
+    # Biometrics and credentials never leave the server. `enrolled` must be
+    # derived BEFORE the embeddings are blanked, or every member would look
+    # face-less in the console.
     for user in users:
+        user['enrolled'] = any(
+            user.get(k) for k in ('face_embedding', 'face_embedding_2', 'face_embedding_3')
+        )
         user['face_embedding'] = None
         user['face_embedding_2'] = None
         user['face_embedding_3'] = None
         user['password_hash'] = None
-        user['enrolled'] = any(
-            user.get(k) for k in ('face_embedding', 'face_embedding_2', 'face_embedding_3')
-        ) or False
 
     return {'users': users}
 
@@ -77,6 +87,8 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
     from app.qr_manager import QRManager
     from app.utils import save_frame
     from app.vision import VisionUnavailableError, analyze_frame, decode_image
+
+    req.user_id = _require_valid_user_id(req.user_id)
 
     # SRMIST-only rule: no other mail domain is evaluated or enrolled.
     if req.email:
@@ -203,6 +215,7 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
 @router.post('')
 async def create_user(user: UserCreate, _: None = Depends(require_admin)):
     """Add user record only (no biometrics). SRMIST mail only."""
+    user.user_id = _require_valid_user_id(user.user_id)
     if user.email:
         from app.auth import reject_non_srmist
         try:
@@ -399,8 +412,13 @@ async def export_user_data(user_id: str, _: None = Depends(require_admin)):
 
 
 @router.get('/{user_id}/qr')
-async def generate_qr(user_id: str):
-    """Generate signed QR pass for user."""
+async def generate_qr(user_id: str, _: None = Depends(require_admin)):
+    """
+    Generate signed QR pass for user.
+
+    Admin only: the QR is a bearer credential for door entry, so an open
+    endpoint here would hand anyone a working pass for any member.
+    """
     from app.qr_manager import QRManager
 
     qr_manager = QRManager()
