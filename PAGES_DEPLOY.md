@@ -115,8 +115,10 @@ pill reading "Demo Data". If assets 404, `base` is wrong — check that
 
 - **No API.** The published site cannot reach your lab backend, and shouldn't.
   Pointing a public static page at a face-matching endpoint would expose it.
-- **No camera, no enrollment, no database.** `LiveMonitor` reads
-  `status: 'offline'` from `MOCK_LIVE`, which is accurate.
+- **No real recognition, enrollment, or database.** Browser photo/webcam
+  capture can demonstrate the entry UI, but the result is explicitly marked
+  as a local showcase simulation. `LiveMonitor` reads `status: 'offline'`
+  from `MOCK_LIVE`, which is accurate until the backend is attached.
 - **No secrets.** Nothing in this build needs `API_ADMIN_PASSWORD` or
   `QR_SECRET_KEY`, and neither should ever be added to the workflow.
 

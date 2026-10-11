@@ -8,6 +8,7 @@ import { IS_STATIC_DEMO } from '../config/runtime'
 import { apiUrl } from '../api/client'
 
 export const SRMIST_SUFFIX = '@srmist.edu.in'
+export const AUTH_POLICY_VERSION = 'srmist-shared-password-v1'
 
 const SRMIST_RE = /^[a-z0-9._%+-]+@srmist\.edu\.in$/i
 
@@ -26,7 +27,14 @@ export function getSession() {
     const raw = sessionStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (!parsed || !isSrmistEmail(parsed.email)) return null
+    if (
+      !parsed ||
+      !isSrmistEmail(parsed.email) ||
+      parsed.auth_policy !== AUTH_POLICY_VERSION
+    ) {
+      clearSession()
+      return null
+    }
     if (!IS_STATIC_DEMO && (!parsed.token || Number(parsed.expires_at) * 1000 <= Date.now())) {
       clearSession()
       return null
@@ -42,6 +50,7 @@ export function saveSession(data) {
   const session = {
     ...supplied,
     email: normalizeEmail(supplied?.email),
+    auth_policy: AUTH_POLICY_VERSION,
     at: new Date().toISOString()
   }
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
@@ -55,30 +64,24 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY)
 }
 
-export const MIN_PASSWORD_LEN = 6
-
 /**
- * Sign in with SRMIST email + member password.
+ * Sign in with SRMIST email + the exact shared AAMS password.
  *
- * - Static demo build (no backend by design): requires an SRMIST address
- *   plus any password of MIN_PASSWORD_LEN+ chars, verified locally. The
- *   demo holds no real data, so this is a gate, not a proof.
- * - With a backend: the server verifies the password hash. A 400/403 with
+ * - Static builds never verify passwords in public browser code. They stay
+ *   locked until VITE_API_URL connects the Pages build to the secure backend.
+ * - With a backend: the server verifies the shared password. A 400/403 with
  *   a JSON verdict is always rethrown — a wrong password must never fall
- *   back to local access. Only a missing/unreachable backend (404 HTML,
- *   network error) honours the local rule.
+ *   back to local access. An unreachable backend also fails closed.
  */
 export async function loginWithBackend(email, password) {
   const clean = normalizeEmail(email)
   if (!isSrmistEmail(clean)) {
     throw new Error(`Only ${SRMIST_SUFFIX} mail IDs are allowed`)
   }
-  if (!password || String(password).length < MIN_PASSWORD_LEN) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD_LEN} characters`)
+  if (!password) throw new Error('AAMS access password is required')
+  if (IS_STATIC_DEMO) {
+    throw new Error('Secure login is unavailable until the AAMS backend is connected')
   }
-  // Static demo build ships with no backend by design — skip the network
-  // call entirely instead of failing on the 404 HTML fallback page.
-  if (IS_STATIC_DEMO) return saveSession({ email: clean, role: 'admin', name: 'Demo Administrator' })
   let res
   try {
     res = await fetch(apiUrl('/api/auth/login'), {

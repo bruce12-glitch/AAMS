@@ -12,6 +12,8 @@ one definition:
 """
 
 import re
+import hmac
+import os
 
 SRMIST_DOMAIN = 'srmist.edu.in'
 SRMIST_SUFFIX = '@' + SRMIST_DOMAIN
@@ -30,6 +32,18 @@ def normalize_email(email) -> str:
 def is_srmist_email(email) -> bool:
     """True only for @srmist.edu.in addresses."""
     return bool(_SRMIST_RE.match(normalize_email(email)))
+
+
+def verify_access_password(password: str) -> bool:
+    """Verify the shared password supplied privately through the environment."""
+    expected = os.getenv('AAMS_ACCESS_PASSWORD', '')
+    supplied = password if isinstance(password, str) else ''
+    return bool(expected) and hmac.compare_digest(supplied.encode(), expected.encode())
+
+
+def access_password_configured() -> bool:
+    """True only when the backend received its private shared credential."""
+    return bool(os.getenv('AAMS_ACCESS_PASSWORD', ''))
 
 
 def reject_non_srmist(email) -> str:

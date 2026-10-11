@@ -99,12 +99,15 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc))
 
-    # Console sign-in needs email + password, so enrollment sets both.
+    # The showcase uses a shared password supplied through the environment.
+    # Keep the legacy per-member hash optional for database compatibility.
     from app.auth import hash_password
-    try:
-        pwd_hash = hash_password(req.password or '')
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    pwd_hash = None
+    if req.password:
+        try:
+            pwd_hash = hash_password(req.password)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
 
     if not req.consent_given:
         raise HTTPException(status_code=400,

@@ -9,6 +9,13 @@ from app.auth import (
     verify_password,
 )
 
+TEST_ACCESS_PASSWORD = 'test-shared-access-password'
+
+
+@pytest.fixture(autouse=True)
+def _shared_access_password(monkeypatch):
+    monkeypatch.setenv('AAMS_ACCESS_PASSWORD', TEST_ACCESS_PASSWORD)
+
 
 def test_hash_verify_roundtrip():
     stored = hash_password('correct-horse-7')
@@ -73,11 +80,17 @@ def test_login_route_password_flow():
 
     client = TestClient(app, raise_server_exceptions=False)
     try:
-        _seed_user('pwdprobe@srmist.edu.in', 's3cret-pass')
+        _seed_user('pwdprobe@srmist.edu.in', 'legacy-member-password')
 
         r = client.post('/api/auth/login',
                         json={'email': 'pwdprobe@srmist.edu.in',
                               'password': 's3cret-pass'})
+        # The old per-member password is no longer a valid console login.
+        assert r.status_code == 403, r.text
+
+        r = client.post('/api/auth/login',
+                        json={'email': 'pwdprobe@srmist.edu.in',
+                              'password': TEST_ACCESS_PASSWORD})
         assert r.status_code == 200, r.text
         assert r.json()['user_id'] == 'PWDPROBE001'
 
@@ -92,8 +105,9 @@ def test_login_route_password_flow():
 
         r = client.post('/api/auth/login',
                         json={'email': 'ghost@srmist.edu.in',
-                              'password': 's3cret-pass'})
-        assert r.status_code == 403, r.text
+                              'password': TEST_ACCESS_PASSWORD})
+        assert r.status_code == 200, r.text
+        assert r.json()['user_id'] == 'ghost'
     finally:
         _drop_user()
 
@@ -107,9 +121,8 @@ def test_login_route_without_password_set():
         _seed_user('nopwd@srmist.edu.in', None)
         r = client.post('/api/auth/login',
                         json={'email': 'nopwd@srmist.edu.in',
-                              'password': 'whatever-1'})
-        assert r.status_code == 403, r.text
-        assert 'password' in r.json()['detail'].lower()
+                              'password': TEST_ACCESS_PASSWORD})
+        assert r.status_code == 200, r.text
     finally:
         _drop_user()
 
