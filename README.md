@@ -140,6 +140,27 @@ models live in Docker volumes and survive rebuilds. The first real face request
 warms the model and can take longer; do one enrollment/recognition rehearsal
 before presenting.
 
+#### Windows edge node (Docker Desktop)
+
+On the Windows webcam PC, open PowerShell in the cloned repository and run:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\deploy\showcase-windows.ps1 -AdminEmail your.name@srmist.edu.in -PublicUrl
+```
+
+The script prompts locally for the administrator password and optional Telegram
+credentials, generates independent signing secrets, builds the stack, checks
+`/ready`, and prints both the local and temporary HTTPS showcase URLs. Secrets
+are written only to the git-ignored `fablab-face-attendance/.env` file.
+
+Docker Desktop does not reliably pass a Windows USB webcam into a Linux
+container. The console therefore includes **Use webcam instead** and
+**Capture from webcam** buttons: the HTTPS browser captures frames on Windows
+and sends them to the local Docker API for InsightFace processing. Unattended
+background capture through `camera.source: 0` remains intended for a native
+Linux edge node or a network/RTSP camera.
+
 ### Build targets
 
 ```bash
