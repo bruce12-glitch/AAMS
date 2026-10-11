@@ -1,17 +1,12 @@
 """
-Auth API — SRMIST email + member password.
+Auth API — SRMIST email + the shared AAMS access password.
 
 POST /api/auth/login
   body: { "email": "name@srmist.edu.in", "password": "..." }
-  - 200 + { ok, email, name, user_id } when the mail belongs to an
-    enrolled member and the password verifies.
+  - 200 + { ok, email, name, user_id } when the email uses the exact
+    SRMIST domain and the shared password verifies.
   - 400 when email or password is missing.
-  - 403 for anything else: non-SRMIST domain, unknown mail, missing
-    password on the account, or wrong password. Messages stay specific
-    enough for a lab operator to act on.
-
-Passwords are set at enrollment (Members → ＋ Enroll) or via the admin
-password-reset endpoint; only PBKDF2 hashes are stored, never plain text.
+  - 403 for any other domain or password.
 
 Brute force: one mail ID gets LOGIN_RATE_LIMIT attempts per minute
 (default 10) and its whole IP five times that, so a shared campus NAT
@@ -27,13 +22,13 @@ from pydantic import BaseModel
 from app.auth import (
     SRMIST_DOMAIN,
     MIN_PASSWORD_LEN,
+    access_password_configured,
     is_srmist_email,
     normalize_email,
-    verify_password,
+    verify_access_password,
 )
 from app.security import (
     admin_email,
-    admin_password,
     auth_enabled,
     issue_session,
     require_user,
@@ -104,19 +99,25 @@ async def login(req: LoginRequest, request: Request):
             detail='Password is required',
         )
 
+    if not access_password_configured():
+        raise HTTPException(
+            status_code=503,
+            detail='AAMS access password is not configured on the server',
+        )
+
     if auth_enabled() and not session_security_ready():
         raise HTTPException(
             status_code=503,
             detail='Server session security is not configured',
         )
 
-    # The administrator signs in through the same form. The password stays in
-    # the environment; it is never written to SQLite or returned to the UI.
+    if not verify_access_password(req.password):
+        raise HTTPException(status_code=403, detail='Wrong email or password')
+
+    # The configured administrator mail receives the admin role. Every other
+    # valid SRMIST address receives a member session. This keeps mutation
+    # privileges least-privileged even though the showcase password is shared.
     if email == admin_email():
-        import hmac
-        if not auth_enabled() or not hmac.compare_digest(
-                req.password.encode(), admin_password().encode()):
-            raise HTTPException(status_code=403, detail='Wrong email or password')
         session = issue_session(
             email=email, user_id='ADMIN', name='Fab Lab Administrator', role='admin')
         return {'ok': True, 'domain': SRMIST_DOMAIN, **session}
@@ -132,24 +133,12 @@ async def login(req: LoginRequest, request: Request):
     row = cursor.fetchone()
     conn.close()
 
-    if not row or not row['active']:
-        raise HTTPException(
-            status_code=403,
-            detail='This mail ID is not enrolled — contact the Fab Lab admin',
-        )
-    if not row['password_hash']:
-        raise HTTPException(
-            status_code=403,
-            detail='No password set for this account — ask the admin to reset it',
-        )
-    if not verify_password(req.password, row['password_hash']):
-        raise HTTPException(
-            status_code=403,
-            detail='Wrong password for this mail ID',
-        )
-
     session = issue_session(
-        email=email, user_id=row['user_id'], name=row['name'], role='member')
+        email=email,
+        user_id=row['user_id'] if row and row['active'] else email.split('@', 1)[0],
+        name=row['name'] if row and row['active'] else email.split('@', 1)[0],
+        role='member',
+    )
     return {
         'ok': True,
         'domain': SRMIST_DOMAIN,
@@ -170,4 +159,6 @@ async def auth_policy():
         'domain': SRMIST_DOMAIN,
         'suffix': '@' + SRMIST_DOMAIN,
         'min_password_len': MIN_PASSWORD_LEN,
+        'shared_password_required': True,
+        'shared_password_configured': access_password_configured(),
     }

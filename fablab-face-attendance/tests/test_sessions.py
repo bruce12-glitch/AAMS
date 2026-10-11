@@ -58,14 +58,15 @@ def test_protected_read_requires_session():
 
 
 def test_admin_login_issues_admin_session(monkeypatch):
+    access_password = 'test-admin-access-password'
+    monkeypatch.setenv('AAMS_ACCESS_PASSWORD', access_password)
     monkeypatch.setattr(routes_auth, 'admin_email', lambda: 'admin@srmist.edu.in')
-    monkeypatch.setattr(routes_auth, 'admin_password', lambda: 'showcase-password')
     monkeypatch.setattr(routes_auth, 'auth_enabled', lambda: True)
     monkeypatch.setattr(routes_auth, 'session_security_ready', lambda: True)
     client = TestClient(app, raise_server_exceptions=False)
     response = client.post('/api/auth/login', json={
         'email': 'admin@srmist.edu.in',
-        'password': 'showcase-password',
+        'password': access_password,
     })
     assert response.status_code == 200
     body = response.json()

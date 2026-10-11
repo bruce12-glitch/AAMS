@@ -2,13 +2,12 @@ import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { adminPost, fileToDataUri } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
-import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
+import { SRMIST_SUFFIX, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { useDialog } from '../hooks/useDialog'
 import CameraCapture from './CameraCapture'
 
 const EMPTY = {
   user_id: '', name: '', phone: '', email: '',
-  password: '', confirm: '',
   payment_status: 'active', payment_expiry: '', consent: false
 }
 
@@ -55,10 +54,6 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
     if (!isSrmistEmail(cleanMail)) {
       return setError(`Only ${SRMIST_SUFFIX} mail IDs can be enrolled — other domains are rejected.`)
     }
-    if (!form.password || form.password.length < MIN_PASSWORD_LEN) {
-      return setError(`Set a sign-in password (min ${MIN_PASSWORD_LEN} characters).`)
-    }
-    if (form.password !== form.confirm) return setError('Passwords do not match.')
     if (!previews.length) return setError('Add at least one face photo')
     if (!form.consent) return setError('Consent is required for biometric enrollment')
     // Enrollment writes to the database and computes ArcFace embeddings
@@ -76,7 +71,6 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
         name: form.name.trim(),
         phone: form.phone.trim(),
         email: cleanMail,
-        password: form.password,
         payment_status: form.payment_status,
         payment_expiry: form.payment_expiry || null,
         consent_given: form.consent,
@@ -142,12 +136,10 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                     </select>
                   </label>
                   <label>Payment expiry<input type="date" value={form.payment_expiry} onChange={set('payment_expiry')} /></label>
-                  <label>Sign-in password *<input value={form.password} onChange={set('password')} placeholder={`Min ${MIN_PASSWORD_LEN} characters`} type="password" autoComplete="new-password" /></label>
-                  <label>Confirm password *<input value={form.confirm} onChange={set('confirm')} placeholder="Repeat password" type="password" autoComplete="new-password" /></label>
                 </div>
 
                 <p className="field-hint">
-                  SRMIST mail + password become the member console sign-in. Enrollment requires an administrator session.
+                  Members use their SRMIST mail with the shared AAMS access password. Enrollment requires an administrator session.
                 </p>
 
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>

@@ -77,7 +77,7 @@ fablab-face-attendance/
    # Edit .env with your settings
    ```
 
-   Set `ADMIN_EMAIL`, `API_ADMIN_PASSWORD`, `SESSION_SECRET_KEY` and
+   Set `ADMIN_EMAIL`, `API_ADMIN_PASSWORD`, `AAMS_ACCESS_PASSWORD`, `SESSION_SECRET_KEY` and
    `QR_SECRET_KEY` before exposing the API. The repository-level helper
    `python deploy/configure_showcase.py --admin-email you@srmist.edu.in`
    generates independent signing keys for the Docker showcase stack.

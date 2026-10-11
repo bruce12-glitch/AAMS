@@ -71,20 +71,20 @@ export default function LiveMonitor() {
   const runSnapshot = async () => {
     setCvError('')
     setResult(null)
-    if (IS_STATIC_DEMO) {
-      // This build ships without a backend, so there is no CV engine to call.
-      // Say so plainly instead of letting the request fail with a network
-      // error that reads like a bug.
-      return setCvError(
-        'Snapshot processing needs the backend: the face pipeline (InsightFace + ArcFace) runs server-side and is not available in this static demo build. Deploy the lab stack to enable it.'
-      )
-    }
     if (!photoUri) return setCvError('Pick a face photo first')
     if (mode === 'token_face' && !tokenValue.trim())
       return setCvError('Enter a token value (user ID or full signed QR JSON)')
 
     setBusy(true)
     try {
+      if (IS_STATIC_DEMO) {
+        const simulated = await simulateEntry('authorized')
+        setResult({
+          ...simulated,
+          reason: 'Showcase simulation completed — the uploaded photo was not analyzed without the backend.'
+        })
+        return
+      }
       const body = {
         image_b64: photoUri,
         liveness_frames_b64: skipLiveness ? [] : burstUris,
@@ -220,7 +220,9 @@ export default function LiveMonitor() {
               <h2 className="panel-title"><span className="tick" />Snapshot Entry Test</h2>
             </div>
             <p style={{ fontSize: 12.5, color: 'var(--text-mid)', lineHeight: 1.55, margin: '0 0 14px' }}>
-              Runs the real pipeline server-side: detect → quality → ArcFace embed → match → policy.
+              {IS_STATIC_DEMO
+                ? 'Showcase mode: demonstrates the entry decision flow. Real face matching starts when the backend is connected.'
+                : 'Runs the real pipeline server-side: detect → quality → ArcFace embed → match → policy.'}
             </p>
 
             <div className="chip-row" style={{ marginBottom: 12 }}>
@@ -274,7 +276,7 @@ export default function LiveMonitor() {
 
             <button className="btn primary" style={{ width: '100%', marginTop: 14 }}
               onClick={runSnapshot} disabled={busy} type="button">
-              {busy ? 'Running CV pipeline…' : 'Process Entry'}
+              {busy ? (IS_STATIC_DEMO ? 'Running showcase…' : 'Running CV pipeline…') : 'Process Entry'}
             </button>
           </motion.section>
 

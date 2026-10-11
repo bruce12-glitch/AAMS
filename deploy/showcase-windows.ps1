@@ -41,6 +41,8 @@ if ($AdminEmail -notmatch '^[a-z0-9._%+-]+@srmist\.edu\.in$') {
 
 $AdminPassword = ConvertFrom-SecureValue (Read-Host 'Choose administrator password (12+ characters)' -AsSecureString)
 if ($AdminPassword.Length -lt 12) { throw 'Administrator password must contain at least 12 characters.' }
+$AccessPassword = ConvertFrom-SecureValue (Read-Host 'Enter shared AAMS login password (12+ characters)' -AsSecureString)
+if ($AccessPassword.Length -lt 12) { throw 'Shared AAMS login password must contain at least 12 characters.' }
 
 $TelegramToken = ''
 $TelegramChat = ''
@@ -61,6 +63,7 @@ $values = @(
     '# Generated locally by deploy/showcase-windows.ps1; never commit this file.',
     'ADMIN_EMAIL=' + (Format-EnvValue $AdminEmail),
     'API_ADMIN_PASSWORD=' + (Format-EnvValue $AdminPassword),
+    'AAMS_ACCESS_PASSWORD=' + (Format-EnvValue $AccessPassword),
     'QR_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
     'SESSION_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
     'SESSION_TTL_SECONDS=28800',
@@ -70,6 +73,7 @@ $values = @(
 )
 [IO.File]::WriteAllLines($BackendEnv, $values, (New-Object Text.UTF8Encoding($false)))
 $AdminPassword = $null
+$AccessPassword = $null
 $TelegramToken = $null
 
 Push-Location $RepoRoot

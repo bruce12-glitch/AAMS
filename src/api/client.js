@@ -1,4 +1,4 @@
-import { API_URL } from '../config/runtime'
+import { API_URL, IS_STATIC_DEMO } from '../config/runtime'
 
 /**
  * API root. Relative '/api' in local dev (Vite proxies to the lab API);
@@ -173,15 +173,16 @@ export const SIM_SCENARIOS = {
 }
 
 export async function simulateEntry(scenario) {
+  const local = SIM_SCENARIOS[scenario] ?? {
+    decision: 'DENIED',
+    tag: 'unknown',
+    reason: 'Unknown scenario'
+  }
+  if (IS_STATIC_DEMO) return { ...local, source: 'local' }
   try {
     const res = await apiPost('/entry/simulate', { scenario }, 4000)
     return { ...res, source: 'api' }
   } catch {
-    const local = SIM_SCENARIOS[scenario] ?? {
-      decision: 'DENIED',
-      tag: 'unknown',
-      reason: 'Unknown scenario'
-    }
     return { ...local, source: 'local' }
   }
 }

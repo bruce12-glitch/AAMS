@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../auth/AuthContext'
-import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
-import { IS_STATIC_DEMO } from '../config/runtime'
+import { SRMIST_SUFFIX, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { FablabMark } from './Logo'
 
 /**
  * Classic entrepreneurial sign-in — calm, centered, single purpose.
- * SRMIST email + member password (set at enrollment). Only
+ * SRMIST email + the shared AAMS showcase password. Only
  * @srmist.edu.in is accepted; anything else is rejected inline.
  * One soft rise-in — no animation clutter.
  */
@@ -26,9 +25,7 @@ export default function Login() {
     if (!isSrmistEmail(clean)) {
       return setError(`Only ${SRMIST_SUFFIX} mail IDs are allowed — other domains cannot access this console.`)
     }
-    if (!password || password.length < MIN_PASSWORD_LEN) {
-      return setError(`Enter your password (min ${MIN_PASSWORD_LEN} characters).`)
-    }
+    if (!password) return setError('Enter the AAMS access password.')
     setBusy(true)
     try {
       await login(clean, password)
@@ -76,13 +73,13 @@ export default function Login() {
             className="search-input login-input"
             type="password"
             autoComplete="current-password"
-            placeholder={IS_STATIC_DEMO ? `Demo — any ${MIN_PASSWORD_LEN}+ characters` : 'Your member password'}
+            placeholder="Enter the AAMS access password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={busy}
           />
           <p className="login-hint">
-            Members sign in with their SRMIST mail + the password set at enrollment.
+            Access is restricted to @srmist.edu.in mail IDs using the shared AAMS password.
           </p>
           {error && (
             <div className="form-error" role="alert">
