@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ratelimit import RateLimitMiddleware, requests_per_minute
-from app.security import allowed_origins, auth_enabled
+from app.security import allowed_origins, auth_enabled, session_security_ready
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title='FacePass FabLab API',
     description='Smart Anti-Proxy Facial Access and Attendance System for SRMIST Fab Lab',
-    version='1.2.0'
+    version='1.3.0'
 )
 
 app.add_middleware(
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=['GET', 'POST', 'PUT', 'DELETE'],
-    allow_headers=['Content-Type', 'X-Admin-Token'],
+    allow_headers=['Content-Type', 'Authorization', 'X-Admin-Token'],
 )
 
 app.add_middleware(RateLimitMiddleware)
@@ -79,6 +79,7 @@ async def health_check():
 async def model_status():
     """CV engine state without triggering initialization/download."""
     from app.vision import engine_state
+    from app.security import auth_enabled, session_security_ready
     return {'cv_engine': engine_state()}
 
 
@@ -119,6 +120,10 @@ async def readiness_check():
             'enabled': bool(telegram.get('enabled', False)),
             'configured': not placeholder_token and not placeholder_chat,
         },
+        'security': {
+            'admin_password_configured': auth_enabled(),
+            'session_secret_configured': session_security_ready(),
+        },
     }
 
 
@@ -135,6 +140,11 @@ async def startup_event():
         logger.warning(
             '*** API_ADMIN_PASSWORD is not set — admin endpoints are OPEN '
             '(dev mode). Set it in .env before any real deployment. ***'
+        )
+    if not session_security_ready():
+        logger.warning(
+            '*** SESSION_SECRET_KEY is not set securely. Set a long random '
+            'value before exposing this API. ***'
         )
 
     # CV engine intentionally NOT loaded here — first request triggers it.

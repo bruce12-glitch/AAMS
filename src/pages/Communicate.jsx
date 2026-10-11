@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { adminPost, getAdminToken, setAdminToken } from '../api/client'
+import { adminPost } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 
 const DEMO_MSG = 'Not available in the static demo build — sending needs the backend API with Telegram credentials.'
@@ -17,7 +17,6 @@ const MAX_LEN = 1000
 export default function Communicate() {
   const status = usePolling('/notify/status', EMPTY_STATUS, 15000, { enabled: !IS_STATIC_DEMO })
   const [message, setMessage] = useState('')
-  const [token, setToken] = useState(getAdminToken())
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
@@ -34,7 +33,6 @@ export default function Communicate() {
     if (message.trim().length > MAX_LEN) return setError(`Message exceeds ${MAX_LEN} characters.`)
     setBusy(true)
     try {
-      setAdminToken(token)
       const res = await adminPost('/notify/send', { message: message.trim() })
       setResult(res)
       if (res.telegram_sent) setMessage('')
@@ -80,17 +78,6 @@ export default function Communicate() {
           />
           <div className="alert-time mono" style={{ marginTop: 6 }}>
             {remaining >= 0 ? `${remaining} characters left` : `${-remaining} over limit`}
-          </div>
-
-          <div className="form-grid" style={{ marginTop: 12 }}>
-            <label>Admin token
-              <input
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="X-Admin-Token"
-                type="password"
-              />
-            </label>
           </div>
 
           {error && <div className="form-error" role="alert">{error}</div>}

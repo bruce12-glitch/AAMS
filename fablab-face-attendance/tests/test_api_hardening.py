@@ -202,8 +202,13 @@ def test_list_users_strips_credentials_and_reports_enrolled():
 
     try:
         client = TestClient(app, raise_server_exceptions=False)
+        from app.security import issue_session
+        token = issue_session(email='reader@srmist.edu.in', user_id='READER',
+                              name='Reader', role='member')['token']
         users = {u['user_id']: u
-                 for u in client.get('/api/users').json()['users']}
+                 for u in client.get(
+                     '/api/users', headers={'Authorization': f'Bearer {token}'})
+                 .json()['users']}
 
         with_face = users['HARDPROBE01']
         without_face = users['HARDPROBE02']

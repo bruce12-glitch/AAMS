@@ -40,6 +40,9 @@ def load_config():
     
     if os.getenv('API_ADMIN_PASSWORD'):
         config['security']['api_admin_password'] = os.getenv('API_ADMIN_PASSWORD')
+
+    if os.getenv('SESSION_SECRET_KEY'):
+        config['security']['session_secret_key'] = os.getenv('SESSION_SECRET_KEY')
     
     if os.getenv('DATABASE_PATH'):
         config['database']['path'] = os.getenv('DATABASE_PATH')

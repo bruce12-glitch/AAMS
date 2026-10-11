@@ -12,7 +12,7 @@ POST /api/notify/send    — send an announcement (admin-guarded).
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.security import require_admin
+from app.security import require_admin, require_user
 
 router = APIRouter(prefix='/api/notify', tags=['notify'])
 
@@ -24,7 +24,7 @@ class SendRequest(BaseModel):
 
 
 @router.get('/status')
-async def notify_status():
+async def notify_status(_: dict = Depends(require_user)):
     """Telegram wiring state for the Communicate page."""
     from app.config import get_telegram_config
 

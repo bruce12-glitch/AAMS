@@ -21,7 +21,7 @@ second, much wider net.
 
 import os
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import (
@@ -30,6 +30,14 @@ from app.auth import (
     is_srmist_email,
     normalize_email,
     verify_password,
+)
+from app.security import (
+    admin_email,
+    admin_password,
+    auth_enabled,
+    issue_session,
+    require_user,
+    session_security_ready,
 )
 
 router = APIRouter(prefix='/api/auth', tags=['auth'])
@@ -96,6 +104,23 @@ async def login(req: LoginRequest, request: Request):
             detail='Password is required',
         )
 
+    if auth_enabled() and not session_security_ready():
+        raise HTTPException(
+            status_code=503,
+            detail='Server session security is not configured',
+        )
+
+    # The administrator signs in through the same form. The password stays in
+    # the environment; it is never written to SQLite or returned to the UI.
+    if email == admin_email():
+        import hmac
+        if not auth_enabled() or not hmac.compare_digest(
+                req.password.encode(), admin_password().encode()):
+            raise HTTPException(status_code=403, detail='Wrong email or password')
+        session = issue_session(
+            email=email, user_id='ADMIN', name='Fab Lab Administrator', role='admin')
+        return {'ok': True, 'domain': SRMIST_DOMAIN, **session}
+
     from app.database import get_connection
 
     conn = get_connection()
@@ -123,13 +148,19 @@ async def login(req: LoginRequest, request: Request):
             detail='Wrong password for this mail ID',
         )
 
+    session = issue_session(
+        email=email, user_id=row['user_id'], name=row['name'], role='member')
     return {
         'ok': True,
-        'email': email,
-        'name': row['name'],
-        'user_id': row['user_id'],
         'domain': SRMIST_DOMAIN,
+        **session,
     }
+
+
+@router.get('/session')
+async def session_info(session: dict = Depends(require_user)):
+    """Validate a stored browser session and return its safe identity fields."""
+    return {k: session[k] for k in ('email', 'name', 'user_id', 'role', 'exp')}
 
 
 @router.get('/policy')

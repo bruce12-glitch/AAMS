@@ -13,6 +13,7 @@ export function apiUrl(path) {
 }
 
 const ADMIN_KEY = 'aams_admin_token'
+const SESSION_KEY = 'aams_srmist_auth'
 
 export function getAdminToken() {
   return localStorage.getItem(ADMIN_KEY) ?? ''
@@ -22,8 +23,17 @@ export function setAdminToken(token) {
   localStorage.setItem(ADMIN_KEY, String(token ?? '').trim())
 }
 
+function sessionHeaders() {
+  try {
+    const session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null')
+    return session?.token ? { Authorization: `Bearer ${session.token}` } : {}
+  } catch {
+    return {}
+  }
+}
+
 function adminHeaders() {
-  const h = { 'Content-Type': 'application/json' }
+  const h = { 'Content-Type': 'application/json', ...sessionHeaders() }
   const t = getAdminToken()
   if (t) h['X-Admin-Token'] = t
   return h
@@ -40,13 +50,11 @@ async function request(path, options = {}, timeoutMs) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   try {
+    const { headers: suppliedHeaders = {}, ...rest } = options
     const res = await fetch(BASE + path, {
-      // Spread options FIRST so an explicit headers object on the options
-      // (e.g. adminHeaders()) wins over this default rather than being
-      // silently overwritten by it.
-      headers: { 'Content-Type': 'application/json' },
+      ...rest,
+      headers: { 'Content-Type': 'application/json', ...sessionHeaders(), ...suppliedHeaders },
       signal: controller.signal,
-      ...options
     })
     if (!res.ok) {
       let detail = `${res.status} ${res.statusText}`
@@ -56,6 +64,9 @@ async function request(path, options = {}, timeoutMs) {
       } catch { /* non-json error body */ }
       const err = new Error(detail)
       err.status = res.status
+      if (res.status === 401 && !path.startsWith('/auth/login')) {
+        window.dispatchEvent(new Event('aams-session-expired'))
+      }
       throw err
     }
     // 204 No Content (common for DELETE / ack) has no JSON body to parse.

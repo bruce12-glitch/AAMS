@@ -148,7 +148,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             raise HTTPException(status_code=400, detail='Token value required')
         if token_value.strip().startswith('{'):
             from app.qr_manager import QRManager
-            verdict = QRManager().verify_token(token_value)
+            qr_manager = QRManager()
+            verdict = qr_manager.verify_token(token_value)
             if not verdict.get('valid'):
                 return await _finalize(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
@@ -157,6 +158,24 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                     tag='unknown', alert_type='UNKNOWN', user=None,
                     similarity=0.0, liveness_status=liveness_status,
                     claimed=None, evidence=evidence_rel,
+                    extra={'face_count': face_count},
+                )
+            # Signature proves the QR was issued by us; the active-token row
+            # proves it has not since been revoked/re-keyed.
+            from app.database import get_connection
+            canonical = qr_manager.serialize_token(verdict['token'])
+            conn = get_connection()
+            active = conn.execute(
+                'SELECT 1 FROM tokens WHERE token_value=? AND user_id=? AND active=1',
+                (canonical, verdict['user_id'])).fetchone()
+            conn.close()
+            if not active:
+                return await _finalize(
+                    latency_ms=round((time.perf_counter() - t0) * 1000, 1),
+                    decision='DENIED', reason='Invalid token: pass revoked',
+                    tag='unknown', alert_type='UNKNOWN', user=None,
+                    similarity=0.0, liveness_status=liveness_status,
+                    claimed=verdict['user_id'], evidence=evidence_rel,
                     extra={'face_count': face_count},
                 )
             token_value = verdict['user_id']

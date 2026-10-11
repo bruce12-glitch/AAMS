@@ -7,12 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-from app.security import require_admin
+from app.security import require_admin, require_user
 
 router = APIRouter(prefix='/api/alerts', tags=['alerts'])
 
 @router.get('')
-async def list_alerts(severity: Optional[str] = None, alert_type: Optional[str] = None):
+async def list_alerts(severity: Optional[str] = None, alert_type: Optional[str] = None,
+                      _: dict = Depends(require_user)):
     """List alerts with optional filters."""
     from app.database import get_connection
     

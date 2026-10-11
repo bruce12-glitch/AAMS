@@ -7,15 +7,12 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - ./fablab-face-attendance/.env
     environment:
       # Lock the browser console origin; add your LAN/host origin for pilots.
-      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8090
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8090}
       - RATE_LIMIT_PER_MIN=120
-      # --- set real secrets before any pilot (or mount a .env file) ---
-      # - API_ADMIN_PASSWORD=change-me
-      # - QR_SECRET_KEY=change-me
-      # - TELEGRAM_BOT_TOKEN=...
-      # - TELEGRAM_CHAT_ID=...
     volumes:
       - api-db:/app/database        # SQLite + backups
       - api-images:/app/images      # enrollment/evidence photos
@@ -43,6 +40,25 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on: [web, api]
+    restart: unless-stopped
+
+  # Zero-account public showcase URL. The generated trycloudflare.com URL is
+  # printed by `docker compose --profile showcase logs -f tunnel-quick` and
+  # remains live while this stack is running.
+  tunnel-quick:
+    image: cloudflare/cloudflared:latest
+    profiles: ["showcase"]
+    command: tunnel --no-autoupdate --url http://web:80
+    depends_on: [web]
+    restart: unless-stopped
+
+  # Stable Cloudflare Tunnel hostname. Create the tunnel in Cloudflare, route
+  # its public hostname to http://web:80, then put the token in the root .env.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [web]
     restart: unless-stopped
 
 volumes:
