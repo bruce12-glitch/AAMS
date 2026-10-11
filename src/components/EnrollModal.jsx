@@ -4,6 +4,7 @@ import { adminPost, fileToDataUri } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { useDialog } from '../hooks/useDialog'
+import CameraCapture from './CameraCapture'
 
 const EMPTY = {
   user_id: '', name: '', phone: '', email: '',
@@ -17,6 +18,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
   const fileRef = useRef(null)
   const titleId = 'enroll-modal-title'
 
@@ -149,7 +151,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                 </p>
 
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>
-                  <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
+                  <input ref={fileRef} type="file" accept="image/*" capture="user" multiple hidden onChange={(e) => pickFiles(e.target.files)} />
                   {previews.length === 0
                     ? <>📸 Click to add face photos<span>3–5 shots · front + slight angles · JPG/PNG ≤ 8 MB each</span></>
                     : <div className="preview-row">
@@ -157,6 +159,8 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                       <span>{previews.length} selected</span>
                     </div>}
                 </div>
+                <button className="btn ghost" style={{ width: '100%', marginTop: 8 }}
+                  type="button" onClick={() => setCameraOpen(true)}>Use webcam instead</button>
 
                 <label className="consent-row">
                   <input type="checkbox" checked={form.consent} onChange={set('consent')} />
@@ -189,6 +193,8 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
           </motion.div>
         </motion.div>
       )}
+      <CameraCapture open={cameraOpen} maxShots={5}
+        onDone={(shots) => setPreviews(shots)} onClose={() => setCameraOpen(false)} />
     </AnimatePresence>
   )
 }

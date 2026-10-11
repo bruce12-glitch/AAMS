@@ -5,6 +5,7 @@ import { apiPost, fileToDataUri, simulateEntry } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_LIVE } from '../api/mock'
 import { IconCheck, IconX } from '../components/icons'
+import CameraCapture from '../components/CameraCapture'
 
 const PIPELINE = [
   'TOKEN_DETECTED',
@@ -33,6 +34,7 @@ export default function LiveMonitor() {
   const [tokenValue, setTokenValue] = useState('')
   const [skipLiveness, setSkipLiveness] = useState(true)
   const [cvError, setCvError] = useState('')
+  const [cameraOpen, setCameraOpen] = useState(false)
 
   const mainRef = useRef(null)
   const burstRef = useRef(null)
@@ -227,12 +229,14 @@ export default function LiveMonitor() {
             </div>
 
             <button className={`dropzone slim ${photoUri ? 'has-files' : ''}`} onClick={() => mainRef.current?.click()} type="button">
-              <input ref={mainRef} type="file" accept="image/*" hidden
+              <input ref={mainRef} type="file" accept="image/*" capture="user" hidden
                 onChange={async (e) => { try { setPhotoUri(await fileToDataUri(e.target.files?.[0])) } catch (err) { setCvError(err.message) } }} />
               {photoUri
                 ? <img src={photoUri} alt="snapshot" style={{ maxHeight: 110, borderRadius: 8 }} />
                 : <>📷 Pick entrance snapshot<span>JPG / PNG — face clearly visible</span></>}
             </button>
+            <button className="btn ghost" style={{ width: '100%', marginTop: 8 }}
+              onClick={() => setCameraOpen(true)} type="button">Capture from webcam</button>
 
             {mode === 'token_face' && (
               <input className="search-input" style={{ width: '100%', marginTop: 10 }}
@@ -293,6 +297,9 @@ export default function LiveMonitor() {
           </motion.section>
         </div>
       </div>
+      <CameraCapture open={cameraOpen} maxShots={1}
+        onDone={(shots) => setPhotoUri(shots[0] ?? '')}
+        onClose={() => setCameraOpen(false)} />
     </div>
   )
 }
