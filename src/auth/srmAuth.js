@@ -19,29 +19,40 @@ export function isSrmistEmail(email) {
   return SRMIST_RE.test(normalizeEmail(email))
 }
 
-const KEY = 'aams_srmist_auth'
+export const SESSION_KEY = 'aams_srmist_auth'
 
 export function getSession() {
   try {
-    const raw = localStorage.getItem(KEY)
+    const raw = sessionStorage.getItem(SESSION_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    if (parsed && isSrmistEmail(parsed.email)) return parsed
-    return null
+    if (!parsed || !isSrmistEmail(parsed.email)) return null
+    if (!IS_STATIC_DEMO && (!parsed.token || Number(parsed.expires_at) * 1000 <= Date.now())) {
+      clearSession()
+      return null
+    }
+    return parsed
   } catch {
     return null
   }
 }
 
-export function saveSession(email) {
-  const clean = normalizeEmail(email)
-  const session = { email: clean, at: new Date().toISOString() }
-  localStorage.setItem(KEY, JSON.stringify(session))
+export function saveSession(data) {
+  const supplied = typeof data === 'string' ? { email: data } : data
+  const session = {
+    ...supplied,
+    email: normalizeEmail(supplied?.email),
+    at: new Date().toISOString()
+  }
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  // Remove pre-session builds that stored an email-only bypass persistently.
+  localStorage.removeItem(SESSION_KEY)
   return session
 }
 
 export function clearSession() {
-  localStorage.removeItem(KEY)
+  sessionStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem(SESSION_KEY)
 }
 
 export const MIN_PASSWORD_LEN = 6
@@ -67,7 +78,7 @@ export async function loginWithBackend(email, password) {
   }
   // Static demo build ships with no backend by design — skip the network
   // call entirely instead of failing on the 404 HTML fallback page.
-  if (IS_STATIC_DEMO) return saveSession(clean)
+  if (IS_STATIC_DEMO) return saveSession({ email: clean, role: 'admin', name: 'Demo Administrator' })
   let res
   try {
     res = await fetch(apiUrl('/api/auth/login'), {
@@ -76,23 +87,18 @@ export async function loginWithBackend(email, password) {
       body: JSON.stringify({ email: clean, password: String(password) })
     })
   } catch {
-    // Backend unreachable (dev without API): honour the local rule.
-    // (On the Pages live site this path is unreachable — IS_STATIC_DEMO
-    // covers it — but a misconfigured host falls back safely here.)
-    return saveSession(clean)
+    throw new Error('The AAMS server is unavailable. Check the backend connection and try again.')
   }
   const contentType = res.headers.get('content-type') || ''
   let body = null
   if (contentType.includes('application/json')) {
     try { body = await res.json() } catch { body = null }
   }
-  if (res.ok) return saveSession(clean)
-  if (body?.detail && (res.status === 400 || res.status === 403)) {
+  if (res.ok && body?.token) return saveSession(body)
+  if (body?.detail) {
     // Genuine backend verdict (unknown mail, no password set, wrong
     // password, non-SRMIST domain) — never bypass.
     throw new Error(body.detail)
   }
-  // Backend missing/misbehaving (404 HTML, 405, proxy error page):
-  // honour the local rule.
-  return saveSession(clean)
+  throw new Error(`Sign-in failed (${res.status}). Check the backend configuration.`)
 }

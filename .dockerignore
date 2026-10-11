@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+venv
+node_modules
+dist
+**/__pycache__
+**/*.pyc
+fablab-face-attendance/.env
+fablab-face-attendance/database
+fablab-face-attendance/images
+fablab-face-attendance/models
+

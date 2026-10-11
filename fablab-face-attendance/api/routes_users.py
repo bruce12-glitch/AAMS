@@ -19,7 +19,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.security import require_admin, validate_user_id
+from app.security import require_admin, require_user, validate_user_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/users', tags=['users'])
@@ -50,7 +50,7 @@ def _require_valid_user_id(user_id: str) -> str:
 
 
 @router.get('')
-async def list_users():
+async def list_users(_: dict = Depends(require_user)):
     """List all users."""
     from app.database import get_connection
 
@@ -203,11 +203,12 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
         # Delete the superseded rows instead of only deactivating them.
         qr = QRManager()
         token = qr.generate_token(req.user_id)
+        token_value = qr.serialize_token(token)
         cursor.execute('DELETE FROM tokens WHERE user_id = ?', (req.user_id,))
         cursor.execute('''
             INSERT INTO tokens (token_value, user_id, token_type, active)
             VALUES (?, ?, 'qr', 1)
-        ''', (req.user_id, req.user_id))
+        ''', (token_value, req.user_id))
 
         conn.commit()
     except Exception as exc:
@@ -223,7 +224,8 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
         'images_rejected': len(req.images) - len(passes),
         'token': token,
         'qr_data_uri': f'data:image/png;base64,' +
-                       base64.b64encode(qr.generate_qr_image(req.user_id)).decode(),
+                       base64.b64encode(qr.generate_qr_image(
+                           req.user_id, token=token)).decode(),
     }
 
 
@@ -367,6 +369,7 @@ async def revoke_and_reissue_token(user_id: str, _: None = Depends(require_admin
 
     qr = QRManager()
     token = qr.generate_token(user_id)
+    token_value = qr.serialize_token(token)
 
     # Same UNIQUE-constraint issue as enrollment: deactivating the old row
     # still left it holding the unique token_value, so a second re-key for the
@@ -375,7 +378,7 @@ async def revoke_and_reissue_token(user_id: str, _: None = Depends(require_admin
     cursor.execute('''
         INSERT INTO tokens (token_value, user_id, token_type, active)
         VALUES (?, ?, 'qr', 1)
-    ''', (user_id, user_id))
+    ''', (token_value, user_id))
     conn.commit()
     conn.close()
 
@@ -384,7 +387,8 @@ async def revoke_and_reissue_token(user_id: str, _: None = Depends(require_admin
         'user_id': user_id,
         'token': token,
         'qr_data_uri': 'data:image/png;base64,' +
-                       b64.b64encode(qr.generate_qr_image(user_id)).decode(),
+                       b64.b64encode(qr.generate_qr_image(
+                           user_id, token=token)).decode(),
     }
 
 
@@ -436,7 +440,19 @@ async def generate_qr(user_id: str, _: None = Depends(require_admin)):
     """
     from app.qr_manager import QRManager
 
+    from app.database import get_connection
+
     qr_manager = QRManager()
-    qr_bytes = qr_manager.generate_qr_image(user_id)
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT token_value FROM tokens WHERE user_id=? AND active=1 "
+        "ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail='No active QR pass for this member')
+    verdict = qr_manager.verify_token(row['token_value'])
+    if not verdict.get('valid'):
+        raise HTTPException(status_code=410, detail='QR pass expired — re-key this member')
+    qr_bytes = qr_manager.generate_qr_image(user_id, token=verdict['token'])
     qr_base64 = base64.b64encode(qr_bytes).decode()
     return {'qr_data_uri': f'data:image/png;base64,{qr_base64}'}

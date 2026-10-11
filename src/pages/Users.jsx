@@ -7,6 +7,7 @@ import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_USERS } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
 import EnrollModal from '../components/EnrollModal'
+import { useAuth } from '../auth/AuthContext'
 
 const initials = (name) =>
   String(name ?? '').split(' ').map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '??'
@@ -18,9 +19,10 @@ const DEMO_MSG = 'Not available in the static demo build — these actions need 
 
 // A 401 means the admin token was never stored (or was rotated): the code
 // above already prompted for it, so this is the "they cancelled" message.
-const TOKEN_MSG = 'Admin token required — run any admin action, enter the token when asked, and try again.'
+const TOKEN_MSG = 'Administrator access is required for this action.'
 
 export default function Users() {
+  const { isAdmin } = useAuth()
   const { data, loading, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
   const [query, setQuery] = useState('')
   const [showEnroll, setShowEnroll] = useState(false)
@@ -120,7 +122,7 @@ export default function Users() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="btn primary" onClick={() => setShowEnroll(true)} type="button">＋ Enroll</button>
+          {isAdmin && <button className="btn primary" onClick={() => setShowEnroll(true)} type="button">＋ Enroll</button>}
         </div>
       </div>
 
@@ -168,7 +170,7 @@ export default function Users() {
                     <select
                       className="mini-select"
                       value={String(u.payment_status ?? 'inactive')}
-                      disabled={busyId === u.user_id}
+                      disabled={!isAdmin || busyId === u.user_id}
                       onChange={(e) => setPayment(u, e.target.value)}
                     >
                       <option value="active">active</option>
@@ -179,11 +181,11 @@ export default function Users() {
                   </span>
                 </td>
                 <td>
-                  <span style={{ display: 'inline-flex', gap: 4 }}>
+                  {isAdmin && <span style={{ display: 'inline-flex', gap: 4 }}>
                     <button className="btn sm ghost" onClick={() => showQr(u)} disabled={busyId === u.user_id} type="button" title="Show current QR pass">QR</button>
                     <button className="btn sm ghost" onClick={() => rekey(u)} disabled={busyId === u.user_id} type="button" title="Lost token: revoke + re-issue">⟳</button>
                     <button className="btn sm ghost" onClick={() => removeUser(u)} disabled={busyId === u.user_id} type="button" title="Delete member">✕</button>
-                  </span>
+                  </span>}
                 </td>
               </motion.tr>
             ))}

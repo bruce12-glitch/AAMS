@@ -3,9 +3,11 @@ Reports API Routes for FacePass FabLab.
 Implements GET daily/weekly/proxy/unpaid/occupancy reports.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.security import require_user
 
-router = APIRouter(prefix='/api/reports', tags=['reports'])
+router = APIRouter(prefix='/api/reports', tags=['reports'],
+                   dependencies=[Depends(require_user)])
 
 @router.get('/daily')
 async def get_daily_report():

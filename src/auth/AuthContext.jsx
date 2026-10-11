@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { clearSession, getSession, loginWithBackend } from './srmAuth'
 
 const AuthCtx = createContext(null)
@@ -17,8 +17,20 @@ export function AuthProvider({ children }) {
     setSession(null)
   }, [])
 
+  useEffect(() => {
+    window.addEventListener('aams-session-expired', logout)
+    return () => window.removeEventListener('aams-session-expired', logout)
+  }, [logout])
+
   const value = useMemo(
-    () => ({ session, userEmail: session?.email ?? null, isAuthed: Boolean(session), login, logout }),
+    () => ({
+      session,
+      userEmail: session?.email ?? null,
+      isAuthed: Boolean(session),
+      isAdmin: session?.role === 'admin',
+      login,
+      logout
+    }),
     [session, login, logout]
   )
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>

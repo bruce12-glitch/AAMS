@@ -8,9 +8,14 @@ If no password is configured (placeholder/empty) the guard runs in
 dev-open mode and logs a warning — convenient locally, loud in logs.
 """
 
+import base64
+import hashlib
 import hmac
+import json
 import logging
+import os
 import re
+import time
 from pathlib import Path
 
 from fastapi import HTTPException, Request
@@ -48,19 +53,113 @@ def auth_enabled() -> bool:
     return admin_password() not in _PLACEHOLDERS
 
 
-async def require_admin(request: Request) -> None:
-    """FastAPI dependency guarding admin/mutating routes."""
+def admin_email() -> str:
+    """Email used for the browser administrator account."""
+    return os.getenv('ADMIN_EMAIL', 'admin@srmist.edu.in').strip().lower()
+
+
+def _session_secret() -> str:
+    """Return the HMAC secret used for short-lived browser sessions."""
+    explicit = os.getenv('SESSION_SECRET_KEY', '').strip()
+    if explicit:
+        return explicit
+    try:
+        return str(get_security_config().get('qr_secret_key') or '').strip()
+    except Exception:
+        return ''
+
+
+def session_security_ready() -> bool:
+    secret = _session_secret()
+    return bool(secret) and secret not in _PLACEHOLDERS and not secret.startswith('CHANGE_')
+
+
+def _b64encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b'=').decode('ascii')
+
+
+def _b64decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
+
+
+def issue_session(*, email: str, user_id: str, name: str, role: str = 'member') -> dict:
+    """Issue a compact, signed, expiring browser session."""
+    try:
+        ttl = max(300, int(os.getenv('SESSION_TTL_SECONDS', '28800')))
+    except ValueError:
+        ttl = 28800
+    now = int(time.time())
+    payload = {
+        'email': email,
+        'user_id': user_id,
+        'name': name,
+        'role': role,
+        'iat': now,
+        'exp': now + ttl,
+    }
+    encoded = _b64encode(json.dumps(payload, separators=(',', ':'), sort_keys=True).encode())
+    signature = hmac.new(_session_secret().encode(), encoded.encode(), hashlib.sha256).digest()
+    return {
+        **payload,
+        'token': encoded + '.' + _b64encode(signature),
+        'expires_at': payload['exp'],
+    }
+
+
+def verify_session(token: str) -> dict:
+    """Verify a browser session signature and expiry; raise 401 on failure."""
+    try:
+        encoded, supplied = token.split('.', 1)
+        expected = hmac.new(
+            _session_secret().encode(), encoded.encode(), hashlib.sha256
+        ).digest()
+        if not hmac.compare_digest(_b64decode(supplied), expected):
+            raise ValueError('signature')
+        payload = json.loads(_b64decode(encoded))
+        if int(payload.get('exp', 0)) <= int(time.time()):
+            raise ValueError('expired')
+        if payload.get('role') not in {'member', 'admin'}:
+            raise ValueError('role')
+        return payload
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail='Session missing, invalid, or expired') from exc
+
+
+def _bearer(request: Request) -> str:
+    header = request.headers.get('Authorization', '')
+    scheme, _, token = header.partition(' ')
+    return token.strip() if scheme.lower() == 'bearer' else ''
+
+
+async def require_user(request: Request) -> dict:
+    """Require any signed member or administrator session."""
+    token = _bearer(request)
+    if not token:
+        raise HTTPException(status_code=401, detail='Sign in required')
+    return verify_session(token)
+
+
+async def require_admin(request: Request) -> dict | None:
+    """Accept an admin browser session or the legacy maintenance token."""
+    bearer = _bearer(request)
+    if bearer:
+        session = verify_session(bearer)
+        if session.get('role') != 'admin':
+            raise HTTPException(status_code=403, detail='Administrator access required')
+        return session
+
     if not auth_enabled():
         logger.warning(
             "API_ADMIN_PASSWORD not set - admin endpoint %s open in dev mode",
             request.url.path,
         )
-        return
+        return None
 
     token = request.headers.get('X-Admin-Token', '')
     # Constant-time comparison prevents token-timing oracles
     if not hmac.compare_digest(token.encode(), admin_password().encode()):
         raise HTTPException(status_code=401, detail='Admin token missing or invalid')
+    return None
 
 
 def allowed_origins() -> list:

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { adminPost, fileToDataUri, setAdminToken, getAdminToken } from '../api/client'
+import { adminPost, fileToDataUri } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { SRMIST_SUFFIX, MIN_PASSWORD_LEN, normalizeEmail, isSrmistEmail } from '../auth/srmAuth'
 import { useDialog } from '../hooks/useDialog'
@@ -14,7 +14,6 @@ const EMPTY = {
 export default function EnrollModal({ open, onClose, onEnrolled }) {
   const [form, setForm] = useState(EMPTY)
   const [previews, setPreviews] = useState([])
-  const [token, setToken] = useState(getAdminToken())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -70,7 +69,6 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
 
     setBusy(true)
     try {
-      setAdminToken(token)
       const res = await adminPost('/users/enroll', {
         user_id: form.user_id.trim(),
         name: form.name.trim(),
@@ -144,12 +142,10 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
                   <label>Payment expiry<input type="date" value={form.payment_expiry} onChange={set('payment_expiry')} /></label>
                   <label>Sign-in password *<input value={form.password} onChange={set('password')} placeholder={`Min ${MIN_PASSWORD_LEN} characters`} type="password" autoComplete="new-password" /></label>
                   <label>Confirm password *<input value={form.confirm} onChange={set('confirm')} placeholder="Repeat password" type="password" autoComplete="new-password" /></label>
-                  <label>Admin token<input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Lab admin token" type="password" /></label>
                 </div>
 
                 <p className="field-hint">
-                  SRMIST mail + password become the member console sign-in. Admin token is the{' '}
-                  <code>API_ADMIN_PASSWORD</code> from the backend <code>.env</code>.
+                  SRMIST mail + password become the member console sign-in. Enrollment requires an administrator session.
                 </p>
 
                 <div className={`dropzone ${previews.length ? 'has-files' : ''}`} onClick={() => fileRef.current?.click()}>

@@ -23,7 +23,7 @@ operations.
 
 - **Face-based entry** — server-side detect → quality gate → ArcFace match → policy decision, with token+face and face-only modes
 - **Anti-proxy & liveness** — blink (EAR) and head-motion checks over frame bursts, spoof/tailgate/unknown detection
-- **SRMIST-only access** — console sign-in and member enrollment accept only `@srmist.edu.in` mail IDs; mutating APIs additionally require an admin token
+- **SRMIST-only access** — expiring signed sessions, read-only member access and administrator-only enrollment/mutations
 - **Live occupancy** — who is inside right now, with names, entry times and automatic timeout exits
 - **Telegram communication portal** — send announcements to the lab group from the console, with delivery status and a full audit trail
 - **Reports & audit** — daily/weekly/proxy/unpaid/occupancy reports, filterable entry logs, severity-graded alerts, retention enforcement
@@ -102,6 +102,7 @@ populated sample data (badged "Demo Data").
 ### Docker (API + console, one command)
 
 ```bash
+python deploy/configure_showcase.py --admin-email your.name@srmist.edu.in
 docker compose up --build
 # API -> http://localhost:8000   (/health is orchestrator-safe)
 # Web -> http://localhost:8090   (nginx serves the console + proxies /api)
@@ -111,8 +112,33 @@ Volumes persist the SQLite database, evidence photos and the model cache
 across rebuilds. TLS guidance: see [`SECURITY.md`](SECURITY.md).
 
 Verify the live stack with `http://localhost:8000/ready`. It reports database
-readiness, whether the CV model is loaded, and whether Telegram is configured
-without exposing credentials.
+readiness, whether the CV model is loaded, and whether Telegram and session
+security are configured without exposing credentials.
+
+### Zero-budget public showcase
+
+The all-in-one deployment keeps React, FastAPI and SQLite on the same machine,
+then exposes the nginx entry point through a free HTTPS tunnel. This avoids a
+cloud database bill and means enrollment photos never need to be stored by a
+third-party database service.
+
+```bash
+python deploy/configure_showcase.py --admin-email your.name@srmist.edu.in
+docker compose --profile showcase up --build -d
+docker compose --profile showcase logs -f tunnel-quick
+```
+
+Open the printed `https://...trycloudflare.com` URL and sign in with the admin
+email/password just configured. That URL lasts while the stack is running and
+is ideal for a presentation. For a permanent hostname, create a named
+Cloudflare Tunnel, put `CLOUDFLARE_TUNNEL_TOKEN=...` in the repository-root
+`.env`, route its public hostname to `http://web:80`, then run
+`docker compose --profile tunnel up --build -d`.
+
+The host must remain on during the showcase. SQLite, images and InsightFace
+models live in Docker volumes and survive rebuilds. The first real face request
+warms the model and can take longer; do one enrollment/recognition rehearsal
+before presenting.
 
 ### Build targets
 
@@ -158,16 +184,23 @@ Leave the secret unset (or delete it) to return to the zero-backend demo.
   stores only a PBKDF2-SHA256 hash (200 000 iterations, random salt) in
   `users.password_hash`; plain-text passwords are never logged, returned
   or persisted. Wrong passwords are rejected by the API, never by a
-  frontend shortcut.
+  frontend shortcut. A successful login returns an HMAC-signed session that
+  expires after eight hours by default and is held in browser session storage.
+- The administrator uses `ADMIN_EMAIL` + `API_ADMIN_PASSWORD`. Members receive
+  read-only sessions; enrollment, payment changes, QR management, alert actions,
+  occupancy overrides and Telegram sends require the administrator role.
 - Without a backend (the public Pages demo) the same rule is enforced
   locally: SRMIST address plus any 6-character password opens the
   console; real 400/403 verdicts from an API are always honoured.
-- Mutating API routes require the `X-Admin-Token` header matching
-  `API_ADMIN_PASSWORD` in `fablab-face-attendance/.env`. With no password
-  configured the API runs in loudly-logged dev-open mode. The console
-  prompts for the token on a 401 and remembers it.
+- Maintenance scripts may still use `X-Admin-Token` with
+  `API_ADMIN_PASSWORD`; the browser uses its administrator session and never
+  asks the operator to paste a secret into individual forms. With no admin
+  password configured, maintenance-token guards stay dev-open with loud logs.
+- Live mode is fail-closed: an unreachable or misconfigured backend cannot
+  fall back to an email-only local login. Only the explicitly static Pages demo
+  uses a local demonstration gate.
 - Sign-in is rate limited (10 attempts/min per mail ID, 50/min per IP) and
-  every guarded route answers `401` without the token — see
+  every protected read answers `401` without a session — see
   [`SECURITY.md`](SECURITY.md) for the full control list.
 
 ## 📷 Connecting the camera
@@ -222,7 +255,7 @@ fablab-face-attendance/
 │                            # reports, dashboard, admin, auth, notify
 ├── enrollment/              # CLI enrollment (capture → quality → embeddings)
 ├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
-└── tests/                   # pytest suite (75 tests)
+└── tests/                   # pytest suite (89 tests)
 ```
 
 Frontend: React 19 + Vite 8 · `three` + `@react-three/fiber` (lazy,

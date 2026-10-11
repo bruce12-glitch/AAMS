@@ -10,14 +10,16 @@ Prototype hardening applied Aug 2026. See CHANGELOG for the audit-driven fixes.
 | Control | Implementation |
 |---|---|
 | Console sign-in | SRMIST mail **+ password**; PBKDF2-SHA256 (200 k iters, random salt), constant-time compare, hashes stripped from every response |
-| Admin authorization | `X-Admin-Token` header vs `API_ADMIN_PASSWORD`, constant-time compare (`hmac.compare_digest`) |
+| Browser sessions | HMAC-SHA256 signed, eight-hour default expiry, stored in session storage; live login fails closed when the API is unavailable |
+| Admin authorization | Signed session role for the browser; `X-Admin-Token` remains available for maintenance scripts |
+| Protected reads | Member, dashboard, alerts, occupants, reports and communication data require a valid member/admin session |
 | Admin-guarded routes | QR pass generation (bearer credential), alert approve/acknowledge, member CRUD, enrollment, payment update, occupancy exit/scan, Telegram send |
 | CORS | Restricted allow-list via `ALLOWED_ORIGINS` (default: localhost dev origins) |
 | Rate limiting | Per-IP fixed window, default 120 req/min (`RATE_LIMIT_PER_MIN`), `429 + Retry-After`; `/health` exempt |
 | Sign-in brute force | 10 attempts/min per mail ID (`LOGIN_RATE_LIMIT`) and 50/min per IP, `429 + Retry-After`, checked before the database |
 | Upload validation | `user_id` allowlist (letters/digits/`.`/`-`/`_`, ≤64) so IDs can't escape `images/`, ≤10 photos per enrollment, ≤8 MB base64 and ≤40 MP per frame |
 | Door pipeline | `POST /api/entry/process` and `/face-only` stay open for the lab host — put them behind the reverse proxy / LAN, they are the only unauthenticated writers |
-| QR passes | HMAC-SHA256 signed payloads with expiry, verified server-side (§27.3) |
+| QR passes | HMAC-SHA256 signed payloads with expiry plus an active SQLite record; re-keying immediately revokes old passes (§27.3) |
 | Health probes | `/health` is side-effect free; model state isolated at `/model-status` |
 | Data retention | Nightly purge: entry logs >90 d, alert images >30 d (§26.4) |
 
@@ -38,17 +40,20 @@ Any standards-compliant proxy works (nginx + certbot equally fine).
 Until TLS is on: admin tokens and face photos transit in cleartext —
 do not expose the deployment beyond the lab LAN.
 
-### Admin token storage (XSS surface)
-The console stores the admin token in `localStorage` to attach it to
-mutating requests. Any XSS in the console could exfiltrate it.
-Mitigations in place/roadmap:
-- Token is only used from the Enroll modal / member actions, never logged
-- Roadmap: server-issued httpOnly session cookie + CSP headers
+### Browser session storage (XSS surface)
+The signed session is kept in `sessionStorage`, so closing the tab clears it;
+an XSS flaw could still read it. A production campus rollout should move the
+session to `Secure`, `HttpOnly`, `SameSite` cookies and add a strict CSP. For
+the prototype, short expiry, role checks and TLS materially limit exposure.
 
 ### Fail-open dev mode
 With `API_ADMIN_PASSWORD` unset, admin endpoints are open **by design for
 local development**, with a loud startup warning and per-request logs.
 Never run this mode on a network others can reach.
+
+`SESSION_SECRET_KEY`, `QR_SECRET_KEY`, `API_ADMIN_PASSWORD` and `ADMIN_EMAIL`
+must all be set for the showcase. `python deploy/configure_showcase.py` creates
+the untracked secret file with independent random signing keys.
 
 ### Rate limiter scope
 In-memory, per-process — the sign-in limiter uses the same store. A

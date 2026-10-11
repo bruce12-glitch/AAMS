@@ -7,6 +7,7 @@ import hmac
 import hashlib
 import json
 import time
+import secrets
 import qrcode
 from io import BytesIO
 from app.config import get_security_config
@@ -26,6 +27,7 @@ class QRManager:
         # Create message without signature
         msg = json.dumps({
             'user_id': payload['user_id'],
+            'token_id': payload['token_id'],
             'issued_at': payload['issued_at'],
             'expires_at': payload['expires_at']
         }, sort_keys=True)
@@ -54,6 +56,7 @@ class QRManager:
         
         payload = {
             'user_id': user_id,
+            'token_id': secrets.token_urlsafe(18),
             'issued_at': issued_at,
             'expires_at': expires_at
         }
@@ -79,7 +82,7 @@ class QRManager:
             return {'valid': False, 'user_id': None, 'reason': 'Invalid JSON format'}
         
         # Check required fields
-        required = ['user_id', 'issued_at', 'expires_at', 'signature']
+        required = ['user_id', 'token_id', 'issued_at', 'expires_at', 'signature']
         for field in required:
             if field not in token:
                 return {'valid': False, 'user_id': None, 'reason': f'Missing field: {field}'}
@@ -94,9 +97,21 @@ class QRManager:
         if not hmac.compare_digest(token['signature'], expected_sig):
             return {'valid': False, 'user_id': token.get('user_id'), 'reason': 'Invalid signature'}
         
-        return {'valid': True, 'user_id': token['user_id'], 'reason': 'Valid token'}
+        return {
+            'valid': True,
+            'user_id': token['user_id'],
+            'token_id': token['token_id'],
+            'token': token,
+            'reason': 'Valid token',
+        }
+
+    @staticmethod
+    def serialize_token(token: dict) -> str:
+        """Stable representation stored in SQLite for revocation checks."""
+        return json.dumps(token, separators=(',', ':'), sort_keys=True)
     
-    def generate_qr_image(self, user_id: str, ttl_seconds: int = 86400) -> bytes:
+    def generate_qr_image(self, user_id: str, ttl_seconds: int = 86400,
+                          token: dict | None = None) -> bytes:
         """
         Generate QR code image as PNG bytes.
         
@@ -107,8 +122,8 @@ class QRManager:
         Returns:
             PNG image bytes
         """
-        token = self.generate_token(user_id, ttl_seconds)
-        token_json = json.dumps(token)
+        token = token or self.generate_token(user_id, ttl_seconds)
+        token_json = self.serialize_token(token)
         
         # Generate QR code
         qr = qrcode.QRCode(

@@ -3,9 +3,11 @@ Dashboard API Routes for FacePass FabLab.
 Implements GET stats, live-status, activity, research.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.security import require_user
 
-router = APIRouter(prefix='/api/dashboard', tags=['dashboard'])
+router = APIRouter(prefix='/api/dashboard', tags=['dashboard'],
+                   dependencies=[Depends(require_user)])
 
 @router.get('/stats')
 async def get_stats():

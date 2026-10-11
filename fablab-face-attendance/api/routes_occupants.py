@@ -6,12 +6,12 @@ Implements GET occupants, POST checkout.
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.security import require_admin
+from app.security import require_admin, require_user
 
 router = APIRouter(prefix='/api/occupants', tags=['occupants'])
 
 @router.get('')
-async def list_occupants():
+async def list_occupants(_: dict = Depends(require_user)):
     """List current occupants inside the Fab Lab."""
     from app.occupancy import OccupancyTracker
     
