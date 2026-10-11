@@ -81,7 +81,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
         payment_expiry: form.payment_expiry || null,
         consent_given: form.consent,
         images: previews
-      })
+      }, 120000)
       setResult(res)
       onEnrolled?.(res)
     } catch (err) {

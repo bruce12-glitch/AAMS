@@ -62,7 +62,7 @@ app.include_router(notify_router)
 @app.get('/')
 async def root():
     """Root endpoint."""
-    return {'message': 'FacePass FabLab API', 'version': '1.1.0'}
+    return {'message': 'FacePass FabLab API', 'version': app.version}
 
 
 @app.get('/health')
@@ -80,6 +80,46 @@ async def model_status():
     """CV engine state without triggering initialization/download."""
     from app.vision import engine_state
     return {'cv_engine': engine_state()}
+
+
+@app.get('/ready')
+async def readiness_check():
+    """Readiness probe for the database, CV state and Telegram wiring."""
+    from fastapi import HTTPException
+
+    from app.config import get_telegram_config
+    from app.database import get_connection
+    from app.vision import engine_state
+
+    try:
+        conn = get_connection()
+        conn.execute('SELECT 1').fetchone()
+        conn.close()
+    except Exception as exc:
+        logger.error('Readiness database check failed: %s', exc)
+        raise HTTPException(status_code=503, detail='database unavailable')
+
+    telegram = get_telegram_config()
+    token = str(telegram.get('bot_token') or '')
+    chat_id = str(telegram.get('chat_id') or '')
+    placeholder_token = (
+        not token or 'here' in token.lower()
+        or token.lower() in {'skip', 'none', 'null'}
+        or token.startswith('YOUR_')
+    )
+    placeholder_chat = (
+        not chat_id or chat_id.lower() in {'skip', 'none', 'null'}
+        or chat_id.startswith('YOUR_')
+    )
+    return {
+        'status': 'ready',
+        'database': 'ready',
+        'cv_engine': engine_state(),
+        'telegram': {
+            'enabled': bool(telegram.get('enabled', False)),
+            'configured': not placeholder_token and not placeholder_chat,
+        },
+    }
 
 
 @app.on_event('startup')

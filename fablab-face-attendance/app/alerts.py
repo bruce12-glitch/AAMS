@@ -174,14 +174,16 @@ class AlertService:
         delivered = 0
         for row in pending:
             try:
-                await self.send_alert(row['alert_type'], row['message'],
-                                      image_path=row['image_path'],
-                                      severity=row['severity'] or 'medium')
-                cursor.execute(
-                    "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
-                    (datetime.now().isoformat(), row['id']))
-                conn.commit()
-                delivered += 1
+                sent = await self.send_alert(
+                    row['alert_type'], row['message'],
+                    image_path=row['image_path'],
+                    severity=row['severity'] or 'medium')
+                if sent:
+                    cursor.execute(
+                        "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
+                        (datetime.now().isoformat(), row['id']))
+                    conn.commit()
+                    delivered += 1
             except Exception as e:
                 logger.warning('Retry failed for alert %s: %s', row['id'], e)
 

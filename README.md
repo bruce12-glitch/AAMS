@@ -41,6 +41,33 @@ operations.
 | Reports | Daily summary, security events, occupancy, retention policy |
 | Communicate | Telegram announcements with channel status and delivery outcome |
 
+## 🗄️ Database decision
+
+Use **SQLite as the source of truth for the pilot**. This repository already
+stores members, face embeddings, attendance, occupants, alerts and audit rows
+in `database/fablab.db`. With Docker, that file lives in the persistent
+`api-db` volume, so container rebuilds do not erase it.
+
+Do **not add FAISS yet**. FAISS is a vector search index, not a replacement for
+a database. For 10–20 volunteers the current search compares at most 60 stored
+embeddings, which is negligible; FAISS would add an index that must be rebuilt
+and kept synchronized without improving the user-visible result. Add it only
+after measured 1:N matching latency becomes a problem (normally at thousands
+of enrolled identities). SQLite remains the authoritative store even then.
+
+The GitHub Pages URL is a static frontend. It cannot run Python, access the lab
+camera, or write SQLite. A live system therefore needs one of these layouts:
+
+- **Recommended pilot:** run `docker compose up --build` on the lab PC and use
+  `http://<lab-pc>:8090`. Frontend, API, camera and SQLite stay together and
+  continue working if the internet drops.
+- **Remote console:** host the API on an HTTPS server with a persistent disk,
+  then set the repository Actions secret `AAMS_API_URL` to that API origin.
+  GitHub Pages remains only the UI; all real records stay behind the API.
+
+Move to PostgreSQL only when you need multiple API replicas, remote concurrent
+writes, or managed backups. That migration is independent of face search.
+
 ## 🚀 Quick start
 
 ### Backend (FastAPI)
@@ -82,6 +109,10 @@ docker compose up --build
 
 Volumes persist the SQLite database, evidence photos and the model cache
 across rebuilds. TLS guidance: see [`SECURITY.md`](SECURITY.md).
+
+Verify the live stack with `http://localhost:8000/ready`. It reports database
+readiness, whether the CV model is loaded, and whether Telegram is configured
+without exposing credentials.
 
 ### Build targets
 
@@ -162,6 +193,12 @@ simulator work without any camera.
 Until then, announcements are stored in the alerts table with the reason
 shown, so nothing is ever silently dropped. A daily summary is delivered
 at 20:00 via the scheduler.
+
+The repository intentionally contains no Telegram credentials, so GitHub alone
+can only verify the integration code. On the machine holding your `.env`, check
+`GET /api/notify/status`: all three fields should be `true`. Then send one test
+announcement from **Communicate** and confirm the response says
+`telegram_sent: true`; unsuccessful sends remain `pending` for retry.
 
 ## 🧱 Backend architecture
 

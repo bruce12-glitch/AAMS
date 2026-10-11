@@ -36,6 +36,16 @@ def _user_id():
     return 'HARDENPROBE001'
 
 
+def test_readiness_reports_database(client):
+    response = client.get('/ready')
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload['status'] == 'ready'
+    assert payload['database'] == 'ready'
+    assert payload['cv_engine'] in {'not_loaded', 'ready', 'failed'}
+    assert isinstance(payload['telegram']['configured'], bool)
+
+
 # ---------------------------------------------------------------- #
 # Admin guards
 # ---------------------------------------------------------------- #

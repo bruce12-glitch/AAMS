@@ -5,7 +5,8 @@ Implements §10 Token+Face Mode and §19 Face-Only Mode.
 """
 
 import numpy as np
-from app.database import get_connection, list_from_rows
+from app.database import get_connection
+from app.config import get_face_config
 from app.face_engine import FaceEngine
 
 class IdentityVerifier:
@@ -13,12 +14,16 @@ class IdentityVerifier:
     Identity verification logic for token+face and face-only modes.
     """
     
-    def __init__(self):
+    def __init__(self, face_engine=None):
         """
         Initialize the identity verifier with face engine and database access.
         """
-        self.face_engine = FaceEngine()
-        self.match_threshold = 0.45  # Configurable via config.yaml
+        # Matching stored vectors is pure NumPy and must not construct a new
+        # ~500 MB InsightFace model for every entry request. Image analysis is
+        # handled by app.vision's process-wide singleton; this class only uses
+        # FaceEngine's stateless matching helpers.
+        self.face_engine = face_engine or FaceEngine
+        self.match_threshold = float(get_face_config().get('match_threshold', 0.45))
     
     def get_user_embeddings(self, user_id: str) -> list:
         """

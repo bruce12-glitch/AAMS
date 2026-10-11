@@ -11,6 +11,7 @@ Enrollment: POST /api/users/enroll
 Webcam CLI enrollment remains available: python -m enrollment.enroll_user
 """
 
+import asyncio
 import base64
 import logging
 from typing import List, Optional
@@ -118,24 +119,38 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
         raise HTTPException(status_code=400, detail=str(exc))
 
     # ---- CV: quality-check + embed each frame ------------------------ #
-    try:
+    def analyze_enrollment_frames():
         passes = []  # list of (source_frame, analysis)
+        rejections = []
         for idx, frame in enumerate(frames):
             analysis = analyze_frame(frame)
             if analysis['face_count'] == 0:
+                rejections.append(f'photo {idx + 1}: no face detected')
                 continue
             if not analysis['quality_passed']:
+                reasons = analysis['quality_reasons'] or ['quality check failed']
                 logger.info('Enroll img %d rejected: %s', idx,
-                            '; '.join(analysis['quality_reasons']))
+                            '; '.join(reasons))
+                rejections.append(
+                    f"photo {idx + 1}: {'; '.join(reasons)}")
                 continue
             passes.append((frame, analysis))
+        return passes, rejections
+
+    try:
+        # InsightFace inference is CPU-bound. Keep all frames sequential on a
+        # single worker (the model session is shared) while leaving FastAPI's
+        # event loop free to serve health, dashboard and Telegram requests.
+        passes, rejections = await asyncio.to_thread(analyze_enrollment_frames)
     except VisionUnavailableError as exc:
         raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
     if len(passes) < 1:
+        reason_text = '; '.join(rejections[:3])
         raise HTTPException(status_code=422, detail=(
             'No usable face found in the provided images. Ensure a clear, '
-            'well-lit, front-facing photo (>120px face width).'))
+            'well-lit, front-facing photo (>120px face width). '
+            f'Rejected because: {reason_text}'))
 
     # ---- Pick best 3 embeddings (§17.4) ------------------------------ #
     picked = passes[:3]
