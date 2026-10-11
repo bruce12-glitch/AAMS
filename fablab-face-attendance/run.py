@@ -6,11 +6,9 @@ Usage: python run.py
 Steps:
 1. Load config.yaml + .env
 2. Initialize database (create if not exists)
-3. Initialize FaceEngine (load InsightFace models)
-4. Initialize LivenessChecker
-5. Initialize AlertService (Telegram bot)
-6. Start FastAPI server on http://localhost:8000
-7. Open frontend dashboard in browser
+3. Initialize lightweight services
+4. Start FastAPI server on http://localhost:8000
+5. Open the API documentation in a browser
 
 The scheduler and remaining services are started by the FastAPI startup event
 in app/main.py, which runs inside uvicorn's event loop. They cannot be started
@@ -51,22 +49,15 @@ def main():
     init_db()
     logger.info('Database initialized')
     
-    # Step 3: Initialize FaceEngine (loads InsightFace models)
-    logger.info('Initializing FaceEngine...')
-    try:
-        from app.face_engine import FaceEngine
-        face_engine = FaceEngine()
-        logger.info('FaceEngine initialized with InsightFace')
-    except Exception as e:
-        logger.warning(f'FaceEngine initialization may require insightface models: {e}')
-    
-    # Step 4: Initialize LivenessChecker
+    # Step 3: Initialize lightweight services. The heavy InsightFace model is
+    # loaded lazily on the first image request so the API can bind immediately
+    # and /health remains available while models are downloading.
     logger.info('Initializing LivenessChecker...')
     from app.liveness import LivenessChecker
     liveness_checker = LivenessChecker()
     logger.info('LivenessChecker initialized')
     
-    # Step 5: Initialize AlertService
+    # Step 4: Initialize AlertService
     logger.info('Initializing AlertService...')
     from app.alerts import AlertService
     alert_service = AlertService()
@@ -75,7 +66,7 @@ def main():
     else:
         logger.info('AlertService initialized (Telegram disabled)')
     
-    # Step 6: Start FastAPI server.
+    # Step 5: Start FastAPI server.
     #
     # Services (database, alerts, scheduler) are initialised by the FastAPI
     # startup event in app/main.py, which runs INSIDE uvicorn's event loop.

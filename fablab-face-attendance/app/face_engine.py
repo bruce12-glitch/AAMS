@@ -60,11 +60,10 @@ class FaceEngine:
         Returns:
             List of face objects with bounding boxes, landmarks, and embeddings
         """
-        # Convert BGR to RGB for InsightFace
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        
-        # Detect faces
-        faces = self.app.get(rgb_frame)
+        # OpenCV decodes/captures BGR frames and InsightFace's detector performs
+        # its own BGR -> RGB channel swap during preprocessing. Converting here
+        # a second time feeds reversed colours to both SCRFD and ArcFace.
+        faces = self.app.get(frame)
         
         return faces
     
@@ -178,7 +177,8 @@ class FaceEngine:
         # InsightFace returns cosine similarity directly
         return float(similarity)
     
-    def find_best_match(self, embedding: np.ndarray, all_embeddings: dict, threshold: float = 0.45) -> tuple:
+    @staticmethod
+    def find_best_match(embedding: np.ndarray, all_embeddings: dict, threshold: float = 0.45) -> tuple:
         """
         Perform 1:N search to find the best matching user.
         
@@ -197,7 +197,7 @@ class FaceEngine:
             # Compare against all stored embeddings for this user
             for user_emb in user_embeddings:
                 if user_emb is not None:
-                    similarity = self.match_embeddings(embedding, user_emb)
+                    similarity = FaceEngine.match_embeddings(embedding, user_emb)
                     
                     if similarity > best_score:
                         best_score = similarity

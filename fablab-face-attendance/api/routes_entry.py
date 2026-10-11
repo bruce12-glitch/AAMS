@@ -262,14 +262,15 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
                                                 image_path=evidence,
                                                 severity=severity)
         try:
-            await service.send_alert(alert_type, message,
-                                     image_path=evidence, severity=severity)
-            conn = get_connection()
-            conn.execute(
-                "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
-                (get_current_time_iso(), alert_row_id))
-            conn.commit()
-            conn.close()
+            sent = await service.send_alert(
+                alert_type, message, image_path=evidence, severity=severity)
+            if sent:
+                conn = get_connection()
+                conn.execute(
+                    "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
+                    (get_current_time_iso(), alert_row_id))
+                conn.commit()
+                conn.close()
         except Exception as exc:
             logger.error('Telegram send failed: %s', exc)
 

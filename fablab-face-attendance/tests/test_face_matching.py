@@ -59,3 +59,39 @@ def test_embedding_normalization():
         scaled = reference * scale
         score = FaceEngine.match_embeddings(unit, scaled / np.linalg.norm(scaled))
         assert abs(base - score) < 1e-9, "normalized-input scores must be scale-invariant"
+
+
+def test_detection_keeps_opencv_bgr_channel_order():
+    """InsightFace performs its own channel swap; pass cv2 frames unchanged."""
+    frame = np.zeros((2, 2, 3), dtype=np.uint8)
+    frame[0, 0] = [10, 20, 30]
+
+    class FakeAnalysis:
+        received = None
+
+        def get(self, image):
+            self.received = image
+            return []
+
+    engine = object.__new__(FaceEngine)
+    engine.app = FakeAnalysis()
+
+    assert engine.detect_faces(frame) == []
+    assert engine.app.received is frame
+    assert engine.app.received[0, 0].tolist() == [10, 20, 30]
+
+
+def test_identity_matching_does_not_construct_model(monkeypatch):
+    """Vector lookup must not reload the heavyweight model per request."""
+    import app.identity as identity
+
+    class ModelMustNotInitialize:
+        def __init__(self):
+            raise AssertionError('IdentityVerifier initialized InsightFace')
+
+        match_embeddings = staticmethod(FaceEngine.match_embeddings)
+        find_best_match = staticmethod(FaceEngine.find_best_match)
+
+    monkeypatch.setattr(identity, 'FaceEngine', ModelMustNotInitialize)
+    verifier = identity.IdentityVerifier()
+    assert verifier.face_engine is ModelMustNotInitialize

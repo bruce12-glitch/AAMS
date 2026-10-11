@@ -65,6 +65,40 @@ def test_severity_routing():
     # Low priority alerts go to daily report only
     print("✓ Severity routing: high=immediate, medium=batch, low=daily only")
 
+
+async def _not_delivered(*_args, **_kwargs):
+    return False
+
+
+def test_failed_delivery_stays_pending(tmp_path, monkeypatch):
+    """A disabled/failed Telegram send must never be recorded as sent."""
+    import asyncio
+    import app.database as dbmod
+
+    monkeypatch.setattr(dbmod, 'DATABASE_PATH', str(tmp_path / 'alerts.db'))
+    dbmod.init_db()
+    conn = dbmod.get_connection()
+    conn.execute(
+        "INSERT INTO alerts (alert_type, severity, message, sent_status) "
+        "VALUES ('UNKNOWN', 'medium', 'test', 'pending')")
+    conn.commit()
+    alert_id = conn.execute('SELECT max(id) FROM alerts').fetchone()[0]
+    conn.close()
+
+    service = object.__new__(AlertService)
+    service.enabled = True
+    service.bot = object()
+    service.send_alert = _not_delivered
+
+    assert asyncio.run(service.flush_pending()) == 0
+    conn = dbmod.get_connection()
+    row = conn.execute(
+        'SELECT sent_status, sent_at FROM alerts WHERE id=?', (alert_id,)
+    ).fetchone()
+    conn.close()
+    assert row['sent_status'] == 'pending'
+    assert row['sent_at'] is None
+
 if __name__ == '__main__':
     test_alert_formats()
     test_severity_routing()

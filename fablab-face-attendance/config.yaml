@@ -12,7 +12,7 @@ camera:
 # Off by default — enable on the lab host where a real camera is fixed at the
 # door. On a laptop it would happily log whoever happens to be sitting there.
 capture:
-  enabled: true
+  enabled: false
   interval_seconds: 2.0      # how often to analyse a frame
   cooldown_seconds: 45.0     # min gap between entries for the same person
 

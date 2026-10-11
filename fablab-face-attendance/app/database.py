@@ -20,8 +20,16 @@ def get_connection():
         Path(DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
     except OSError:
         pass
-    conn = sqlite3.connect(DATABASE_PATH)
+    # The capture worker, API requests and report scheduler can all touch the
+    # database concurrently. WAL lets readers continue while one writer is
+    # committing, while timeout/busy_timeout prevent short write collisions
+    # from surfacing as "database is locked" errors to the console.
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys = ON')
+    conn.execute('PRAGMA journal_mode = WAL')
+    conn.execute('PRAGMA synchronous = NORMAL')
+    conn.execute('PRAGMA busy_timeout = 30000')
     return conn
 
 def init_db():
