@@ -1,60 +1,44 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiGet } from '../api/client'
+import { IS_STATIC_DEMO } from '../config/runtime'
 
-/**
- * Polls a GET endpoint and falls back to mock data when the
- * backend is unreachable, so the UI always renders.
- *
- * @param path       API path, e.g. '/dashboard/stats'
- * @param fallback   Sample data used before the first response and whenever
- *                   the request fails. Pass a STABLE reference - a module
- *                   constant or a useMemo - not a fresh object literal per
- *                   render (see the fallbackRef note below).
- * @param intervalMs Poll cadence in milliseconds.
- * @param options.enabled  Set false to suppress polling entirely. Used by the
- *                   static Pages build, which has no backend: without this,
- *                   every mounted hook would fire a request that 404s and
- *                   flood the console with failed fetches.
- *
- * The `enabled` flag arrived as a bare 4th positional argument, which made
- * call sites read as `usePolling(path, fallback, 6000, false)` - the meaning
- * of the trailing boolean was invisible, and the 3rd argument could not be
- * omitted to reach it. An options object keeps call sites self-describing.
- */
+/** Poll current API data, keep the last real response on failure, and prevent
+ * overlapping or obsolete requests from overwriting the current page. Sample
+ * records are only used by an explicitly static demonstration build. */
 export function usePolling(path, fallback, intervalMs = 8000, options = {}) {
   const { enabled = true } = options
-  const [data, setData] = useState(fallback)
+  const [data, setData] = useState(IS_STATIC_DEMO ? fallback : null)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState(null)
 
-  // Hold the latest fallback in a ref. Previously `fallback` was read inside
-  // fetchOnce but omitted from its dependency list, so the closure captured
-  // the first fallback forever - a stale-closure bug that would serve outdated
-  // sample data even after the caller supplied a fresh object.
-  const fallbackRef = useRef(fallback)
-  fallbackRef.current = fallback
-
   // Track mount state per-effect rather than with a single mutable ref, so a
   // remount cannot leave a previously-unmounted component marked as mounted.
   const mountedRef = useRef(true)
+  const requestRef = useRef(0)
+  const inFlightRef = useRef(false)
 
   const fetchOnce = useCallback(async (silent = false) => {
-    if (!enabled) return
+    if (!enabled || inFlightRef.current) return
+    inFlightRef.current = true
+    const requestId = ++requestRef.current
     if (!silent) setLoading(true)
     try {
       const res = await apiGet(path)
-      if (!mountedRef.current) return
+      if (!mountedRef.current || requestId !== requestRef.current) return
       setData(res)
       setIsLive(true)
       setError(null)
     } catch (err) {
-      if (!mountedRef.current) return
+      if (!mountedRef.current || requestId !== requestRef.current) return
       setIsLive(false)
       setError(err?.message ?? 'unreachable')
-      if (fallbackRef.current !== undefined) setData(fallbackRef.current)
+      // Keep the last real response on failure; never substitute sample records.
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (requestId === requestRef.current) {
+        inFlightRef.current = false
+        if (mountedRef.current) setLoading(false)
+      }
     }
   }, [path, enabled])
 
@@ -73,6 +57,8 @@ export function usePolling(path, fallback, intervalMs = 8000, options = {}) {
     }, intervalMs)
     return () => {
       mountedRef.current = false
+      requestRef.current += 1
+      inFlightRef.current = false
       clearInterval(id)
     }
   }, [fetchOnce, intervalMs, enabled])

@@ -40,6 +40,8 @@ export default function Sidebar({ active, onSelect, isLive }) {
                 className={`nav-item ${active === id ? 'active' : ''}`}
                 onClick={() => onSelect(id)}
                 type="button"
+                aria-label={label}
+                title={label}
               >
                 {active === id && (
                   <motion.span
@@ -49,7 +51,7 @@ export default function Sidebar({ active, onSelect, isLive }) {
                   />
                 )}
                 <span className="nav-glyph"><Icon width={17} height={17} /></span>
-                {label}
+                <span className="nav-label">{label}</span>
               </button>
             </div>
           )
@@ -95,7 +97,7 @@ export default function Sidebar({ active, onSelect, isLive }) {
 
         <span className="conn-pill">
           <span className={`conn-dot ${isLive ? 'live' : 'demo'}`} />
-          {isLive ? 'API Connected' : 'Demo Data'}
+          {isLive ? 'API Connected' : 'Backend unavailable'}
         </span>
       </div>
     </aside>

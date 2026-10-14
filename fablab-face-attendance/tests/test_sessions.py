@@ -62,6 +62,7 @@ def test_admin_login_issues_admin_session(monkeypatch):
     monkeypatch.setenv('AAMS_ACCESS_PASSWORD', access_password)
     monkeypatch.setattr(routes_auth, 'admin_email', lambda: 'admin@srmist.edu.in')
     monkeypatch.setattr(routes_auth, 'auth_enabled', lambda: True)
+    monkeypatch.setattr(routes_auth, 'admin_password', lambda: access_password)
     monkeypatch.setattr(routes_auth, 'session_security_ready', lambda: True)
     client = TestClient(app, raise_server_exceptions=False)
     response = client.post('/api/auth/login', json={
@@ -79,3 +80,24 @@ def test_expired_session_rejected(monkeypatch):
     monkeypatch.setattr(time, 'time', lambda: 99999999999)
     with pytest.raises(HTTPException):
         security.verify_session(token)
+
+
+def test_shared_password_cannot_claim_administrator(monkeypatch):
+    monkeypatch.setenv('AAMS_ACCESS_PASSWORD', 'test-member-credential')
+    monkeypatch.setenv('SESSION_SECRET_KEY', 'test-session-secret-for-regression')
+    monkeypatch.setattr(routes_auth, 'admin_email', lambda: 'admin@srmist.edu.in')
+    monkeypatch.setattr(routes_auth, 'admin_password', lambda: 'test-distinct-admin-credential')
+    monkeypatch.setattr(routes_auth, 'auth_enabled', lambda: True)
+    client = TestClient(app, raise_server_exceptions=False)
+    response = client.post('/api/auth/login', json={
+        'email': 'admin@srmist.edu.in', 'password': 'test-member-credential'})
+    assert response.status_code == 403
+
+
+def test_production_entry_requires_session(monkeypatch):
+    monkeypatch.setenv('AAMS_ENV', 'production')
+    client = TestClient(app, raise_server_exceptions=False)
+    assert client.post('/api/entry/simulate', json={'scenario': 'authorized'}).status_code == 401
+    response = client.post('/api/entry/simulate', json={'scenario': 'authorized'},
+                           headers={'Authorization': f'Bearer {_token()}'})
+    assert response.status_code == 200

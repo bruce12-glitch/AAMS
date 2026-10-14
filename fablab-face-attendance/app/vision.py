@@ -12,6 +12,7 @@ import base64
 import binascii
 import logging
 import time
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _ENGINE = None
 _ENGINE_FAILED = False
+_ENGINE_LOCK = threading.Lock()
 
 
 class VisionUnavailableError(RuntimeError):
@@ -45,22 +47,23 @@ def engine_state() -> str:
 def get_engine():
     """Return the shared FaceEngine singleton, initializing lazily."""
     global _ENGINE, _ENGINE_FAILED
-    if _ENGINE is not None:
-        return _ENGINE
-    if _ENGINE_FAILED:
-        raise VisionUnavailableError(
-            "Face engine failed to initialize earlier "
-            "(InsightFace models missing or invalid)."
-        )
-    try:
-        from app.face_engine import FaceEngine
-        _ENGINE = FaceEngine()
-        logger.info("FaceEngine initialized")
-        return _ENGINE
-    except Exception as exc:  # pragma: no cover - depends on model download
-        _ENGINE_FAILED = True
-        logger.error("FaceEngine init failed: %s", exc)
-        raise VisionUnavailableError(str(exc)) from exc
+    with _ENGINE_LOCK:
+        if _ENGINE is not None:
+            return _ENGINE
+        if _ENGINE_FAILED:
+            raise VisionUnavailableError(
+                "Face engine failed to initialize earlier "
+                "(InsightFace models missing or invalid)."
+            )
+        try:
+            from app.face_engine import FaceEngine
+            _ENGINE = FaceEngine()
+            logger.info("FaceEngine initialized")
+            return _ENGINE
+        except Exception as exc:  # pragma: no cover - depends on model download
+            _ENGINE_FAILED = True
+            logger.error("FaceEngine init failed: %s", exc)
+            raise VisionUnavailableError(str(exc)) from exc
 
 
 # Upload guards. The console downscales photos to 1280 px / JPEG q0.9, which

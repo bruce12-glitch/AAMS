@@ -3,7 +3,8 @@ Reports Engine for FacePass FabLab.
 Generates daily, weekly, proxy, unpaid, and occupancy reports per §15.2.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from app.database import get_connection
 
 class ReportGenerator:
@@ -37,7 +38,7 @@ class ReportGenerator:
             }
         """
         if date_str is None:
-            date_str = datetime.now().strftime('%Y-%m-%d')
+            date_str = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%Y-%m-%d')
         
         conn = get_connection()
         cursor = conn.cursor()
@@ -45,27 +46,27 @@ class ReportGenerator:
         # Get date range
         start_dt = datetime.strptime(date_str, '%Y-%m-%d')
         end_dt = start_dt + timedelta(days=1)
-        start_ts = start_dt.isoformat()
-        end_ts = end_dt.isoformat()
+        start_ts = start_dt.replace(tzinfo=ZoneInfo('Asia/Kolkata')).astimezone(timezone.utc).isoformat()
+        end_ts = end_dt.replace(tzinfo=ZoneInfo('Asia/Kolkata')).astimezone(timezone.utc).isoformat()
         
         # Total entries
         cursor.execute('''
             SELECT COUNT(*) as count FROM entry_logs 
-            WHERE event_time >= ? AND event_time < ?
+            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
         ''', (start_ts, end_ts))
         total_entries = cursor.fetchone()['count']
         
         # Unique users
         cursor.execute('''
             SELECT COUNT(DISTINCT recognized_id) as count FROM entry_logs 
-            WHERE event_time >= ? AND event_time < ? AND recognized_id IS NOT NULL
+            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?) AND recognized_id IS NOT NULL
         ''', (start_ts, end_ts))
         unique_users = cursor.fetchone()['count']
         
         # Count by tag
         cursor.execute('''
             SELECT tag, COUNT(*) as count FROM entry_logs 
-            WHERE event_time >= ? AND event_time < ?
+            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
             GROUP BY tag
         ''', (start_ts, end_ts))
         
@@ -84,15 +85,15 @@ class ReportGenerator:
             SELECT u.name, o.entry_time, o.exit_time
             FROM occupants o
             JOIN users u ON o.user_id = u.user_id
-            WHERE o.entry_time >= ? AND o.entry_time < ?
+            WHERE datetime(o.entry_time) >= datetime(?) AND datetime(o.entry_time) < datetime(?)
             AND o.exit_time IS NOT NULL
             ORDER BY o.entry_time
         ''', (start_ts, end_ts))
         
         active_users = []
         for row in cursor.fetchall():
-            entry_dt = datetime.fromisoformat(row['entry_time'])
-            exit_dt = datetime.fromisoformat(row['exit_time'])
+            entry_dt = datetime.fromisoformat(row['entry_time']).replace(tzinfo=timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
+            exit_dt = datetime.fromisoformat(row['exit_time']).replace(tzinfo=timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
             
             active_users.append({
                 'name': row['name'],
@@ -121,15 +122,15 @@ class ReportGenerator:
         cursor = conn.cursor()
         
         # Get last 7 days
-        end_dt = datetime.now()
+        end_dt = datetime.now(timezone.utc)
         start_dt = end_dt - timedelta(days=7)
         
         cursor.execute('''
-            SELECT DATE(event_time) as date, COUNT(*) as entries,
+            SELECT DATE(event_time, '+330 minutes') as date, COUNT(*) as entries,
                    COUNT(DISTINCT recognized_id) as unique_users
             FROM entry_logs
-            WHERE event_time >= ?
-            GROUP BY DATE(event_time)
+            WHERE datetime(event_time) >= datetime(?)
+            GROUP BY DATE(event_time, '+330 minutes')
             ORDER BY date DESC
         ''', (start_dt.isoformat(),))
         
@@ -206,22 +207,27 @@ class ReportGenerator:
         ''')
         current_count = cursor.fetchone()['count']
         
-        # Today's occupancy stats
-        today = datetime.now().strftime('%Y-%m-%d')
-        cursor.execute('''
-            SELECT MAX(occupant_count) as peak, AVG(occupant_count) as average
-            FROM (
-                SELECT COUNT(*) as occupant_count
-                FROM occupants
-                WHERE DATE(entry_time) = ?
-                GROUP BY strftime('%H', entry_time)
-            )
-        ''', (today,))
-        
-        stats = cursor.fetchone()
-        peak_occupancy = stats['peak'] if stats['peak'] else 0
-        avg_occupancy = stats['average'] if stats['average'] else 0
-        
+        # Peak simultaneous occupancy and time-weighted daily average.
+        from app.utils import utc_now, parse_timestamp
+        now = utc_now()
+        day = datetime.now(ZoneInfo('Asia/Kolkata')).replace(hour=0, minute=0, second=0, microsecond=0)
+        start = day.astimezone(timezone.utc).replace(tzinfo=None)
+        rows = cursor.execute("SELECT entry_time, exit_time FROM occupants WHERE datetime(entry_time)<=datetime(?) AND (exit_time IS NULL OR datetime(exit_time)>=datetime(?))", (now.isoformat(), start.isoformat())).fetchall()
+        events = []
+        person_seconds = 0.0
+        for row in rows:
+            begin = max(start, parse_timestamp(row['entry_time']))
+            finish = min(now, parse_timestamp(row['exit_time']) if row['exit_time'] else now)
+            if finish > begin:
+                events.extend([(begin, 1), (finish, -1)])
+                person_seconds += (finish - begin).total_seconds()
+        peak_occupancy = 0
+        present = 0
+        for _stamp, change in sorted(events):
+            present += change
+            peak_occupancy = max(peak_occupancy, present)
+        avg_occupancy = person_seconds / max(1.0, (now - start).total_seconds())
+
         conn.close()
         
         return {

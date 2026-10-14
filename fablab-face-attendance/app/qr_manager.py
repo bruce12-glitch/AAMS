@@ -81,15 +81,23 @@ class QRManager:
         except json.JSONDecodeError:
             return {'valid': False, 'user_id': None, 'reason': 'Invalid JSON format'}
         
+        if not isinstance(token, dict):
+            return {'valid': False, 'user_id': None, 'reason': 'Token must be an object'}
+
         # Check required fields
         required = ['user_id', 'token_id', 'issued_at', 'expires_at', 'signature']
         for field in required:
             if field not in token:
                 return {'valid': False, 'user_id': None, 'reason': f'Missing field: {field}'}
         
+        if (not isinstance(token['user_id'], str) or not isinstance(token['token_id'], str)
+                or not isinstance(token['signature'], str)
+                or type(token['issued_at']) is not int or type(token['expires_at']) is not int):
+            return {'valid': False, 'user_id': None, 'reason': 'Invalid token field types'}
+
         # Check expiry
         current_time = int(time.time())
-        if current_time > token['expires_at']:
+        if current_time >= token['expires_at']:
             return {'valid': False, 'user_id': token.get('user_id'), 'reason': 'Token expired'}
         
         # Verify signature

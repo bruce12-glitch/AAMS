@@ -17,3 +17,6 @@ aiofiles==25.1.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
 httpx2==2.13.1
+
+# Notification integration tests exercise the real Telegram SDK with a local transport.
+python-telegram-bot[socks]==22.8

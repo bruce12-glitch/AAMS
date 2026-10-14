@@ -1,316 +1,66 @@
-# AAMS — FacePass FabLab
+# AAMS — FacePass Fab Lab
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_the_Site-14b8a6?style=for-the-badge)](https://bruce12-glitch.github.io/AAMS/)
-[![CI](https://github.com/bruce12-glitch/AAMS/actions/workflows/ci.yml/badge.svg)](https://github.com/bruce12-glitch/AAMS/actions/workflows/ci.yml)
-[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](fablab-face-attendance/)
-[![React 19](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](src/)
+A React/Vite console and FastAPI service for the SRMIST Fab Lab. The proposed showcase build includes student profiles, face enrollment, signed QR passes, entry checks, occupancy, security alerts, reporting and Telegram communication.
 
-> ### 🌐 Visit the live website: [bruce12-glitch.github.io/AAMS](https://bruce12-glitch.github.io/AAMS/)
-> Interactive demo of the console (sample data, no backend needed).
-> Sign in with any `@srmist.edu.in` address + any 6-character password.
+## What works in the proposed build
 
-**Smart Anti-Proxy Facial Access and Attendance Management System** for the
-SRMIST Fab Lab — face recognition at the door, live occupancy, security
-alerts over Telegram, and a calm, classic console designed for daily
-operations.
+- SRMIST-only sign-in. Members use a privately configured shared access credential; the configured administrator uses a different private administrator credential. The shared credential does not grant administrator privileges.
+- Add and edit student ID, full name, SRMIST email, phone, department, year, section, member type, payment status/expiry and account status. Student creation does not require biometric enrollment.
+- Enroll face photos or capture webcam photos after consent. The server validates images, runs InsightFace, saves embeddings, and issues a signed QR pass. Display/download/re-key passes; old passes are rejected after re-keying.
+- Process signed QR + face or face-only snapshots. Expired payments are denied. Granted entries update occupancy and logs; administrators can check students out.
+- Filter the latest 500 entry logs and export CSV. Export student records. View daily, weekly, security and occupancy reports. Times display in IST.
+- Configure the Telegram group privately in **Communicate**, verify its identity, send a test or announcement, and inspect delivery history. Announcements, student additions/enrollments, granted entries and security alerts use a persistent queue. Failed deliveries remain queued and retry automatically. The daily summary runs at the configured IST time; default 20:00. Background camera notifications are queued for the next retry cycle.
+- Clear loading/error states. Live pages retain the last real response on outages instead of substituting sample students or attendance.
 
-| Component | Description |
-|---|---|
-| `fablab-face-attendance/` | FastAPI backend — InsightFace recognition, SQLite, signed QR passes, Telegram alerts, scheduled reports, pytest suite |
-| `src/` + `index.html` | React 19 console (Vite) — subtle classic 3D backdrop, motion-respecting transitions, live data with offline demo fallback |
+## Private local launch
 
-## ✨ Features
+Requires Docker Desktop or a Docker engine. The supported images use Node 24 and Python 3.12. Configuration and data stay out of Git.
 
-- **Face-based entry** — server-side detect → quality gate → ArcFace match → policy decision, with token+face and face-only modes
-- **Anti-proxy & liveness** — blink (EAR) and head-motion checks over frame bursts, spoof/tailgate/unknown detection
-- **SRMIST-only access** — expiring signed sessions, read-only member access and administrator-only enrollment/mutations
-- **Live occupancy** — who is inside right now, with names, entry times and automatic timeout exits
-- **Telegram communication portal** — send announcements to the lab group from the console, with delivery status and a full audit trail
-- **Reports & audit** — daily/weekly/proxy/unpaid/occupancy reports, filterable entry logs, severity-graded alerts, retention enforcement
-- **Signed QR passes** — HMAC-signed 24 h passes with lost-token revoke-and-reissue
-
-## 🖥️ Console pages
-
-| Page | Purpose |
-|---|---|
-| Dashboard | KPIs, recent activity, occupants inside (with names), latest alerts |
-| Live Monitor | Camera/pipeline status, snapshot entry test, scenario simulator |
-| Entry Logs | Filterable trail of every access attempt |
-| Alerts | Security alerts by severity, with acknowledge action |
-| Members | Enrolled users — payment, consent and QR-pass management |
-| Reports | Daily summary, security events, occupancy, retention policy |
-| Communicate | Telegram announcements with channel status and delivery outcome |
-
-## 🗄️ Database decision
-
-Use **SQLite as the source of truth for the pilot**. This repository already
-stores members, face embeddings, attendance, occupants, alerts and audit rows
-in `database/fablab.db`. With Docker, that file lives in the persistent
-`api-db` volume, so container rebuilds do not erase it.
-
-Do **not add FAISS yet**. FAISS is a vector search index, not a replacement for
-a database. For 10–20 volunteers the current search compares at most 60 stored
-embeddings, which is negligible; FAISS would add an index that must be rebuilt
-and kept synchronized without improving the user-visible result. Add it only
-after measured 1:N matching latency becomes a problem (normally at thousands
-of enrolled identities). SQLite remains the authoritative store even then.
-
-The GitHub Pages URL is a static frontend. It cannot run Python, access the lab
-camera, or write SQLite. A live system therefore needs one of these layouts:
-
-- **Recommended pilot:** run `docker compose up --build` on the lab PC and use
-  `http://<lab-pc>:8090`. Frontend, API, camera and SQLite stay together and
-  continue working if the internet drops.
-- **Remote console:** host the API on an HTTPS server with a persistent disk,
-  then set the repository Actions secret `AAMS_API_URL` to that API origin.
-  GitHub Pages remains only the UI; all real records stay behind the API.
-
-Move to PostgreSQL only when you need multiple API replicas, remote concurrent
-writes, or managed backups. That migration is independent of face search.
-
-## 🚀 Quick start
-
-### Backend (FastAPI)
-
-```bash
-cd fablab-face-attendance
-python -m venv venv
-venv\Scripts\activate        # Windows (or: source venv/bin/activate)
-pip install -r requirements.txt
-copy .env.example .env       # then set real secrets (see below)
-python -m scripts.create_db
-python -m scripts.seed_demo_data   # optional demo data
-python run.py                # API on http://localhost:8000 (docs at /docs)
-```
-
-> First run downloads the InsightFace `buffalo_l` models (~500 MB) into
-> `models/insightface/`. The CV engine loads lazily — the API boots and
-> serves immediately; image endpoints warm it up on first use.
-
-### Frontend (React console)
-
-```bash
-npm install
-npm run dev                  # dev server on http://localhost:3000
-npm run lint                 # ESLint — must be clean before committing
-```
-
-The dev server proxies `/api/*` to `http://localhost:8000`, so run the
-backend first for live data. Without a backend the console renders
-populated sample data (badged "Demo Data").
-
-### Docker (API + console, one command)
-
-```bash
-python deploy/configure_showcase.py --admin-email your.name@srmist.edu.in
-docker compose up --build
-# API -> http://localhost:8000   (/health is orchestrator-safe)
-# Web -> http://localhost:8090   (nginx serves the console + proxies /api)
-```
-
-Volumes persist the SQLite database, evidence photos and the model cache
-across rebuilds. TLS guidance: see [`SECURITY.md`](SECURITY.md).
-
-Verify the live stack with `http://localhost:8000/ready`. It reports database
-readiness, whether the CV model is loaded, and whether Telegram and session
-security are configured without exposing credentials.
-
-### Zero-budget public showcase
-
-The all-in-one deployment keeps React, FastAPI and SQLite on the same machine,
-then exposes the nginx entry point through a free HTTPS tunnel. This avoids a
-cloud database bill and means enrollment photos never need to be stored by a
-third-party database service.
-
-```bash
-python deploy/configure_showcase.py --admin-email your.name@srmist.edu.in
-docker compose --profile showcase up --build -d
-docker compose --profile showcase logs -f tunnel-quick
-```
-
-Open the printed `https://...trycloudflare.com` URL and sign in with the admin
-email/password just configured. That URL lasts while the stack is running and
-is ideal for a presentation. For a permanent hostname, create a named
-Cloudflare Tunnel, put `CLOUDFLARE_TUNNEL_TOKEN=...` in the repository-root
-`.env`, route its public hostname to `http://web:80`, then run
-`docker compose --profile tunnel up --build -d`.
-
-The host must remain on during the showcase. SQLite, images and InsightFace
-models live in Docker volumes and survive rebuilds. The first real face request
-warms the model and can take longer; do one enrollment/recognition rehearsal
-before presenting.
-
-#### Windows edge node (Docker Desktop)
-
-On the Windows webcam PC, open PowerShell in the cloned repository and run:
+Windows PowerShell:
 
 ```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\deploy\showcase-windows.ps1 -AdminEmail your.name@srmist.edu.in -PublicUrl
+.\deploy\showcase-windows.ps1 -SkipTelegram
 ```
 
-The script prompts locally for the administrator password and optional Telegram
-credentials, generates independent signing secrets, builds the stack, checks
-`/ready`, and prints both the local and temporary HTTPS showcase URLs. Secrets
-are written only to the git-ignored `fablab-face-attendance/.env` file.
-
-Docker Desktop does not reliably pass a Windows USB webcam into a Linux
-container. The console therefore includes **Use webcam instead** and
-**Capture from webcam** buttons: the HTTPS browser captures frames on Windows
-and sends them to the local Docker API for InsightFace processing. Unattended
-background capture through `camera.source: 0` remains intended for a native
-Linux edge node or a network/RTSP camera.
-
-### Build targets
+Other hosts:
 
 ```bash
-npm run build                # lab target   — base '/', live API + health probe
-npm run build:pages          # Pages target — base '/AAMS/', static demo, zero backend calls
+python deploy/configure_showcase.py --admin-email your.name@srmist.edu.in
+docker compose up --build -d
 ```
 
-> The Pages target hardcodes `/AAMS/` in `vite.config.js` (must stay an
-> absolute path for deep links). If the repository is renamed, update
-> `PAGES_BASE` to match.
+Open http://localhost:8090 and sign in with the configured administrator account. The web and API host ports bind to localhost. Telegram credentials can be entered on the Communicate page and are stored in a private file on the database volume. They are never returned by the API or embedded in browser assets.
 
-## 🔗 Linking the live site to the backend
+The shared access credential remains a server-side setting, `AAMS_ACCESS_PASSWORD`. Use the requested value privately; do not commit it. `API_ADMIN_PASSWORD` must be different. Configuration helpers generate separate random QR/session signing secrets.
 
-The Pages build is a self-contained demo by default. To run it against
-the real backend (sign-in verification, enrollment, live data):
+The first face request may download the configured `buffalo_l` models. Browser webcam capture needs HTTPS or localhost and camera permission. Unattended hardware capture is opt-in through `capture.enabled` in the backend configuration and requires the camera host; it is not needed for snapshot upload demonstrations.
 
-1. Host the API (lab machine, `docker compose`, or any HTTPS host) over
-   **HTTPS** — the site is served over TLS and a plain-HTTP API would be
-   blocked as mixed content. The GitHub Pages origin is already in the
-   default CORS allow-list; extra origins go in `ALLOWED_ORIGINS`.
-2. Give members a password, otherwise nobody can sign in:
-   `set SEED_MEMBER_PASSWORD=...` before `python -m scripts.seed_demo_data`,
-   or reset one later from **Members → ⟳** / `POST /api/users/{id}/password`.
-3. Repository **Settings → Secrets and variables → Actions** → add
-   `AAMS_API_URL` = `https://<your-api-host>` (no trailing slash)
-4. Push to `main` — the workflow injects it as `VITE_API_URL` and the
-   site switches from demo mode to live mode
-5. Verify: reload the site and check the sidebar status pill turns
-   **Live**, sign in with a seeded `@srmist.edu.in` member (a wrong
-   password must be refused by the server, not by the page), then open
-   **Members** and confirm real rows load. The browser dev-tools Network
-   tab should show `/api/...` calls going to your API host.
-
-Leave the secret unset (or delete it) to return to the zero-backend demo.
-
-## 🔐 Authentication
-
-- Console sign-in, member enrollment and `POST /api/auth/login` accept
-  **only `@srmist.edu.in`** addresses — every other domain is rejected
-  with a clear message, on both frontend and backend.
-- Sign-in is **email + password** (minimum 6 characters). The server
-  stores only a PBKDF2-SHA256 hash (200 000 iterations, random salt) in
-  `users.password_hash`; plain-text passwords are never logged, returned
-  or persisted. Wrong passwords are rejected by the API, never by a
-  frontend shortcut. A successful login returns an HMAC-signed session that
-  expires after eight hours by default and is held in browser session storage.
-- The administrator uses `ADMIN_EMAIL` + `API_ADMIN_PASSWORD`. Members receive
-  read-only sessions; enrollment, payment changes, QR management, alert actions,
-  occupancy overrides and Telegram sends require the administrator role.
-- Without a backend (the public Pages demo) the same rule is enforced
-  locally: SRMIST address plus any 6-character password opens the
-  console; real 400/403 verdicts from an API are always honoured.
-- Maintenance scripts may still use `X-Admin-Token` with
-  `API_ADMIN_PASSWORD`; the browser uses its administrator session and never
-  asks the operator to paste a secret into individual forms. With no admin
-  password configured, maintenance-token guards stay dev-open with loud logs.
-- Live mode is fail-closed: an unreachable or misconfigured backend cannot
-  fall back to an email-only local login. Only the explicitly static Pages demo
-  uses a local demonstration gate.
-- Sign-in is rate limited (10 attempts/min per mail ID, 50/min per IP) and
-  every protected read answers `401` without a session — see
-  [`SECURITY.md`](SECURITY.md) for the full control list.
-
-## 📷 Connecting the camera
-
-The only step needed to go live on the lab host:
-
-1. Set `camera.source` (USB index `0`, or an RTSP URL) and
-   `capture.enabled: true` in `fablab-face-attendance/config.yaml`
-2. Restart the API (`python run.py`)
-
-Recognized members are then recorded automatically with their names, and
-the dashboard occupancy updates in real time. The Live Monitor page shows
-this guidance while the camera is offline; the snapshot test and scenario
-simulator work without any camera.
-
-## 💬 Telegram setup
-
-1. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in
-   `fablab-face-attendance/.env`, and `alerts.telegram_enabled: true`
-   in `config.yaml`
-2. Restart the API — the Communicate page reports the channel as ready
-
-Until then, announcements are stored in the alerts table with the reason
-shown, so nothing is ever silently dropped. A daily summary is delivered
-at 20:00 via the scheduler.
-
-The repository intentionally contains no Telegram credentials, so GitHub alone
-can only verify the integration code. On the machine holding your `.env`, check
-`GET /api/notify/status`: all three fields should be `true`. Then send one test
-announcement from **Communicate** and confirm the response says
-`telegram_sent: true`; unsuccessful sends remain `pending` for retry.
-
-## 🧱 Backend architecture
-
-```
-fablab-face-attendance/
-├── app/                     # Core modules
-│   ├── main.py              # FastAPI app + CORS + startup wiring
-│   ├── auth.py              # SRMIST-only email rule (single source of truth)
-│   ├── config.py            # config.yaml + .env loader
-│   ├── database.py          # SQLite schema + helpers
-│   ├── face_engine.py       # InsightFace SCRFD + ArcFace, quality checks
-│   ├── liveness.py          # Blink (EAR) + head-motion detection
-│   ├── identity.py          # Token+face (1:1) and face-only (1:N) matching
-│   ├── access_policy.py     # Decision matrix
-│   ├── occupancy.py         # Inside/outside tracking with timeout
-│   ├── alerts.py            # Telegram bot + announcements
-│   ├── qr_manager.py        # HMAC-signed QR passes
-│   ├── capture_service.py   # Background camera loop (owns the device)
-│   └── scheduler.py         # APScheduler — 20:00 daily report
-├── api/                     # Routes: entry, users, alerts, occupants,
-│                            # reports, dashboard, admin, auth, notify
-├── enrollment/              # CLI enrollment (capture → quality → embeddings)
-├── scripts/                 # create_db, seed_demo_data, generate_qr, backup_db
-└── tests/                   # pytest suite (89 tests)
-```
-
-Frontend: React 19 + Vite 8 · `three` + `@react-three/fiber` (lazy,
-DPR-capped classic backdrop) · `framer-motion` (reduced-motion aware) ·
-no CSS framework — design tokens in `src/styles/global.css`.
-
-## ✅ Testing
+## Development and checks
 
 ```bash
+npm ci
+pip install -r fablab-face-attendance/requirements.txt
+npm run lint
+npm run build
 cd fablab-face-attendance
-python -m pytest tests/ -v
+python -m pytest tests/ -q
 ```
 
-CI runs the backend suite plus frontend lint and both build targets on
-every push to `main`; the Pages demo redeploys automatically.
+For browser integration checks, from the repository root:
 
-## 🧪 Field pilot
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
 
-Everything for the one-week pilot lives in [`docs/pilot/`](docs/pilot/):
+The browser test starts disposable local servers and an isolated database. Its neural inference boundary is controlled for CI; production source continues to use the real model. Set `AAMS_TEST_PYTHON` if the backend packages live in a separate Python environment. Tests must run in the same network namespace as their local servers.
 
-| File | Purpose |
-|---|---|
-| `PILOT_RUNBOOK.md` | Day-by-day plan from approvals to report |
-| `CONSENT_FORM_TEMPLATE.md` | Printable biometric consent form |
-| `GO_LIVE_CHECKLIST.md` | Secrets / TLS / AI sanity gates before opening the door |
-| `TEST_REPORT_TEMPLATE.md` | Results tables for the final report |
+CI includes backend tests, frontend lint/build, browser flows, and a disposable Docker startup/persistence/proxy check. `deploy/ci_smoke.py` is restricted to GitHub Actions and refuses an existing private environment file.
 
-See also [`SECURITY.md`](SECURITY.md) (threat model + TLS) and
-[`CHANGELOG.md`](CHANGELOG.md).
+## Database and hosting
 
-> ⚠️ **Privacy:** never put real student data in `src/api/mock.js` — it
-> ships in the public JavaScript bundle. Samples use synthetic IDs
-> (`SAMPLE-0001`). Real data belongs in the database behind the API.
+SQLite WAL and additive migrations are retained for the single-host showcase. The database, evidence/enrollment photos and model cache use persistent Docker volumes. Backups use SQLite's online backup API, including committed WAL data. Run one API process to keep the camera, scheduler and in-memory rate limits coherent.
 
-## 📄 License
+GitHub Pages serves only static files. Secure sign-in and persistent features require a backend; a Pages-only build intentionally cannot sign in. The proposed Pages workflow requires a manual dispatch, so publishing source changes does not automatically publish a site. A same-origin Docker deployment is the preferred complete showcase path.
 
-See [`LICENSE`](LICENSE).
+No public deployment, merge or branch deletion is implied by these launch instructions. See [SHOWCASE_READINESS.md](SHOWCASE_READINESS.md) for verified results, unresolved external setup and the deployment boundary.

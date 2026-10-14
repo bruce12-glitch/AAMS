@@ -3,7 +3,7 @@ Dashboard API Routes for FacePass FabLab.
 Implements GET stats, live-status, activity, research.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from app.security import require_user
 
 router = APIRouter(prefix='/api/dashboard', tags=['dashboard'],
@@ -19,9 +19,10 @@ async def get_stats():
     
     # Total entries today
     from datetime import datetime
-    today = datetime.now().strftime('%Y-%m-%d')
+    from zoneinfo import ZoneInfo
+    today = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%Y-%m-%d')
     cursor.execute('''
-        SELECT COUNT(*) FROM entry_logs WHERE DATE(event_time) = ?
+        SELECT COUNT(*) FROM entry_logs WHERE DATE(event_time, '+330 minutes') = ?
     ''', (today,))
     total_entries = cursor.fetchone()[0]
     
@@ -30,7 +31,7 @@ async def get_stats():
     inside_count = cursor.fetchone()[0]
     
     # Unacknowledged alerts
-    cursor.execute('SELECT COUNT(*) FROM alerts WHERE acked = 0')
+    cursor.execute("SELECT COUNT(*) FROM alerts WHERE acked=0 AND alert_type NOT IN ('ANNOUNCE','REPORT','ENROLLMENT','ENTRY','TEST')")
     alert_count = cursor.fetchone()[0]
     
     # Active members
@@ -47,7 +48,7 @@ async def get_stats():
     }
 
 @router.get('/activity')
-async def get_activity():
+async def get_activity(limit: int = Query(default=20, ge=1, le=500)):
     """Get recent activity feed."""
     from app.database import get_connection
     
@@ -55,8 +56,8 @@ async def get_activity():
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT * FROM entry_logs ORDER BY event_time DESC LIMIT 20
-    ''')
+        SELECT * FROM entry_logs ORDER BY id DESC LIMIT ?
+    ''', (limit,))
     activities = [dict(row) for row in cursor.fetchall()]
     conn.close()
     
@@ -135,7 +136,8 @@ async def get_latency_metrics():
                 'target_ms': 3000, 'within_target': None}
 
     ordered = sorted(values)
-    p95 = ordered[max(0, int(len(ordered) * 0.95) - 1)]
+    from math import ceil
+    p95 = ordered[max(0, ceil(len(ordered) * 0.95) - 1)]
     avg = sum(values) / len(values)
     return {
         'samples': len(values),

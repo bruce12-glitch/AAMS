@@ -5,12 +5,21 @@ Image saving, timestamp formatting, and other common functions.
 
 import os
 import cv2
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Base directory for images
 BASE_DIR = Path(__file__).parent.parent
 IMAGES_DIR = BASE_DIR / "images"
+
+def utc_now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def parse_timestamp(value):
+    parsed = datetime.fromisoformat(value)
+    return parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
+
 
 def ensure_image_dirs():
     """Ensure all image directories exist."""
@@ -57,7 +66,7 @@ def format_timestamp(dt: datetime = None) -> str:
 
 def get_current_time_iso() -> str:
     """Get current time in ISO format."""
-    return datetime.now().isoformat()
+    return utc_now().isoformat()
 
 def calculate_duration(start_iso: str, end_iso: str = None) -> dict:
     """
@@ -66,8 +75,8 @@ def calculate_duration(start_iso: str, end_iso: str = None) -> dict:
     Returns:
         Dictionary with seconds, minutes, hours
     """
-    start = datetime.fromisoformat(start_iso)
-    end = datetime.fromisoformat(end_iso) if end_iso else datetime.now()
+    start = parse_timestamp(start_iso)
+    end = parse_timestamp(end_iso) if end_iso else utc_now()
     
     delta = end - start
     total_seconds = int(delta.total_seconds())

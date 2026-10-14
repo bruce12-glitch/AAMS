@@ -36,5 +36,6 @@ async def mark_exit(user_id: str, _: None = Depends(require_admin)):
 @router.post('/scan')
 async def trigger_scan(_: None = Depends(require_admin)):
     """Trigger indoor floor scan simulation."""
-    # This would integrate with indoor positioning system
-    return {'success': True, 'message': 'Scan triggered'}
+    from app.occupancy import OccupancyTracker
+    checked = OccupancyTracker().check_timeouts()
+    return {'success': True, 'timeout_exits': len(checked), 'message': 'Occupancy timeout check completed'}

@@ -7,7 +7,7 @@ import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
-from app.config import get_config
+from app.config import get_config, get_telegram_config
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class ReportScheduler:
         self.report_generator = report_generator
         self.db_path = db_path
         
-        self.scheduler = AsyncIOScheduler()
+        self.scheduler = AsyncIOScheduler(timezone='Asia/Kolkata', job_defaults={'coalesce': True, 'max_instances': 1, 'misfire_grace_time': 300})
         self._setup_jobs()
     
     def _setup_jobs(self):
@@ -40,12 +40,12 @@ class ReportScheduler:
         config = get_config()
         
         # Daily report at 20:00 (8 PM)
-        daily_report_time = config.get('alerts', {}).get('daily_report_time', '20:00')
+        daily_report_time = get_telegram_config().get('daily_report_time', '20:00')
         hour, minute = map(int, daily_report_time.split(':'))
         
         self.scheduler.add_job(
             self.send_daily_report,
-            CronTrigger(hour=hour, minute=minute),
+            CronTrigger(hour=hour, minute=minute, timezone='Asia/Kolkata'),
             id='daily_report',
             name='Send daily report'
         )
@@ -61,7 +61,7 @@ class ReportScheduler:
         # Database backup daily at 23:00
         self.scheduler.add_job(
             self.backup_database,
-            CronTrigger(hour=23, minute=0),
+            CronTrigger(hour=23, minute=0, timezone='Asia/Kolkata'),
             id='db_backup',
             name='Backup database'
         )
@@ -69,7 +69,7 @@ class ReportScheduler:
         # Retention enforcement (§26.4) nightly at 03:00
         self.scheduler.add_job(
             self.run_retention,
-            CronTrigger(hour=3, minute=0),
+            CronTrigger(hour=3, minute=0, timezone='Asia/Kolkata'),
             id='retention',
             name='Apply data retention policy'
         )
@@ -89,9 +89,12 @@ class ReportScheduler:
             report = self.report_generator.generate_daily()
             report_text = self.report_generator.to_plain_text(report)
             
-            if self.alert_service:
-                await self.alert_service.send_daily_report(report_text)
-                logger.info("Daily report sent successfully")
+            from app.alerts import AlertService
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            day = datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat()
+            result = await AlertService().queue_and_deliver('REPORT', report_text, dedupe_key=f'daily:{day}')
+            logger.info('Daily report delivery: %s', result['telegram_sent'])
         except Exception as e:
             logger.error(f"Failed to send daily report: {e}")
     
@@ -113,7 +116,7 @@ class ReportScheduler:
     def backup_database(self):
         """Create a backup of the database."""
         try:
-            import shutil
+            import sqlite3
             from datetime import datetime
             
             if not self.db_path:
@@ -121,7 +124,13 @@ class ReportScheduler:
                 return
             
             backup_path = f"{self.db_path}.backup.{datetime.now().strftime('%Y%m%d')}"
-            shutil.copy2(self.db_path, backup_path)
+            source = sqlite3.connect(str(self.db_path))
+            target = sqlite3.connect(backup_path)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+                source.close()
             logger.info(f"Database backed up to {backup_path}")
         except Exception as e:
             logger.error(f"Failed to backup database: {e}")
@@ -129,7 +138,8 @@ class ReportScheduler:
     async def flush_pending_alerts(self):
         """Resend alerts that were stored while the network was down."""
         try:
-            await self.alert_service.flush_pending()
+            from app.alerts import AlertService
+            await AlertService().flush_pending()
         except Exception as e:
             logger.error(f'Failed to flush pending alerts: {e}')
 
@@ -142,6 +152,10 @@ class ReportScheduler:
         except Exception as e:
             logger.error(f'Failed to apply retention policy: {e}')
 
+    def reschedule_daily_report(self):
+        hour, minute = map(int, get_telegram_config()['daily_report_time'].split(':'))
+        self.scheduler.reschedule_job('daily_report', trigger=CronTrigger(hour=hour, minute=minute, timezone='Asia/Kolkata'))
+
     def start(self):
         """Start the scheduler."""
         self.scheduler.start()
@@ -149,5 +163,6 @@ class ReportScheduler:
     
     def shutdown(self):
         """Shutdown the scheduler."""
-        self.scheduler.shutdown()
+        if self.scheduler.running:
+            self.scheduler.shutdown(wait=False)
         logger.info("Scheduler shutdown")

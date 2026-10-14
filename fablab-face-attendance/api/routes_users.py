@@ -14,10 +14,10 @@ Webcam CLI enrollment remains available: python -m enrollment.enroll_user
 import asyncio
 import base64
 import logging
-from typing import List, Optional
+from typing import List, Optional, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Body
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from app.security import require_admin, require_user, validate_user_id
 
@@ -26,14 +26,27 @@ router = APIRouter(prefix='/api/users', tags=['users'])
 
 
 class UserCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
     user_id: str
-    name: str
-    phone: Optional[str] = None
-    email: Optional[str] = None
-    user_type: str = 'student'
-    payment_status: str = 'inactive'
+    name: str = Field(min_length=1, max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=254)
+    user_type: Literal['student', 'faculty', 'staff', 'guest'] = 'student'
+    payment_status: Literal['active', 'pending', 'expired', 'inactive'] = 'inactive'
     payment_expiry: Optional[str] = None
-    password: Optional[str] = None  # plain text once; only its hash is stored
+    password: Optional[str] = None  # compatibility with old records
+    department: Optional[str] = Field(default=None, max_length=120)
+    year: Optional[int] = Field(default=None, ge=1, le=6)
+    section: Optional[str] = Field(default=None, max_length=30)
+
+    @field_validator('payment_expiry')
+    @classmethod
+    def validate_expiry(cls, value):
+        if value:
+            from datetime import date
+            date.fromisoformat(value)
+        return value or None
+
 
 
 class EnrollRequest(UserCreate):
@@ -47,6 +60,45 @@ def _require_valid_user_id(user_id: str) -> str:
         return validate_user_id(user_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+def _check_email_available(email, user_id):
+    if not email:
+        raise HTTPException(status_code=400, detail='SRMIST email is required')
+    from app.database import get_connection
+    conn = get_connection()
+    try:
+        row = conn.execute('SELECT user_id FROM users WHERE lower(email)=lower(?) AND user_id<>?', (email, user_id)).fetchone()
+        if row:
+            raise HTTPException(status_code=409, detail='This email is already assigned to another student')
+    finally:
+        conn.close()
+
+
+async def _notify_student(user_id, name, action):
+    from app.config import get_telegram_config
+    from app.alerts import AlertService
+    if get_telegram_config().get('notify_on_enrollment', True):
+        try:
+            await AlertService().queue_and_deliver('ENROLLMENT', f'AAMS — {action}\nName: {name}\nStudent ID: {user_id}')
+        except Exception as exc:
+            logger.warning('Student notification failed (%s)', type(exc).__name__)
+
+
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    phone: Optional[str] = Field(default=None, max_length=30)
+    email: Optional[str] = Field(default=None, max_length=254)
+    user_type: Optional[Literal['student', 'faculty', 'staff', 'guest']] = None
+    department: Optional[str] = Field(default=None, max_length=120)
+    year: Optional[int] = Field(default=None, ge=1, le=6)
+    section: Optional[str] = Field(default=None, max_length=30)
+    payment_status: Optional[Literal['active', 'pending', 'expired', 'inactive']] = None
+    payment_expiry: Optional[str] = None
+    active: Optional[Literal[0, 1]] = None
+
+    _expiry = field_validator('payment_expiry')(UserCreate.validate_expiry.__func__)
 
 
 @router.get('')
@@ -102,6 +154,7 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
     # The showcase uses a shared password supplied through the environment.
     # Keep the legacy per-member hash optional for database compatibility.
     from app.auth import hash_password
+    _check_email_available(req.email, req.user_id)
     pwd_hash = None
     if req.password:
         try:
@@ -129,6 +182,9 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
             analysis = analyze_frame(frame)
             if analysis['face_count'] == 0:
                 rejections.append(f'photo {idx + 1}: no face detected')
+                continue
+            if analysis['face_count'] != 1:
+                rejections.append(f'photo {idx + 1}: keep only one face in the photo')
                 continue
             if not analysis['quality_passed']:
                 reasons = analysis['quality_reasons'] or ['quality check failed']
@@ -196,6 +252,9 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
                   emb_bytes[0], emb_bytes[1], emb_bytes[2],
                   photo_rel, pwd_hash, int(req.consent_given)))
 
+        cursor.execute('UPDATE users SET department=?, year=?, section=? WHERE user_id=?',
+                       (req.department, req.year, req.section, req.user_id))
+
         # Issue active token (replace old ones).
         #
         # tokens.token_value is UNIQUE. This endpoint is documented as
@@ -220,6 +279,7 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
     finally:
         conn.close()
 
+    await _notify_student(req.user_id, req.name, 'Face enrollment completed')
     return {
         'success': True,
         'user_id': req.user_id,
@@ -242,6 +302,7 @@ async def create_user(user: UserCreate, _: None = Depends(require_admin)):
             user.email = reject_non_srmist(user.email)
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc))
+    _check_email_available(user.email, user.user_id)
     pwd_hash = None
     if user.password:
         from app.auth import hash_password
@@ -256,11 +317,12 @@ async def create_user(user: UserCreate, _: None = Depends(require_admin)):
     try:
         cursor.execute('''
             INSERT INTO users (user_id, name, phone, email, user_type,
-                               payment_status, payment_expiry, password_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                               payment_status, payment_expiry, password_hash, department, year, section)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (user.user_id, user.name, user.phone, user.email, user.user_type,
-              user.payment_status, user.payment_expiry, pwd_hash))
+              user.payment_status, user.payment_expiry, pwd_hash, user.department, user.year, user.section))
         conn.commit()
+        await _notify_student(user.user_id, user.name, 'Student added')
         return {'success': True, 'user_id': user.user_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -299,37 +361,41 @@ async def reset_password(user_id: str, req: PasswordReset,
 
 
 @router.put('/{user_id}')
-async def update_user(user_id: str, payment_status: Optional[str] = None,
-                      active: Optional[int] = None,
-                      _: None = Depends(require_admin)):
-    """Update user (payment, active status)."""
+async def update_user(user_id: str, payment_status: Optional[Literal['active', 'pending', 'expired', 'inactive']] = None,
+                      active: Optional[Literal[0, 1]] = None,
+                      profile: Optional[UserUpdate] = Body(default=None),
+                      _: dict = Depends(require_admin)):
+    """Edit student details; retain legacy payment query support."""
     from app.database import get_connection
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    updates, params = [], []
+    values = profile.model_dump(exclude_unset=True) if profile else {}
     if payment_status is not None:
-        updates.append('payment_status = ?')
-        params.append(payment_status)
+        values['payment_status'] = payment_status
     if active is not None:
-        updates.append('active = ?')
-        params.append(active)
-    if not updates:
+        values['active'] = active
+    if not values:
         raise HTTPException(status_code=400, detail='No fields to update')
-
-    params.append(user_id)
-    cursor.execute(f'''
-        UPDATE users SET {", ".join(updates)}, updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ?
-    ''', params)
-
-    conn.commit()
-    affected = cursor.rowcount
-    conn.close()
-
-    if affected == 0:
-        raise HTTPException(status_code=404, detail='User not found')
+    for required in ('name', 'email', 'user_type', 'payment_status', 'active'):
+        if required in values and values[required] is None:
+            raise HTTPException(status_code=400, detail=f'{required} cannot be empty')
+    if 'email' in values:
+        from app.auth import reject_non_srmist
+        try:
+            values['email'] = reject_non_srmist(values['email'])
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        _check_email_available(values['email'], user_id)
+    conn = get_connection()
+    try:
+        assignments = ', '.join(f'{key}=?' for key in values)
+        cursor = conn.execute(f'UPDATE users SET {assignments}, updated_at=CURRENT_TIMESTAMP WHERE user_id=?', (*values.values(), user_id))
+        if not cursor.rowcount:
+            raise HTTPException(status_code=404, detail='Student not found')
+        if values.get('active') == 0:
+            conn.execute('UPDATE tokens SET active=0 WHERE user_id=?', (user_id,))
+            conn.execute("UPDATE occupants SET status='exited', exit_time=CURRENT_TIMESTAMP WHERE user_id=? AND status='inside'", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
     return {'success': True}
 
 
@@ -340,6 +406,7 @@ async def delete_user(user_id: str, _: None = Depends(require_admin)):
 
     conn = get_connection()
     cursor = conn.cursor()
+    row = cursor.execute('SELECT face_image_path FROM users WHERE user_id=?', (user_id,)).fetchone()
     cursor.execute('DELETE FROM tokens WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM occupants WHERE user_id = ?', (user_id,))
     cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
@@ -349,6 +416,12 @@ async def delete_user(user_id: str, _: None = Depends(require_admin)):
 
     if affected == 0:
         raise HTTPException(status_code=404, detail='User not found')
+    if row and row['face_image_path']:
+        from app.config import BASE_DIR
+        from pathlib import Path
+        image = (BASE_DIR / row['face_image_path']).resolve()
+        if image.is_relative_to((BASE_DIR / 'images' / 'enrolled').resolve()):
+            image.unlink(missing_ok=True)
     return {'success': True}
 
 

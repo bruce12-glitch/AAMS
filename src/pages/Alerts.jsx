@@ -1,26 +1,30 @@
+import { parseTimestamp, LAB_TIME_ZONE } from '../utils/time'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray, adminPost, withAdminPrompt } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_ALERTS } from '../api/mock'
+import { useAuth } from '../auth/AuthContext'
+import DataNotice from '../components/DataNotice'
 
 const SEV = ['all', 'high', 'medium', 'low']
 
 // Guard invalid timestamps: new Date(bad).toLocaleString() returns the literal
 // string "Invalid Date", which would render straight into the UI.
 const fmtStamp = (iso) => {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN')
+  const d = parseTimestamp(iso)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE })
 }
 
 export default function Alerts() {
-  const { data, isLive, refresh } = usePolling(
+  const { data, isLive, error, refresh } = usePolling(
     '/alerts',
     MOCK_ALERTS,
     6000,
     { enabled: !IS_STATIC_DEMO }
   )
+  const { isAdmin } = useAuth()
   const [sev, setSev] = useState('all')
   const [acked, setAcked] = useState({})
   const [ackError, setAckError] = useState('')
@@ -64,6 +68,7 @@ export default function Alerts() {
         </div>
       </div>
 
+      <DataNotice error={error} />
       <div className="report-grid">
         {ackError && (
           <div className="form-error" style={{ gridColumn: '1 / -1' }} role="alert">
@@ -92,7 +97,7 @@ export default function Alerts() {
                     {fmtStamp(a.created_at)} · severity {a.severity ?? 'low'}
                   </div>
                 </div>
-                {!isAcked && (
+                {!isAcked && isAdmin && (
                   <button className="btn sm" onClick={() => ack(a.id)} type="button" style={{ alignSelf: 'center' }}>
                     Ack
                   </button>
@@ -108,7 +113,7 @@ export default function Alerts() {
               No {sev === 'all' ? '' : sev + '-severity '}alerts.
               <span className="mono">SYSTEM NOMINAL</span>
             </div>
-            {!isLive && <p className="alert-time">Backend offline — sample feed shown.</p>}
+            {!isLive && <p className="alert-time">Backend unavailable. Previously loaded records may be out of date.</p>}
           </motion.div>
         )}
       </div>

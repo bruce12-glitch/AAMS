@@ -37,8 +37,8 @@ export function useBackendStatus(intervalMs = 15000) {
 
     async function probe() {
       try {
-        const res = await fetch(apiUrl('/health'), { method: 'GET' })
-        if (mountedRef.current) setIsLive(res.ok)
+        const res = await fetch(apiUrl('/health'), { method: 'GET', signal: AbortSignal.timeout(5000) })
+        if (mountedRef.current) setIsLive(res.ok && (await res.json()).status === 'ok')
       } catch {
         if (mountedRef.current) setIsLive(false)
       }

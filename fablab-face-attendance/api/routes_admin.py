@@ -6,6 +6,7 @@ Mutating endpoints require X-Admin-Token (§27.2).
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from typing import Literal
 
 from app.security import require_admin, require_user
 
@@ -20,7 +21,7 @@ class ExceptionLog(BaseModel):
 
 class PaymentUpdate(BaseModel):
     user_id: str
-    payment_status: str
+    payment_status: Literal['active', 'pending', 'expired', 'inactive']
 
 
 @router.get('/exceptions')

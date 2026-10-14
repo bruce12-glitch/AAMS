@@ -7,6 +7,9 @@ import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_USERS } from '../api/mock'
 import StatusBadge from '../components/StatusBadge'
 import EnrollModal from '../components/EnrollModal'
+import StudentModal from '../components/StudentModal'
+import DataNotice from '../components/DataNotice'
+import { downloadCsv } from '../utils/download'
 import { useAuth } from '../auth/AuthContext'
 
 const initials = (name) =>
@@ -23,9 +26,12 @@ const TOKEN_MSG = 'Administrator access is required for this action.'
 
 export default function Users() {
   const { isAdmin } = useAuth()
-  const { data, loading, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
+  const { data, loading, error, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
   const [query, setQuery] = useState('')
   const [showEnroll, setShowEnroll] = useState(false)
+  const [enrollStudent, setEnrollStudent] = useState(null)
+  const [editStudent, setEditStudent] = useState(undefined)
+  const [success, setSuccess] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [qrView, setQrView] = useState(null)   // {name, dataUri}
   const qrDialogRef = useDialog(!!qrView, () => setQrView(null))
@@ -73,7 +79,7 @@ export default function Users() {
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       list = list.filter((u) =>
-        [u.name, u.user_id, u.phone].some((f) => String(f ?? '').toLowerCase().includes(q))
+        [u.name, u.user_id, u.phone, u.email, u.department].some((f) => String(f ?? '').toLowerCase().includes(q))
       )
     }
     return list
@@ -113,7 +119,7 @@ export default function Users() {
       <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
         <div>
           <h1 className="page-title">Members</h1>
-          <p className="page-sub">Enrolled Fab Lab users with payment and consent status.</p>
+          <p className="page-sub">Student profiles, face enrollment, payment status and signed access passes.</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <input
@@ -122,12 +128,15 @@ export default function Users() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          {isAdmin && <button className="btn primary" onClick={() => setShowEnroll(true)} type="button">＋ Enroll</button>}
+          <button className="btn ghost" type="button" disabled={!rows.length} onClick={() => downloadCsv('aams-students.csv', [['ID', 'Name', 'Email', 'Phone', 'Department', 'Year', 'Section', 'Payment'], ...rows.map((u) => [u.user_id, u.name, u.email, u.phone, u.department, u.year, u.section, u.payment_status])])}>Export CSV</button>
+          {isAdmin && <button className="btn primary" onClick={() => setEditStudent(null)} type="button">＋ Add student</button>}
         </div>
       </div>
 
+      <DataNotice error={error} loading={loading} />
+      {success && <p className="success-note" role="status">{success}</p>}
       <motion.div
-        className="panel"
+        className="panel table-panel"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
@@ -144,7 +153,7 @@ export default function Users() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Member</th><th>ID</th><th>Phone</th><th>Biometrics</th><th>Payment</th><th></th>
+              <th>Student</th><th>ID</th><th>Details</th><th>Biometrics</th><th>Payment</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -158,11 +167,11 @@ export default function Users() {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                     <div className="avatar" style={{ width: 30, height: 30, fontSize: 10.5 }}>{initials(u.name)}</div>
-                    <span className="name-cell">{u.name ?? '—'}</span>
+                    <span className="name-cell">{u.name ?? '—'}{u.active === 0 && <small className="alert-time"> · disabled</small>}</span>
                   </div>
                 </td>
                 <td className="mono">{u.user_id}</td>
-                <td className="mono">{u.phone ?? '—'}</td>
+                <td><div>{u.email || '—'}</div><small className="alert-time">{[u.phone, u.department, u.year && `Year ${u.year}`, u.section].filter(Boolean).join(' · ')}</small></td>
                 <td><StatusBadge value={u.enrolled ? 'active' : 'noface'} /></td>
                 <td>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -181,7 +190,9 @@ export default function Users() {
                   </span>
                 </td>
                 <td>
-                  {isAdmin && <span style={{ display: 'inline-flex', gap: 4 }}>
+                  {isAdmin && <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, maxWidth: 230 }}>
+                    <button className="btn sm ghost" type="button" onClick={() => setEditStudent(u)}>Edit</button>
+                    <button className="btn sm ghost" type="button" onClick={() => { setEnrollStudent(u); setShowEnroll(true) }}>Enroll face</button>
                     <button className="btn sm ghost" onClick={() => showQr(u)} disabled={busyId === u.user_id} type="button" title="Show current QR pass">QR</button>
                     <button className="btn sm ghost" onClick={() => rekey(u)} disabled={busyId === u.user_id} type="button" title="Lost token: revoke + re-issue">⟳</button>
                     <button className="btn sm ghost" onClick={() => removeUser(u)} disabled={busyId === u.user_id} type="button" title="Delete member">✕</button>
@@ -190,13 +201,15 @@ export default function Users() {
               </motion.tr>
             ))}
             {rows.length === 0 && !loading && (
-              <tr><td colSpan={6}><div className="empty-state">No members found.<span className="mono">USE ＋ ENROLL TO ADD</span></div></td></tr>
+              <tr><td colSpan={6}><div className="empty-state">No members found.<span className="mono">USE ＋ ADD STUDENT</span></div></td></tr>
             )}
           </tbody>
         </table>
       </motion.div>
 
-      <EnrollModal open={showEnroll} onClose={() => setShowEnroll(false)} onEnrolled={() => refresh()} />
+      <EnrollModal key={enrollStudent?.user_id ?? 'new'} member={enrollStudent} open={showEnroll} onClose={() => setShowEnroll(false)} onEnrolled={() => { refresh(); setSuccess('Face enrollment saved.') }} />
+      {editStudent !== undefined && <StudentModal key={editStudent?.user_id ?? 'new'} student={editStudent}
+        onClose={() => setEditStudent(undefined)} onSaved={() => { setEditStudent(undefined); setSuccess('Student details saved.'); refresh() }} />}
 
       <AnimatePresence>
         {qrView && (
@@ -211,6 +224,7 @@ export default function Users() {
                 <div className="qr-wrap">
                   <img src={qrView.dataUri} alt="QR pass" />
                   <span>Signed pass · expires in 24 h. Old passes were revoked if you just re-keyed.</span>
+                  <a className="btn ghost" download="aams-qr-pass.png" href={qrView.dataUri}>Download QR</a>
                 </div>
               )}
               <div className="modal-actions">

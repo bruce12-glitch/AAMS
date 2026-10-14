@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { IS_STATIC_DEMO } from '../config/runtime'
+import DataNotice from '../components/DataNotice'
 import { MOCK_DAILY_REPORT, MOCK_STATS } from '../api/mock'
 
 function ReportCard({ title, rows, delay = 0, footer }) {
@@ -60,7 +61,7 @@ export default function Reports() {
   const s = stats.data ?? {}
   const d = daily.data ?? {}
 
-  const dailyKeys = ['date', 'total_entries', 'unique_users', 'authorized_entries',
+  const dailyKeys = ['date', 'total_entries', 'unique_users', 'authorized', 'authorized_entries',
     'granted', 'denied']
   const secKeys = ['proxy_attempts', 'unpaid_attempts', 'unknown_attempts',
     'spoof_attempts', 'tailgate_alerts']
@@ -69,12 +70,13 @@ export default function Reports() {
     <div className="page-wrap">
       <div className="page-intro">
         <h1 className="page-title">Reports</h1>
-        <p className="page-sub">Live summaries from the reporting engine — also delivered to the in-charge at 20:00 via Telegram.</p>
+        <p className="page-sub">Current attendance and security summaries. Daily Telegram delivery follows your configured report time.</p>
       </div>
 
+      <DataNotice error={daily.error || weekly.error || proxy.error || unpaid.error || occ.error} loading={daily.loading} />
       <div className="report-grid">
         <ReportCard title="Daily Summary" delay={0}
-          rows={pick(d, dailyKeys).length ? pick(d, dailyKeys) : pick(MOCK_DAILY_REPORT, dailyKeys)}
+          rows={pick(d, dailyKeys)}
           footer={daily.isLive ? 'live' : 'demo'} />
 
         <ReportCard title="Security Events" delay={0.08}
@@ -94,7 +96,7 @@ export default function Reports() {
         <ReportCard title="Occupancy Report" delay={0.24}
           rows={(() => {
             const o = occ.data ?? {}
-            const rows = pick(o, ['peak_occupancy', 'current_occupancy',
+            const rows = pick(o, ['peak_today', 'average_today', 'current_occupants', 'peak_occupancy', 'current_occupancy',
               'total_entries_today', 'timeout_exits', 'avg_duration_minutes'])
             if (rows.length) return rows
             const arr = Array.isArray(o) ? o.slice(0, 6) : []
@@ -105,18 +107,18 @@ export default function Reports() {
         <ReportCard title="Weekly Trend" delay={0.32}
           rows={(() => {
             const w = weekly.data ?? {}
-            const rows = pick(w, ['week_start', 'week_end', 'total_entries',
+            const rows = pick(w, ['period', 'week_start', 'week_end', 'total_entries',
               'unique_users', 'proxy_attempts', 'unpaid_attempts'])
-            if (rows.length) return rows
-            return [['week', '(demo data — backend offline)']]
+            if (rows.length) return [...rows, ...(w.daily_stats || []).map((day) => [day.date, `${day.entries} entries · ${day.unique_users} students`])]
+            return []
           })()}
           footer={weekly.isLive ? 'live' : 'demo'} />
 
-        <ReportCard title="Retention Policy (§26)" delay={0.4}
+        <ReportCard title="Data retention" delay={0.4}
           rows={[
             ['Entry logs', 'purged after 90 days'],
             ['Alert images', 'purged after 30 days'],
-            ['Daily reports', 'kept 1 year']
+            ['Student biometrics', 'removed when student is deleted']
           ]} />
       </div>
     </div>

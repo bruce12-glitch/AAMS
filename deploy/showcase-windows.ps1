@@ -24,7 +24,7 @@ function New-RandomSecret {
 
 function Format-EnvValue([string]$Value) {
     if ($Value -match "[\r\n]") { throw 'Environment values cannot contain newlines.' }
-    return '"' + $Value.Replace('\', '\\').Replace('"', '\"') + '"'
+    return "'" + $Value.Replace("'", "\'") + "'"
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -43,6 +43,8 @@ $AdminPassword = ConvertFrom-SecureValue (Read-Host 'Choose administrator passwo
 if ($AdminPassword.Length -lt 12) { throw 'Administrator password must contain at least 12 characters.' }
 $AccessPassword = ConvertFrom-SecureValue (Read-Host 'Enter shared AAMS login password (12+ characters)' -AsSecureString)
 if ($AccessPassword.Length -lt 12) { throw 'Shared AAMS login password must contain at least 12 characters.' }
+
+if ($AdminPassword -ceq $AccessPassword) { throw 'Administrator and shared credentials must be different.' }
 
 $TelegramToken = ''
 $TelegramChat = ''
@@ -67,6 +69,7 @@ $values = @(
     'QR_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
     'SESSION_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
     'SESSION_TTL_SECONDS=28800',
+    'AAMS_ENV=production',
     'DATABASE_PATH=database/fablab.db',
     'TELEGRAM_BOT_TOKEN=' + (Format-EnvValue $TelegramToken),
     'TELEGRAM_CHAT_ID=' + (Format-EnvValue $TelegramChat)

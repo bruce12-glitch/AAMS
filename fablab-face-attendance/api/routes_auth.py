@@ -17,7 +17,7 @@ second, much wider net.
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth import (
     SRMIST_DOMAIN,
@@ -29,6 +29,7 @@ from app.auth import (
 )
 from app.security import (
     admin_email,
+    admin_password,
     auth_enabled,
     issue_session,
     require_user,
@@ -51,8 +52,8 @@ def login_attempt_limit() -> int:
 
 
 class LoginRequest(BaseModel):
-    email: str = ''
-    password: str = ''
+    email: str = Field(default='', max_length=254)
+    password: str = Field(default='', max_length=512)
 
 
 def _check_login_rate(request: Request, email: str) -> None:
@@ -111,13 +112,19 @@ async def login(req: LoginRequest, request: Request):
             detail='Server session security is not configured',
         )
 
-    if not verify_access_password(req.password):
+    is_admin = email == admin_email()
+    if is_admin:
+        import hmac
+        password_valid = auth_enabled() and hmac.compare_digest(
+            req.password.encode(), admin_password().encode())
+    else:
+        password_valid = verify_access_password(req.password)
+    if not password_valid:
         raise HTTPException(status_code=403, detail='Wrong email or password')
 
-    # The configured administrator mail receives the admin role. Every other
-    # valid SRMIST address receives a member session. This keeps mutation
-    # privileges least-privileged even though the showcase password is shared.
-    if email == admin_email():
+    # Administrator identity requires its separate private credential.
+    # The shared showcase password can only issue member sessions.
+    if is_admin:
         session = issue_session(
             email=email, user_id='ADMIN', name='Fab Lab Administrator', role='admin')
         return {'ok': True, 'domain': SRMIST_DOMAIN, **session}
@@ -132,6 +139,9 @@ async def login(req: LoginRequest, request: Request):
         (email,))
     row = cursor.fetchone()
     conn.close()
+
+    if row and not row['active']:
+        raise HTTPException(status_code=403, detail='This account has been disabled')
 
     session = issue_session(
         email=email,

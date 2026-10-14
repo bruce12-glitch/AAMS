@@ -1,8 +1,13 @@
+import { parseTimestamp, LAB_TIME_ZONE } from '../utils/time'
+import { useState } from 'react'
+import { useAuth } from '../auth/AuthContext'
+import { adminPost } from '../api/client'
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_STATS, MOCK_ACTIVITY, MOCK_ALERTS, MOCK_OCCUPANTS } from '../api/mock'
+import DataNotice from '../components/DataNotice'
 import StatCard from '../components/StatCard'
 import StatusBadge from '../components/StatusBadge'
 import { IconDoor, IconFace, IconBell, IconUsers } from '../components/icons'
@@ -18,8 +23,8 @@ const LIVE = { enabled: !IS_STATIC_DEMO }
 // inverse of what callers expect - which made every timestamp render as an em
 // dash. getTime() returns NaN precisely when the date is invalid.
 const fmtTime = (iso) => {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+  const d = parseTimestamp(iso)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { timeZone: LAB_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
 }
 
 const initials = (id) => (id ? id.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase() : '??')
@@ -32,7 +37,18 @@ export default function Dashboard({ onNavigate }) {
   const alerts = usePolling('/alerts', MOCK_ALERTS, 8000, LIVE)
   const occupants = usePolling('/occupants', MOCK_OCCUPANTS, 8000, LIVE)
 
-  const s = stats.data ?? MOCK_STATS
+  const { isAdmin } = useAuth()
+  const [exitError, setExitError] = useState('')
+  const [exiting, setExiting] = useState(null)
+  const checkout = async (id) => {
+    setExiting(id); setExitError('')
+    try {
+      await adminPost(`/occupants/${encodeURIComponent(id)}/exit`, {})
+      occupants.refresh(); stats.refresh()
+    } catch (err) { setExitError(err.message) }
+    finally { setExiting(null) }
+  }
+  const s = stats.data ?? {}
   const acts = toArray(activity.data, 'activities').slice(0, 8)
   const alertList = toArray(alerts.data, 'alerts').slice(0, 5)
   const occList = toArray(occupants.data, 'occupants').filter((o) => o.status === 'inside')
@@ -44,11 +60,12 @@ export default function Dashboard({ onNavigate }) {
         <p className="page-sub">Real-time Fab Lab access control — entries, occupancy and security events.</p>
       </div>
 
+      <DataNotice error={exitError || stats.error || activity.error || alerts.error || occupants.error} loading={stats.loading} />
       <div className="grid-stats">
-        <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#0e7490" tint="#ecfeff" trend="+12%" trendDir="up" />
+        <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#0e7490" tint="#ecfeff" trend={stats.isLive ? 'live' : '—'} trendDir="flat" />
         <StatCard index={1} label="Inside Now" value={s.inside_count} icon={<IconFace width={17} height={17} />} color="#047857" tint="#ecfdf5" trend="live" trendDir="flat" />
-        <StatCard index={2} label="Open Alerts" value={s.alert_count} icon={<IconBell width={17} height={17} />} color="#b91c1c" tint="#fef2f2" trend="-2" trendDir="down" />
-        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} height={17} />} color="#6d28d9" tint="#f5f3ff" trend="+3" trendDir="up" />
+        <StatCard index={2} label="Open Alerts" value={s.alert_count} icon={<IconBell width={17} height={17} />} color="#b91c1c" tint="#fef2f2" trend="live" trendDir="flat" />
+        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} height={17} />} color="#6d28d9" tint="#f5f3ff" trend="live" trendDir="flat" />
       </div>
 
       <div className="grid-main">
@@ -111,6 +128,7 @@ export default function Dashboard({ onNavigate }) {
                   <div className="occupant-meta">{o.name ? `${o.user_id} · ` : ''}In at {fmtTime(o.entry_time)}</div>
                 </div>
                 <span className="occupant-dur">{Math.round(o.duration_minutes ?? 0)}m</span>
+                {isAdmin && <button className="btn sm ghost" type="button" disabled={exiting === o.user_id} onClick={() => checkout(o.user_id)}>Check out</button>}
               </div>
             ))}
           </motion.section>

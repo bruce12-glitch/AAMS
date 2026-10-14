@@ -49,6 +49,10 @@ def admin_password() -> str:
         return ''
 
 
+def production_mode() -> bool:
+    return os.getenv('AAMS_ENV', 'development').lower() == 'production'
+
+
 def auth_enabled() -> bool:
     return admin_password() not in _PLACEHOLDERS
 
@@ -71,7 +75,8 @@ def _session_secret() -> str:
 
 def session_security_ready() -> bool:
     secret = _session_secret()
-    return bool(secret) and secret not in _PLACEHOLDERS and not secret.startswith('CHANGE_')
+    valid = bool(secret) and secret not in _PLACEHOLDERS and not secret.startswith('CHANGE_')
+    return valid and (not production_mode() or len(secret) >= 32)
 
 
 def _b64encode(raw: bytes) -> str:
@@ -136,7 +141,17 @@ async def require_user(request: Request) -> dict:
     token = _bearer(request)
     if not token:
         raise HTTPException(status_code=401, detail='Sign in required')
-    return verify_session(token)
+    session = verify_session(token)
+    if session['role'] == 'member':
+        from app.database import get_connection
+        conn = get_connection()
+        try:
+            row = conn.execute('SELECT active FROM users WHERE lower(email)=?', (session['email'],)).fetchone()
+            if row and not row['active']:
+                raise HTTPException(status_code=401, detail='Account disabled')
+        finally:
+            conn.close()
+    return session
 
 
 async def require_admin(request: Request) -> dict | None:
@@ -149,6 +164,8 @@ async def require_admin(request: Request) -> dict | None:
         return session
 
     if not auth_enabled():
+        if production_mode():
+            raise HTTPException(status_code=503, detail='Administrator security is not configured')
         logger.warning(
             "API_ADMIN_PASSWORD not set - admin endpoint %s open in dev mode",
             request.url.path,

@@ -60,7 +60,7 @@ async function request(path, options = {}, timeoutMs) {
       let detail = `${res.status} ${res.statusText}`
       try {
         const body = await res.json()
-        if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+        if (body?.detail) detail = typeof body.detail === 'string' ? body.detail : body.detail.map((item) => `${item.loc?.at(-1) || 'Input'}: ${item.msg}`).join('; ')
       } catch { /* non-json error body */ }
       const err = new Error(detail)
       err.status = res.status
@@ -101,15 +101,7 @@ export function adminPost(path, body, timeoutMs) {
  * result or rethrows the original error when the operator cancels.
  */
 export async function withAdminPrompt(run) {
-  try {
-    return await run()
-  } catch (err) {
-    if (err?.status !== 401 || typeof window === 'undefined') throw err
-    const entered = window.prompt('Lab admin token required for this action:')
-    if (!entered || !entered.trim()) throw err
-    setAdminToken(entered)
-    return run()
-  }
+  return run()
 }
 
 export function apiPut(path, body, timeoutMs) {

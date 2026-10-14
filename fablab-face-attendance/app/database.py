@@ -129,7 +129,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS admin_actions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            admin_id TEXT DEFAULT 'Dr. Meena K.',
+            admin_id TEXT DEFAULT 'administrator',
             action TEXT NOT NULL,
             target_user_id TEXT,
             reason TEXT,
@@ -152,8 +152,17 @@ def _ensure_columns():
         'entry_logs': {
             'latency_ms': 'REAL',          # §23.3 decision-time tracking
         },
+        'alerts': {
+            'delivery_attempts': 'INTEGER DEFAULT 0',
+            'last_error': 'TEXT',
+            'last_attempt_at': 'TEXT',
+            'dedupe_key': 'TEXT',
+        },
         'users': {
             'password_hash': 'TEXT',       # console sign-in (email + password)
+            'department': 'TEXT',
+            'year': 'INTEGER',
+            'section': 'TEXT',
         },
     }
     conn = get_connection()
@@ -164,6 +173,10 @@ def _ensure_columns():
         for col, decl in cols.items():
             if col not in existing:
                 cursor.execute(f'ALTER TABLE {table} ADD COLUMN {col} {decl}')
+    conn.execute('CREATE UNIQUE INDEX IF NOT EXISTS alerts_dedupe ON alerts(dedupe_key) WHERE dedupe_key IS NOT NULL')
+    duplicates = conn.execute("SELECT 1 FROM users WHERE email IS NOT NULL AND email<>'' GROUP BY lower(email) HAVING COUNT(*)>1 LIMIT 1").fetchone()
+    if not duplicates:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique ON users(lower(email)) WHERE email IS NOT NULL AND email<>''")
     conn.commit()
     conn.close()
 

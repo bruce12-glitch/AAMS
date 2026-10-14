@@ -9,22 +9,36 @@ Security notes (§27):
 """
 
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.ratelimit import RateLimitMiddleware, requests_per_minute
-from app.security import allowed_origins, auth_enabled, session_security_ready
+from app.security import allowed_origins, auth_enabled, session_security_ready, production_mode
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+# Telegram uses token-bearing URLs; HTTP request logging must never expose them.
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpx2').setLevel(logging.WARNING)
+
+@asynccontextmanager
+async def lifespan(_app):
+    await startup_event()
+    try:
+        yield
+    finally:
+        await shutdown_event()
+
 
 app = FastAPI(
     title='FacePass FabLab API',
     description='Smart Anti-Proxy Facial Access and Attendance System for SRMIST Fab Lab',
-    version='1.3.0'
+    lifespan=lifespan,
+    version='1.4.0'
 )
 
 app.add_middleware(
@@ -36,6 +50,32 @@ app.add_middleware(
 )
 
 app.add_middleware(RateLimitMiddleware)
+
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_validation_errors(_request, exc):
+    # Validation errors must not echo bot tokens, passwords or face payloads.
+    detail = [{key: error[key] for key in ('loc', 'msg', 'type')} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={'detail': detail})
+
+
+
+@app.middleware('http')
+async def protect_production_entry(request, call_next):
+    # Image processing writes evidence, alerts and occupancy; it is not public.
+    if production_mode() and request.url.path.startswith('/api/entry/') and request.method != 'OPTIONS':
+        from app.security import require_user
+        from fastapi import HTTPException
+        from fastapi.responses import JSONResponse
+        try:
+            await require_user(request)
+        except HTTPException as exc:
+            return JSONResponse(status_code=exc.status_code, content={'detail': exc.detail})
+    return await call_next(request)
+
 
 # Include routers
 from api.routes_entry import router as entry_router
@@ -127,10 +167,21 @@ async def readiness_check():
     }
 
 
-@app.on_event('startup')
 async def startup_event():
     """Initialize services on startup."""
     logger.info('Starting FacePass FabLab API...')
+
+    if production_mode():
+        from app.auth import access_password_configured, is_srmist_email, verify_access_password
+        from app.security import admin_email, admin_password
+        from app.config import get_security_config
+        qr_secret = str(get_security_config().get('qr_secret_key') or '')
+        if (len(qr_secret) < 32 or qr_secret.startswith('CHANGE_')
+                or len(admin_password()) < 12
+                or not auth_enabled() or not session_security_ready()
+                or not access_password_configured() or not is_srmist_email(admin_email())
+                or verify_access_password(admin_password())):
+            raise RuntimeError('Production requires distinct administrator and member credentials, an SRMIST administrator email, and a secure session secret')
 
     from app.database import init_db
     init_db()
@@ -160,6 +211,7 @@ async def startup_event():
         report_gen = ReportGenerator()
         scheduler = ReportScheduler(alert_service, report_gen, get_database_path())
         scheduler.start()
+        app.state.report_scheduler = scheduler
         logger.info('Scheduler started')
     except Exception as e:
         logger.warning(f'Scheduler initialization skipped: {e}')
@@ -178,10 +230,13 @@ async def startup_event():
         logger.warning(f'Capture service not started: {e}')
 
 
-@app.on_event('shutdown')
 async def shutdown_event():
     """Cleanup on shutdown."""
     logger.info('Shutting down FacePass FabLab API...')
+
+    scheduler = getattr(app.state, 'report_scheduler', None)
+    if scheduler:
+        scheduler.shutdown()
 
     # Release the camera, or the device stays locked until the process exits.
     try:
