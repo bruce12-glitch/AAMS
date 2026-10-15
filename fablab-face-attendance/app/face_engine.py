@@ -4,6 +4,7 @@ Implements SCRFD detection + ArcFace embedding + quality checks.
 Uses InsightFace library for face analysis.
 """
 
+import os
 import cv2
 import numpy as np
 
@@ -38,7 +39,11 @@ class FaceEngine:
         self.det_size = tuple(config.get('resolution', [640, 640]))
         
         # Initialize InsightFace with CPU provider (can be changed to CUDA)
-        self.app = _FaceAnalysis(name='buffalo_l', providers=['CPUExecutionProvider'])
+        self.app = _FaceAnalysis(
+            name='buffalo_l',
+            root=os.getenv('INSIGHTFACE_ROOT') or os.path.expanduser('~/.insightface'),
+            providers=['CPUExecutionProvider'],
+        )
         self.app.prepare(ctx_id=0, det_size=self.det_size)
         
         # Load configuration thresholds
