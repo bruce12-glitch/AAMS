@@ -61,7 +61,7 @@ CI includes backend tests, frontend lint/build, browser flows, a disposable Dock
 
 SQLite WAL and additive migrations are retained for the single-host showcase. The database, evidence/enrollment photos and model cache use persistent Docker volumes. Backups use SQLite's online backup API, including committed WAL data. Run one API process to keep the camera, scheduler and in-memory rate limits coherent.
 
-For full website hosting, use [deploy/HOSTING.md](deploy/HOSTING.md) and `Dockerfile.showcase`. It serves the website and API together, honors the host's port, and keeps student records, photos, models and generated signing keys on one persistent volume. Production authentication must be configured privately before startup. The launcher refuses a Railway service without an attached volume. This option requires no local VS Code or terminal after hosting setup.
+For full website hosting, use [deploy/HOSTING.md](deploy/HOSTING.md), `docker-compose.oracle.yml` and `Dockerfile.showcase`. The selected path is Oracle Cloud Always Free: it serves the website and API together, keeps student records/photos/models/signing keys on one persistent volume, and uses Caddy for HTTPS. Production authentication is configured privately on the host. This option requires no local VS Code or terminal after initial hosting setup.
 
 GitHub Pages serves only static files. Secure sign-in and persistent features require a backend; a Pages-only build intentionally cannot sign in. The Pages workflow requires a manual dispatch, so publishing source changes does not automatically publish a site.
 

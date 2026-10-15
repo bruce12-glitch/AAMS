@@ -24,6 +24,7 @@ wheels/
 .env
 .env.local
 .env.*.local
+deploy/.env.oracle
 
 # Build artifacts
 dist/

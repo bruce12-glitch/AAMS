@@ -1,0 +1,41 @@
+name: aams-showcase
+
+# Oracle Cloud Always Free deployment. Caddy is the only public service; the
+# AAMS image stays on the internal network and stores all mutable state in the
+# named volume. Start with the private deploy/.env.oracle file described in
+# deploy/HOSTING.md.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.showcase
+    env_file:
+      - ./deploy/.env.oracle
+    environment:
+      AAMS_DATA_DIR: /data
+      PORT: "8000"
+      AAMS_ENV: production
+    volumes:
+      - aams-data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - ./deploy/.env.oracle
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile.oracle:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  aams-data:
+  caddy-data:
+  caddy-config:
