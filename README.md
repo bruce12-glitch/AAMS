@@ -1,8 +1,8 @@
 # AAMS — FacePass Fab Lab
 
-A React/Vite console and FastAPI service for the SRMIST Fab Lab. The proposed showcase build includes student profiles, face enrollment, signed QR passes, entry checks, occupancy, security alerts, reporting and Telegram communication.
+A React/Vite console and FastAPI service for the SRMIST Fab Lab. The showcase build includes student profiles, face enrollment, signed QR passes, entry checks, occupancy, security alerts and reporting. Telegram integration is implemented; live bot/group setup is deferred.
 
-## What works in the proposed build
+## Showcase features
 
 - SRMIST-only sign-in. Members use a privately configured shared access credential; the configured administrator uses a different private administrator credential. The shared credential does not grant administrator privileges.
 - Add and edit student ID, full name, SRMIST email, phone, department, year, section, member type, payment status/expiry and account status. Student creation does not require biometric enrollment.
@@ -55,12 +55,14 @@ npm run test:e2e
 
 The browser test starts disposable local servers and an isolated database. Its neural inference boundary is controlled for CI; production source continues to use the real model. Set `AAMS_TEST_PYTHON` if the backend packages live in a separate Python environment. Tests must run in the same network namespace as their local servers.
 
-CI includes backend tests, frontend lint/build, browser flows, and a disposable Docker startup/persistence/proxy check. `deploy/ci_smoke.py` is restricted to GitHub Actions and refuses an existing private environment file.
+CI includes backend tests, frontend lint/build, browser flows, a disposable Docker startup/persistence/proxy check, and a complete hosted-container check. Deployment smoke tests are restricted to disposable GitHub Actions runners and never configure a real Telegram group.
 
 ## Database and hosting
 
 SQLite WAL and additive migrations are retained for the single-host showcase. The database, evidence/enrollment photos and model cache use persistent Docker volumes. Backups use SQLite's online backup API, including committed WAL data. Run one API process to keep the camera, scheduler and in-memory rate limits coherent.
 
-GitHub Pages serves only static files. Secure sign-in and persistent features require a backend; a Pages-only build intentionally cannot sign in. The proposed Pages workflow requires a manual dispatch, so publishing source changes does not automatically publish a site. A same-origin Docker deployment is the preferred complete showcase path.
+For full website hosting, use [deploy/HOSTING.md](deploy/HOSTING.md) and `Dockerfile.showcase`. It serves the website and API together, honors the host's port, and keeps student records, photos, models and generated signing keys on one persistent volume. Production authentication must be configured privately before startup. The launcher refuses a Railway service without an attached volume. This option requires no local VS Code or terminal after hosting setup.
 
-No public deployment, merge or branch deletion is implied by these launch instructions. See [SHOWCASE_READINESS.md](SHOWCASE_READINESS.md) for verified results, unresolved external setup and the deployment boundary.
+GitHub Pages serves only static files. Secure sign-in and persistent features require a backend; a Pages-only build intentionally cannot sign in. The Pages workflow requires a manual dispatch, so publishing source changes does not automatically publish a site.
+
+PR #8 is merged into `main` with the tested feature build. Hosting publication is still pending a connected container-hosting account and private authentication settings. All existing branches are preserved. See [SHOWCASE_READINESS.md](SHOWCASE_READINESS.md) for verified results and remaining external setup.

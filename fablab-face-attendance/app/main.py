@@ -9,6 +9,7 @@ Security notes (§27):
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -97,12 +98,6 @@ app.include_router(dashboard_router)
 app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(notify_router)
-
-
-@app.get('/')
-async def root():
-    """Root endpoint."""
-    return {'message': 'FacePass FabLab API', 'version': app.version}
 
 
 @app.get('/health')
@@ -244,6 +239,16 @@ async def shutdown_event():
         get_capture_service().stop()
     except Exception as e:
         logger.warning(f'Capture service shutdown skipped: {e}')
+
+
+if os.getenv('SPA_DIST_DIR'):
+    from app.web import mount_console
+    mount_console(app, os.environ['SPA_DIST_DIR'])
+else:
+    @app.get('/')
+    async def root():
+        """API-only deployments keep their existing root response."""
+        return {'message': 'FacePass FabLab API', 'version': app.version}
 
 
 if __name__ == '__main__':
