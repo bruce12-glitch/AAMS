@@ -1,0 +1,53 @@
+name: Deploy AAMS showcase to Oracle
+
+# Manual only: publishing never happens simply because source was pushed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aams-oracle-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and restart the private Oracle host
+    runs-on: ubuntu-latest
+    environment: aams-oracle
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify deployment connection is configured
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+          ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+        run: |
+          test -n "$ORACLE_HOST"
+          test -n "$ORACLE_KNOWN_HOSTS"
+          test -n "$ORACLE_SSH_PRIVATE_KEY"
+
+      - name: Sync source and recreate only the app stack
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+          ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > ~/.ssh/aams_oracle
+          chmod 600 ~/.ssh/aams_oracle
+          printf '%s\n' "$ORACLE_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/aams_oracle aams@"$ORACLE_HOST" '
+            set -eu
+            cd /srv/aams/AAMS
+            git fetch origin main
+            git merge --ff-only origin/main
+            docker compose --env-file deploy/.env.oracle -f docker-compose.oracle.yml up --build -d --remove-orphans
+            for attempt in $(seq 1 60); do
+              if curl --fail --silent --show-error https://$(grep "^AAMS_HOSTNAME=" deploy/.env.oracle | cut -d= -f2)/ready >/dev/null; then exit 0; fi
+              sleep 2
+            done
+            exit 1
+          '

@@ -84,7 +84,19 @@ def _b64encode(raw: bytes) -> str:
 
 
 def _b64decode(value: str) -> bytes:
-    return base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
+    """Decode only the canonical unpadded base64url form used in sessions.
+
+    A permissive decoder accepts multiple last characters that decode to the
+    same bytes when padding bits are ignored. Rejecting those aliases means a
+    changed token can never pass verification merely because its altered bits
+    were non-significant base64 padding bits.
+    """
+    if not value or not re.fullmatch(r'[A-Za-z0-9_-]+', value):
+        raise ValueError('base64url')
+    raw = base64.urlsafe_b64decode(value + '=' * (-len(value) % 4))
+    if _b64encode(raw) != value:
+        raise ValueError('non-canonical base64url')
+    return raw
 
 
 def issue_session(*, email: str, user_id: str, name: str, role: str = 'member') -> dict:

@@ -1,60 +1,53 @@
-# Full website hosting
+# AAMS production showcase hosting
 
-`Dockerfile.showcase` builds React and FastAPI into one container. Both are served on the platform's `PORT`, so login, uploads, QR passes and reports use the same HTTPS origin. The original two-service Compose stack remains available for local use.
+## Chosen platform and method
 
-## Railway setup
+The complete AAMS website will run on **Oracle Cloud Always Free**, not on GitHub Pages, Render or Railway. One Oracle Ampere A1 VM (1 OCPU, 6 GB RAM) runs `docker-compose.oracle.yml`. The `app` container serves the React console and FastAPI API together; Caddy terminates HTTPS and forwards requests internally. SQLite, photos, model downloads and signing keys live in the persistent `aams-data` Docker volume.
 
-Use a GitHub-connected service for `bruce12-glitch/AAMS`, branch `main`:
+This is a single-host showcase design: it is appropriate for the current single-digit audience. Keep one app replica because SQLite, scheduled reports, rate limits and camera ownership are single-process features. The website remains fully functional; it is not a static mockup.
 
-| Setting | Value |
+Oracle lists 2 OCPUs and 12 GB RAM of Ampere A1 capacity as Always Free, so the selected 1 OCPU / 6 GB instance leaves headroom while remaining inside the free allocation. Oracle account creation normally requires a phone number and card verification. Do not create paid resources or exceed the Always Free allocation. The public name will be a free DuckDNS hostname, and Caddy provisions and renews TLS automatically.
+
+## Repository assets
+
+| File | Purpose |
 | --- | --- |
-| Build | Dockerfile |
-| Dockerfile path | `Dockerfile.showcase` (or variable `RAILWAY_DOCKERFILE_PATH=Dockerfile.showcase`) |
-| Persistent volume mount | `/data` |
-| Replicas | `1` |
-| Health check | `/ready` |
-| Start command | Image default, `python start_showcase.py` |
-| Public domain | Generate HTTPS domain after the service is healthy |
-| Auto-deploy | Disable until the release is verified; enable only if desired |
+| `Dockerfile.showcase` | Builds the complete console + API image. |
+| `docker-compose.oracle.yml` | App, HTTPS reverse proxy and persistent volumes for the Oracle VM. |
+| `deploy/Caddyfile.oracle` | HTTPS and same-origin proxy configuration. |
+| `deploy/.env.oracle.example` | Private runtime-variable template; copy it only on the VM. |
+| `.github/workflows/deploy-oracle.yml` | Manual GitHub deployment after the server is provisioned. |
 
-Create the volume before the first deployment. The launcher refuses to run a Railway service without its volume metadata. Do not use a build/pre-deploy command to initialize the volume; volumes are available at runtime. Use native service settings rather than the deprecated config-as-code format for a new service.
+No source push publishes a website. The GitHub workflow is manual, verifies its SSH connection before changing the host, fast-forwards only to `main`, rebuilds the two service stack, and probes `/ready` over HTTPS.
 
-Configure these values privately in the provider's Variables screen:
+## First-time provisioning
 
-| Variable | Requirement |
-| --- | --- |
-| `ADMIN_EMAIL` | Your exact `@srmist.edu.in` administrator address |
-| `API_ADMIN_PASSWORD` | Private administrator credential, at least 12 characters |
-| `AAMS_ACCESS_PASSWORD` | Private shared member credential, at least 12 characters; different from administrator credential |
-| `RAILWAY_DOCKERFILE_PATH` | `Dockerfile.showcase`, if not selected in build settings |
+The setup will be completed through the Oracle Cloud dashboard after the account is available:
 
-Do not put credentials in Git, chat messages, build arguments or frontend variables. The server enforces the SRMIST domain for both sign-in and student records. A shared member password does not verify ownership of a mailbox.
+1. Create **one** Always Free `VM.Standard.A1.Flex` instance in the account's home region with **1 OCPU / 6 GB RAM**, Ubuntu, a public IPv4 address, and a 50 GB boot volume. If the A1 shape reports temporary capacity exhaustion, wait or try another availability domain; do not choose a paid shape.
+2. Allow inbound TCP **80** and **443** in the Oracle VCN security list. Restrict SSH (22) to the administrator's IP; do not expose the Docker app port 8000.
+3. Create a unique free `*.duckdns.org` hostname pointing to the VM public IP. Open only the hostname through HTTPS; Caddy redirects HTTP automatically.
+4. Install Docker and Git on the VM, clone `bruce12-glitch/AAMS` to `/srv/aams/AAMS`, copy `deploy/.env.oracle.example` to the ignored `deploy/.env.oracle`, and fill the private values there. The two `AAMS_HOSTNAME`/`ALLOWED_ORIGINS` values must use the exact same hostname.
+5. Start the stack with `docker compose --env-file deploy/.env.oracle -f docker-compose.oracle.yml up --build -d`. The first biometric request downloads the InsightFace model to the persistent volume.
+6. Store the VM host, its SSH host fingerprint and a dedicated deploy-key in GitHub's **`aams-oracle` environment secrets** as `ORACLE_HOST`, `ORACLE_KNOWN_HOSTS`, and `ORACLE_SSH_PRIVATE_KEY`. Run **Deploy AAMS showcase to Oracle** manually for subsequent updates.
 
-The launcher enforces production mode and supplies stable random QR/session signing keys on the volume. Existing `QR_SECRET_KEY` / `SESSION_SECRET_KEY` overrides are supported for an intentional migration; keep them permanently consistent with the source instance. Changing or removing an override can invalidate sessions and existing passes. Do not configure a second replica: the scheduler, camera ownership and rate limiter are process-local, and SQLite is intended for a single-host showcase.
-
-Telegram is deferred. No bot credentials or group setup are required to start or use the other features.
+Credentials are never placed in Git, build arguments, browser assets, GitHub Actions logs, or chat. Configure the administrator address with the exact `@srmist.edu.in` domain. The server continues to enforce the SRMIST email restriction and distinct administrator/member credentials. Telegram stays unconfigured for now.
 
 ## Persistent state and recovery
 
-The mounted data directory holds:
+The `aams-data` volume holds:
 
 | Path | Contents |
 | --- | --- |
-| `database/` | SQLite database, WAL files, private notification settings and scheduled backups |
-| `images/` | Enrollment and evidence photos |
-| `models/` | InsightFace cache, downloaded on the first face request |
-| `signing-keys.json` | Generated private QR/session keys (mode `0600`) |
+| `database/` | SQLite database, WAL files, private notification settings and backups |
+| `images/` | Enrollment and evidence images |
+| `models/` | InsightFace cache |
+| `signing-keys.json` | Private QR/session keys (mode `0600`) |
 
-Only the built `web-dist` folder is public. `/images`, `/database`, `/data` and signing keys are not static routes. Evidence photos remain private; QR downloads use authenticated API routes. Back up the entire volume, including signing keys, before moving hosts. Do not attach an empty volume over an existing installation without a planned migration.
-
-The launcher accepts `AAMS_DATA_DIR` for another container host; default `/data`. `DATABASE_PATH` and `INSIGHTFACE_ROOT` must remain inside that directory. It refuses to overwrite an existing ordinary image directory containing photos.
-
-For a different Docker host, mount a persistent directory at `/data`, supply the private variables above, and route HTTPS to `PORT` (default `8000`). No separate database service is necessary. The host must have enough memory/CPU for the actual model; use runtime metrics during real-image verification before selecting a production plan. Hardware capture requires a camera-attached host; browser snapshot upload works remotely.
+Back up this volume before moving hosts. Do not attach an empty volume to an existing showcase, overwrite its signing keys, run multiple app replicas or put the database on ephemeral container storage.
 
 ## Release verification
 
-CI builds the complete image and verifies HTML/assets, API readiness, SRMIST rejection, secure login, student creation, private-file protection, and student/photo/session persistence after destroying and recreating the container with its volume. It does not publish a domain or send Telegram messages.
+After first deployment, verify: HTTPS padlock; rejected non-SRMIST login; administrator sign-in; add/edit a temporary student; enrollment with consented image; QR download/re-key; entry/occupancy/reports; persistence after a controlled container replacement. Remove the temporary student once verified. Browser webcam capture requires HTTPS and camera permission. Telegram is outside this verification scope.
 
-After deploying, verify the HTTPS address, sign in as the configured administrator, add/edit a temporary student, enroll a consented image, download/re-key its QR, submit an entry snapshot, check occupancy/checkout, and inspect reports. Confirm persistence after a controlled redeploy; then remove the temporary record. The first face request downloads the model, so allow it to finish before showcasing. Webcam capture needs camera permission and HTTPS. Measure biometric and liveness performance with consented volunteers on the intended camera before operational use, and review pretrained-model licensing before commercial use.
-
-Provider references: [Dockerfile selection](https://docs.railway.com/builds/dockerfiles), [persistent volumes](https://docs.railway.com/volumes), [config-as-code lifecycle](https://docs.railway.com/config-as-code/reference).
+References: [Oracle Always Free compute](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm), [Oracle public IP setup](https://docs.oracle.com/en-us/iaas/Content/Network/Tasks/assign-public-ip-instance-launch.htm), [DuckDNS](https://www.duckdns.org/), [Caddy automatic HTTPS](https://caddyserver.com/docs/quick-starts/https).
