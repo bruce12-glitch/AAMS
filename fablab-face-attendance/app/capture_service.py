@@ -28,6 +28,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from app.utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ def _now_iso():
     service writes last_seen_time, _finalize writes entry_time) breaks
     duration maths in the occupancy view. Use ISO consistently here.
     """
-    return datetime.now().isoformat()
+    return utc_now().isoformat()
 
 
 class CaptureService:
@@ -164,9 +165,18 @@ class CaptureService:
         from app.utils import save_frame
 
         payment = user.get('payment_status', 'inactive')
-        granted = payment == 'active'
+        from zoneinfo import ZoneInfo
+        if payment == 'active' and user.get('payment_expiry'):
+            from datetime import date
+            try:
+                if date.fromisoformat(user['payment_expiry']) < datetime.now(ZoneInfo('Asia/Kolkata')).date():
+                    payment = 'expired'
+            except ValueError:
+                payment = 'expired'
+        require_liveness = get_config().get('security', {}).get('require_liveness', False)
+        granted = payment == 'active' and not require_liveness
         decision = 'GRANTED' if granted else 'DENIED'
-        tag = 'authorized' if granted else 'unpaid'
+        tag = 'authorized' if granted else ('spoof' if require_liveness and payment == 'active' else 'unpaid')
         similarity = round(result.get('similarity', 0.0), 4)
         now_iso = _now_iso()
 
@@ -181,6 +191,7 @@ class CaptureService:
 
         conn = get_connection()
         cur = conn.cursor()
+        newly_inside = False
         try:
             cur.execute('''
                 INSERT INTO entry_logs (event_time, claimed_id, recognized_id,
@@ -192,7 +203,7 @@ class CaptureService:
                 user.get('user_id'), user.get('user_id'), similarity,
                 payment, 'unknown',
                 decision,
-                'Automatic entry (camera)' if granted else f'Payment {payment}',
+                'Automatic entry (camera)' if granted else ('Liveness not verified' if tag == 'spoof' else f'Payment {payment}'),
                 tag, evidence, location,
             ))
 
@@ -203,6 +214,7 @@ class CaptureService:
                     WHERE user_id = ? AND status = 'inside'
                 ''', (user.get('user_id'),))
                 if cur.fetchone() is None:
+                    newly_inside = True
                     cur.execute('''
                         INSERT INTO occupants (user_id, entry_time,
                             last_seen_time, status)
@@ -217,6 +229,18 @@ class CaptureService:
             conn.commit()
         finally:
             conn.close()
+
+        from app.alerts import AlertService
+        from app.config import get_telegram_config
+        if not granted or (newly_inside and get_telegram_config().get('notify_on_entry', True)):
+            event = 'ENTRY' if granted else ('SPOOF' if tag == 'spoof' else 'UNPAID')
+            message = f"AAMS — Camera entry {decision.lower()}\nName: {user.get('name')}\nStudent ID: {user.get('user_id')}\nPayment: {payment}"
+            try:
+                # The capture worker queues without awaiting network traffic.
+                # The scheduler delivers the durable queue automatically.
+                AlertService().save_alert_to_db(event, message, image_path=evidence, severity='low' if granted else 'medium')
+            except Exception as exc:
+                logger.warning('Camera notification queue failed (%s)', type(exc).__name__)
 
         self.last_event = {
             'recognized_id': user.get('user_id'),

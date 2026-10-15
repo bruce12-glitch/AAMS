@@ -5,7 +5,7 @@ Run: python -m scripts.backup_db
 """
 
 import sys
-import shutil
+import sqlite3
 from datetime import datetime
 sys.path.insert(0, '..')
 
@@ -16,7 +16,8 @@ def main():
     backup_path = f"{db_path}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     
     try:
-        shutil.copy2(db_path, backup_path)
+        with sqlite3.connect(str(db_path)) as source, sqlite3.connect(backup_path) as target:
+            source.backup(target)
         print(f"[OK] Database backed up to: {backup_path}")
     except Exception as e:
         print(f"[FAIL] Backup failed: {e}")

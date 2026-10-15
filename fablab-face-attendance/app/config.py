@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
 
 # Get the base directory (where config.yaml is located)
 BASE_DIR = Path(__file__).parent.parent
@@ -73,12 +73,20 @@ def get_database_path():
 def get_telegram_config():
     """Get Telegram bot configuration."""
     config = get_config()
-    return {
+    from app.notification_settings import read_settings
+    cfg = {
         'enabled': config['alerts'].get('telegram_enabled', False),
         'bot_token': config['alerts'].get('telegram_bot_token', ''),
         'chat_id': config['alerts'].get('telegram_chat_id', ''),
-        'send_photo': config['alerts'].get('send_photo', True)
+        'send_photo': config['alerts'].get('send_photo', True),
+        'daily_report_time': config['alerts'].get('daily_report_time', '20:00'),
+        'timezone': 'Asia/Kolkata',
+        'notify_on_enrollment': True,
+        'notify_on_entry': True,
     }
+    cfg.update(read_settings())
+    return cfg
+
 
 def get_face_config():
     """Get face recognition configuration."""

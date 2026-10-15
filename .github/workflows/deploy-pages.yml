@@ -12,22 +12,13 @@ name: Deploy console to GitHub Pages
 # One-time setup: Settings -> Pages -> Build and deployment -> Source:
 #   "GitHub Actions"
 #
-# Then push to main, or run this workflow manually from the Actions tab.
+# Public publishing is manual: run this workflow only after deployment approval.
 #
 # NOTE on the base path: the Vite config hardcodes '/AAMS/' for this target.
 # If the repository is ever renamed, PAGES_BASE in vite.config.js must change
 # with it or every asset URL will 404.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'index.html'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'vite.config.js'
-      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -49,7 +40,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
 

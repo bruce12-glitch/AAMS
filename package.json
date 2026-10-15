@@ -9,7 +9,8 @@
     "build": "vite build",
     "build:pages": "VITE_TARGET=pages vite build",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:e2e": "node tests/e2e/run.mjs"
   },
   "dependencies": {
     "@react-three/fiber": "^9.5.0",
@@ -28,6 +29,7 @@
     "eslint-plugin-react": "^7.37.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
+    "playwright": "1.64.1",
     "vite": "^8.2.2"
   }
 }

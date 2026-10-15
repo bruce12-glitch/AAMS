@@ -26,8 +26,11 @@ export default defineConfig({
     port: 3000,
     open: false,
     proxy: {
+      '/health': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/ready': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      '/model-status': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true
       }
     }

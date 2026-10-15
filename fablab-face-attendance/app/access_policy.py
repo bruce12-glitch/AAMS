@@ -58,6 +58,9 @@ class AccessDecision:
                 "tag": "spoof"
             }
         
+        if self.require_liveness and face_result.get('result') == 'MATCH' and liveness_status != 'real':
+            return {'decision': 'DENIED', 'reason': 'Liveness not verified', 'alert_type': 'SPOOF', 'tag': 'spoof'}
+
         # Row 9: Multiple faces → GRANT (to verified) + TAILGATE alert
         if face_count > 1:
             # Still grant to the verified user but raise tailgate alert
@@ -89,8 +92,7 @@ class AccessDecision:
         
         # Row 2: Valid token + face matches + expired payment + real → DENY + UNPAID alert
         if (face_result.get('result') == 'MATCH' and 
-            payment_status in ['expired', 'unpaid', 'inactive'] and 
-            liveness_status == 'real'):
+            payment_status != 'active'):
             return {
                 "decision": "DENIED",
                 "reason": f"Access denied - payment {payment_status}",
@@ -121,8 +123,7 @@ class AccessDecision:
             return {
                 "decision": "GRANTED",
                 "reason": ("Authorized entry - verified face, active payment "
-                           "(liveness not verified; set security.require_liveness "
-                           "to true to enforce)"),
+                           "(liveness not verified for this snapshot)"),
                 "alert_type": None,
                 "tag": "authorized"
             }

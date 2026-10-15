@@ -68,3 +68,11 @@ yarn-error.log*
 # here would try to record it as a submodule gitlink, which is not what
 # anyone wants and fails confusingly on push.
 Notin/
+
+# Private notification settings, SQLite WAL and test artifacts
+**/notification-settings.json
+*.db-wal
+*.db-shm
+aams-showcase.patch
+test-results/
+playwright-report/

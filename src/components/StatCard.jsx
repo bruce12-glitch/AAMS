@@ -16,14 +16,14 @@ export default function StatCard({ label, value, icon, color = '#0e7490', tint =
         <span className="stat-label">{label}</span>
         <span className="stat-icon">{icon}</span>
       </div>
-      <div className="stat-value">{shown.toLocaleString('en-IN')}</div>
+      <div className="stat-value">{Number.isFinite(value) ? shown.toLocaleString('en-IN') : '—'}</div>
       <div className="stat-foot">
         {trend && (
           <span className={`trend-chip ${trendDir}`}>
             {trendDir === 'down' ? '▼' : trendDir === 'up' ? '▲' : '■'} {trend}
           </span>
         )}
-        <span>vs yesterday</span>
+        <span>current records</span>
       </div>
     </motion.div>
   )

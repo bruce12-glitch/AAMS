@@ -22,6 +22,14 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener('aams-session-expired', logout)
   }, [logout])
 
+  useEffect(() => {
+    if (!session?.expires_at) return undefined
+    const remaining = Number(session.expires_at) * 1000 - Date.now()
+    if (!Number.isFinite(remaining) || remaining <= 0) { logout(); return undefined }
+    const timer = setTimeout(logout, Math.min(remaining, 2147483647))
+    return () => clearTimeout(timer)
+  }, [session, logout])
+
   const value = useMemo(
     () => ({
       session,

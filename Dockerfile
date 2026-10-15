@@ -1,5 +1,5 @@
 # ---- Builder: compile native wheels (insightface needs a C toolchain) ----
-FROM python:3.11-slim AS builder
+FROM python:3.12-slim AS builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential g++ \
@@ -10,7 +10,7 @@ COPY fablab-face-attendance/requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # ---- Runtime ----
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # libgl1/libglib2.0: required by cv2 at import time
 RUN apt-get update \

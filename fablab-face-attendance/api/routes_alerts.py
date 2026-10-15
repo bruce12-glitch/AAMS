@@ -20,7 +20,7 @@ async def list_alerts(severity: Optional[str] = None, alert_type: Optional[str] 
     conn = get_connection()
     cursor = conn.cursor()
     
-    query = 'SELECT * FROM alerts WHERE 1=1'
+    query = "SELECT * FROM alerts WHERE alert_type NOT IN ('ANNOUNCE','REPORT','ENROLLMENT','ENTRY','TEST')"
     params = []
     
     if severity:

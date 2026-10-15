@@ -11,8 +11,8 @@ const EMPTY = {
   payment_status: 'active', payment_expiry: '', consent: false
 }
 
-export default function EnrollModal({ open, onClose, onEnrolled }) {
-  const [form, setForm] = useState(EMPTY)
+export default function EnrollModal({ open, onClose, onEnrolled, member }) {
+  const [form, setForm] = useState({ ...EMPTY, ...member, consent: false })
   const [previews, setPreviews] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -74,6 +74,7 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
         payment_status: form.payment_status,
         payment_expiry: form.payment_expiry || null,
         consent_given: form.consent,
+        department: form.department || null, year: form.year || null, section: form.section || null, user_type: form.user_type || 'student',
         images: previews
       }, 120000)
       setResult(res)
@@ -86,7 +87,9 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
   }
 
   const close = () => {
-    setForm(EMPTY); setPreviews([]); setResult(null); setError('')
+    if (busy) return
+    setCameraOpen(false)
+    setForm({ ...EMPTY, ...member, consent: false }); setPreviews([]); setResult(null); setError('')
     onClose()
   }
 
@@ -119,11 +122,11 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
               <>
                 <h3 className="modal-title" id={titleId}>Enroll Member</h3>
                 <p className="modal-sub">
-                  Photos are processed server-side — quality-gated ArcFace embeddings (§17).
+                  Add a clear face photo to enable face recognition and create a signed QR pass.
                 </p>
 
                 <div className="form-grid">
-                  <label>User ID *<input value={form.user_id} onChange={set('user_id')} placeholder="e.g. SAMPLE-0001" /></label>
+                  <label>User ID *<input value={form.user_id} disabled={Boolean(member)} onChange={set('user_id')} placeholder="e.g. SAMPLE-0001" /></label>
                   <label>Full name *<input value={form.name} onChange={set('name')} placeholder="Member full name" /></label>
                   <label>SRMIST email *<input value={form.email} onChange={set('email')} placeholder={`you${SRMIST_SUFFIX}`} type="email" /></label>
                   <label>Phone<input value={form.phone} onChange={set('phone')} placeholder="Optional contact number" /></label>
@@ -156,10 +159,10 @@ export default function EnrollModal({ open, onClose, onEnrolled }) {
 
                 <label className="consent-row">
                   <input type="checkbox" checked={form.consent} onChange={set('consent')} />
-                  Student consents to facial biometric storage for Fab Lab access (§26.2)
+                  Student consents to facial biometric storage for Fab Lab access
                 </label>
 
-                {error && <div className="form-error">{error}</div>}
+                {error && <div className="form-error" role="alert">{error}</div>}
 
                 <div className="modal-actions">
                   <button className="btn ghost" onClick={close} disabled={busy} type="button">Cancel</button>

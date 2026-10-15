@@ -148,3 +148,12 @@ def test_rate_limiter_exempt_paths():
     for _ in range(10):
         r = asyncio.run(mw.dispatch(Req(), call_next))
         assert getattr(r, 'status_code', 200) == 200
+
+
+@pytest.mark.asyncio
+async def test_production_admin_fails_closed(monkeypatch):
+    monkeypatch.setenv('AAMS_ENV', 'production')
+    monkeypatch.setattr(sec, 'auth_enabled', lambda: False)
+    with pytest.raises(HTTPException) as exc:
+        await sec.require_admin(FakeRequest())
+    assert exc.value.status_code == 503

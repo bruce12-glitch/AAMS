@@ -1,219 +1,161 @@
-"""
-Alert Service for FacePass FabLab.
-Implements §15 Telegram Bot Integration for real-time alerts.
-"""
+"""Telegram transport and a durable, auditable delivery queue."""
 
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from pathlib import Path
+
 from app.database import get_connection
-from app.config import get_telegram_config
+from app.config import get_telegram_config, BASE_DIR
 
 logger = logging.getLogger(__name__)
 
+
+def configured(value):
+    text = str(value or '').strip()
+    return bool(text) and text.lower() not in {'skip', 'none', 'null'} and not text.startswith(('YOUR_', 'CHANGE_'))
+
+
+def delivery_error(exc):
+    # Telegram/network exceptions may contain request URLs with bot tokens.
+    names = {
+        'Forbidden': 'Bot cannot post to the group. Add it and allow messages.',
+        'InvalidToken': 'The Telegram bot token is invalid.',
+        'BadRequest': 'Telegram rejected the destination or message. Check the group ID.',
+        'TimedOut': 'Telegram timed out; the message remains queued for retry.',
+        'NetworkError': 'Telegram is unreachable; the message remains queued for retry.',
+        'RetryAfter': 'Telegram rate limit reached; the message remains queued for retry.',
+    }
+    return names.get(type(exc).__name__, 'Telegram delivery failed; check bot permissions and connection.')
+
+
 class AlertService:
-    """
-    Sends alerts to Telegram group with photo evidence.
-    Implements alert formats from §15.2 exactly.
-    """
-    
     def __init__(self):
-        """Initialize alert service with Telegram configuration."""
         config = get_telegram_config()
-        self.enabled = config.get('enabled', False)
-        self.bot_token = config.get('bot_token', '')
-        self.chat_id = config.get('chat_id', '')
-        self.send_photo = config.get('send_photo', True)
-        
-        # Initialize Telegram bot if enabled.
-        # Generous network timeouts: on the demo host the event loop can be
-        # busy for seconds at a time, and the default 5 s read timeout turned
-        # slow-but-fine deliveries into 'Timed out' failures.
+        self.enabled = bool(config.get('enabled', False))
+        self.bot_token = str(config.get('bot_token') or '')
+        self.chat_id = str(config.get('chat_id') or '')
+        self.send_photo = bool(config.get('send_photo', True))
         self.bot = None
-        if self.enabled and self.bot_token:
+        if self.enabled and configured(self.bot_token) and configured(self.chat_id):
             try:
                 from telegram import Bot
                 from telegram.request import HTTPXRequest
-                request = HTTPXRequest(
-                    connect_timeout=30.0,
-                    read_timeout=30.0,
-                    write_timeout=30.0,
-                    pool_timeout=10.0,
-                )
-                self.bot = Bot(token=self.bot_token, request=request)
-            except Exception as e:
-                logger.error(f"Failed to initialize Telegram bot: {e}")
-    
-    async def send_alert(self, alert_type: str, message: str, 
-                        image_path: str = None, severity: str = "high") -> bool:
-        """
-        Send alert to Telegram group.
-        
-        Alert formats (§15.2):
-        - PROXY ALERT: Location, Claimed ID, Detected Face, Confidence, Time, Photo
-        - UNPAID ENTRY ATTEMPT: Name, ID, Payment Expired, Time, Photo
-        - UNKNOWN PERSON ALERT: Time, Photo
-        - SPOOF ALERT: Possible photo/video used, Time, Photo
-        - TAILGATING ALERT: Multiple faces detected, Time, Photo
-        - SYSTEM FAULT: Camera offline, Time
-        
-        Args:
-            alert_type: PROXY/UNPAID/UNKNOWN/SPOOF/TAILGATE/NOFACE/SYSTEM
-            message: Alert message text
-            image_path: Path to evidence photo (optional)
-            severity: high/medium/low
-            
-        Returns:
-            True if sent successfully
-        """
-        if not self.enabled or not self.bot:
-            logger.info(f"Alert suppressed (Telegram disabled): {alert_type} - {message}")
-            return False
-        
-        # Low priority alerts go to daily report only
-        if severity == "low":
-            logger.info(f"Low priority alert logged for daily report: {alert_type}")
-            return False
-        
-        try:
-            if self.send_photo and image_path:
-                await self.send_with_photo(message, image_path)
-            else:
-                await self.bot.send_message(chat_id=self.chat_id, text=message)
-            
-            logger.info(f"Alert sent: {alert_type} - {severity}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send Telegram alert: {e}")
-            return False
-    
-    async def send_with_photo(self, caption: str, photo_path: str):
-        """Send photo evidence with alert caption."""
-        from telegram import InputMediaPhoto
-        
-        try:
-            with open(photo_path, 'rb') as photo:
-                await self.bot.send_photo(
-                    chat_id=self.chat_id,
-                    photo=photo,
-                    caption=caption
-                )
-        except Exception as e:
-            logger.error(f"Failed to send photo: {e}")
-            # Fallback to text-only
-            await self.bot.send_message(chat_id=self.chat_id, text=caption)
-    
-    async def send_announcement(self, message: str) -> tuple:
-        """
-        Send a free-text announcement to the Telegram group (communication
-        portal). Unlike send_alert, this is never severity-gated — an
-        explicit send from the console always attempts delivery.
+                self.bot = Bot(token=self.bot_token, request=HTTPXRequest(
+                    connect_timeout=5, read_timeout=10, write_timeout=10, pool_timeout=5))
+            except Exception as exc:
+                logger.warning('Telegram initialization failed (%s)', type(exc).__name__)
 
-        Returns (sent: bool, reason: str).
-        """
+    async def _send(self, text, image_path=None):
+        if not self.enabled or not self.bot:
+            return False, 'Telegram is not configured. Message is queued.'
+        try:
+            async with self.bot:
+                path = (BASE_DIR / image_path).resolve() if image_path else None
+                image_root = (BASE_DIR / 'images').resolve()
+                if self.send_photo and path and path.is_relative_to(image_root) and path.is_file():
+                    try:
+                        with path.open('rb') as photo:
+                            await self.bot.send_photo(chat_id=self.chat_id, photo=photo, caption=text[:1024])
+                        if len(text) > 1024:
+                            await self.bot.send_message(chat_id=self.chat_id, text=text[1024:4096])
+                    except Exception:
+                        await self.bot.send_message(chat_id=self.chat_id, text=text[:4096])
+                else:
+                    await self.bot.send_message(chat_id=self.chat_id, text=text[:4096])
+            return True, 'Delivered to Telegram'
+        except Exception as exc:
+            logger.warning('Telegram send failed (%s)', type(exc).__name__)
+            return False, delivery_error(exc)
+
+    async def send_alert(self, alert_type, message, image_path=None, severity='high'):
+        if severity == 'low':
+            return False
+        sent, _reason = await self._send(message, image_path)
+        return sent
+
+    async def send_with_photo(self, caption, photo_path):
+        return await self._send(caption, photo_path)
+
+    async def send_announcement(self, message):
         text = (message or '').strip()
         if not text:
-            return False, 'message is empty'
-        if not self.enabled or not self.bot:
-            return False, 'telegram not configured'
-        if not self.chat_id or str(self.chat_id).startswith('YOUR_'):
-            return False, 'telegram chat not configured'
+            return False, 'Message is empty'
+        return await self._send(text)
+
+    async def send_daily_report(self, report_text):
+        # Plain text avoids Markdown parse errors caused by names/punctuation.
+        return (await self._send(report_text))[0]
+
+    def save_alert_to_db(self, alert_type, message, image_path=None, severity='medium', dedupe_key=None):
+        conn = get_connection()
         try:
-            await self.bot.send_message(chat_id=self.chat_id, text=text)
-            logger.info('Announcement sent (%d chars)', len(text))
-            return True, 'sent'
-        except Exception as e:
-            logger.error(f'Failed to send announcement: {e}')
-            return False, f'send failed: {e}'
+            cur = conn.execute('''
+                INSERT OR IGNORE INTO alerts (alert_type, severity, message, image_path, sent_status, dedupe_key)
+                VALUES (?, ?, ?, ?, 'pending', ?)
+            ''', (alert_type, severity, message, image_path, dedupe_key))
+            alert_id = cur.lastrowid
+            if cur.rowcount == 0:
+                alert_id = conn.execute('SELECT id FROM alerts WHERE dedupe_key=?', (dedupe_key,)).fetchone()[0]
+            conn.commit()
+            return alert_id
+        finally:
+            conn.close()
 
-    async def send_daily_report(self, report_text: str):
-        """Send the 8:00 PM daily summary report."""
+    async def deliver(self, alert_id):
         if not self.enabled or not self.bot:
-            return False
-
+            return False, 'Telegram is not configured. Message is queued.'
+        conn = get_connection()
         try:
-            await self.bot.send_message(
-                chat_id=self.chat_id,
-                text=report_text,
-                parse_mode='Markdown'
-            )
-            logger.info("Daily report sent successfully")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send daily report: {e}")
-            return False
+            # Atomic claim prevents scheduler/manual retry races in one host.
+            cur = conn.execute("UPDATE alerts SET sent_status='sending', delivery_attempts=delivery_attempts+1, last_attempt_at=datetime('now') WHERE id=? AND sent_status='pending'", (alert_id,))
+            conn.commit()
+            row = conn.execute('SELECT * FROM alerts WHERE id=?', (alert_id,)).fetchone()
+            if not row:
+                return False, 'Notification not found'
+            if cur.rowcount == 0:
+                return row['sent_status'] == 'sent', 'Already delivered' if row['sent_status'] == 'sent' else 'Delivery is already in progress'
+        finally:
+            conn.close()
+        if row['severity'] == 'low' and row['alert_type'] not in {'ANNOUNCE', 'REPORT', 'ENROLLMENT', 'ENTRY', 'TEST'}:
+            sent, reason = False, 'Included in daily summary only'
+            status = 'suppressed'
+        else:
+            sent, reason = await self._send(row['message'], row['image_path'])
+            status = 'sent' if sent else 'pending'
+        conn = get_connection()
+        try:
+            conn.execute('UPDATE alerts SET sent_status=?, sent_at=?, last_error=? WHERE id=?', (
+                status, datetime.now(timezone.utc).isoformat() if sent else None,
+                None if sent else reason, alert_id))
+            conn.commit()
+        finally:
+            conn.close()
+        return sent, reason
 
-    async def flush_pending(self, max_age_hours: int = 24) -> int:
-        """
-        Retry delivery of alerts stored while offline (§30.7).
-        Pending rows younger than max_age_hours are re-sent; older ones are
-        marked 'expired' so the queue cannot grow unbounded.
-        Returns number of alerts successfully delivered.
-        """
+    async def queue_and_deliver(self, alert_type, message, severity='low', image_path=None, dedupe_key=None):
+        alert_id = self.save_alert_to_db(alert_type, message, image_path, severity, dedupe_key)
+        sent, reason = await self.deliver(alert_id)
+        return {'alert_id': alert_id, 'telegram_sent': sent, 'reason': reason}
+
+    async def flush_pending(self, max_age_hours=24):
         if not self.enabled or not self.bot:
             return 0
-
         conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT id, alert_type, message, image_path, severity
-            FROM alerts
-            WHERE sent_status = 'pending'
-              AND datetime(created_at) >= datetime('now', ?)
-            ORDER BY id ASC
-        ''', (f'-{int(max_age_hours)} hours',))
-        pending = cursor.fetchall()
-        # Expire ancient backlog instead of spamming the group later
-        cursor.execute('''
-            UPDATE alerts SET sent_status = 'expired'
-            WHERE sent_status = 'pending'
-              AND datetime(created_at) < datetime('now', ?)
-        ''', (f'-{int(max_age_hours)} hours',))
-        conn.commit()
-
+        try:
+            # Recover claims abandoned by a stopped process. Telegram has no
+            # idempotency key: ambiguous network outcomes can be redelivered.
+            conn.execute("UPDATE alerts SET sent_status='pending' WHERE sent_status='sending' AND datetime(last_attempt_at)<datetime('now','-5 minutes')")
+            conn.execute("UPDATE alerts SET sent_status='expired' WHERE sent_status='pending' AND datetime(created_at)<datetime('now',?)", (f'-{int(max_age_hours)} hours',))
+            rows = conn.execute("SELECT id FROM alerts WHERE sent_status='pending' AND (last_attempt_at IS NULL OR datetime(last_attempt_at)<=datetime('now','-1 minute')) ORDER BY id LIMIT 50").fetchall()
+            conn.commit()
+        finally:
+            conn.close()
         delivered = 0
-        for row in pending:
-            try:
-                sent = await self.send_alert(
-                    row['alert_type'], row['message'],
-                    image_path=row['image_path'],
-                    severity=row['severity'] or 'medium')
-                if sent:
-                    cursor.execute(
-                        "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
-                        (datetime.now().isoformat(), row['id']))
-                    conn.commit()
-                    delivered += 1
-            except Exception as e:
-                logger.warning('Retry failed for alert %s: %s', row['id'], e)
-
-        conn.close()
-        if pending:
-            logger.info('Alert retry: %d/%d delivered', delivered, len(pending))
+        for row in rows:
+            sent, _reason = await self.deliver(row['id'])
+            delivered += int(sent)
         return delivered
-    
-    def save_alert_to_db(self, alert_type: str, message: str, 
-                        image_path: str = None, severity: str = "medium") -> int:
-        """
-        Save alert to database for tracking.
-        
-        Returns:
-            Alert ID in database
-        """
-        conn = get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO alerts (alert_type, severity, message, image_path, sent_status)
-            VALUES (?, ?, ?, ?, 'pending')
-        ''', (alert_type, severity, message, image_path))
-        
-        alert_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return alert_id
-    
+
     def format_proxy_alert(self, location: str, claimed_id: str, 
                           detected_face: str, confidence: float, 
                           time_str: str, photo_path: str = None) -> tuple:

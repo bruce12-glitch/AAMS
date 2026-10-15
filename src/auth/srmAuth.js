@@ -35,7 +35,7 @@ export function getSession() {
       clearSession()
       return null
     }
-    if (!IS_STATIC_DEMO && (!parsed.token || Number(parsed.expires_at) * 1000 <= Date.now())) {
+    if (!IS_STATIC_DEMO && (!parsed.token || !Number.isFinite(Number(parsed.expires_at)) || Number(parsed.expires_at) * 1000 <= Date.now())) {
       clearSession()
       return null
     }
@@ -62,6 +62,8 @@ export function saveSession(data) {
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(SESSION_KEY)
+  localStorage.removeItem('aams_admin_token')
+  sessionStorage.removeItem('aams_admin_token')
 }
 
 /**

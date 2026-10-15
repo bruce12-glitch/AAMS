@@ -79,7 +79,7 @@ export default function Login() {
             disabled={busy}
           />
           <p className="login-hint">
-            Access is restricted to @srmist.edu.in mail IDs using the shared AAMS password.
+            Use your @srmist.edu.in address and AAMS access password. Administrators use their separate administrator password.
           </p>
           {error && (
             <div className="form-error" role="alert">

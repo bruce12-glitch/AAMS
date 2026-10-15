@@ -1,24 +1,27 @@
+import { parseTimestamp, LAB_TIME_ZONE } from '../utils/time'
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
 import { toArray } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_ACTIVITY } from '../api/mock'
+import DataNotice from '../components/DataNotice'
+import { downloadCsv } from '../utils/download'
 import StatusBadge from '../components/StatusBadge'
 
 const TAGS = ['all', 'authorized', 'proxy', 'unpaid', 'unknown', 'spoof', 'tailgate']
 
 // See Dashboard.jsx: isNaN(d) is unreliable on Date objects. Use getTime().
 const fmt = (iso) => {
-  const d = new Date(iso)
+  const d = parseTimestamp(iso)
   return Number.isNaN(d.getTime())
     ? '—'
-    : d.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 export default function Logs() {
-  const { data, isLive, loading, refresh } = usePolling(
-    '/dashboard/activity',
+  const { data, isLive, loading, error, refresh } = usePolling(
+    '/dashboard/activity?limit=500',
     MOCK_ACTIVITY,
     8000,
     { enabled: !IS_STATIC_DEMO }
@@ -44,13 +47,14 @@ export default function Logs() {
       <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
         <div>
           <h1 className="page-title">Entry Logs</h1>
-          <p className="page-sub">Every access attempt with claimed identity, face similarity and decision.</p>
+          <p className="page-sub">Latest 500 access attempts with identity, face similarity and decision. Export the filtered records as CSV.</p>
         </div>
-        <button className="btn sm ghost" onClick={refresh} type="button">↻ Refresh</button>
+        <div className="action-row"><button className="btn sm ghost" type="button" disabled={!rows.length} onClick={() => downloadCsv('aams-entry-logs.csv', [['Time', 'Claimed ID', 'Recognized ID', 'Similarity', 'Decision', 'Reason'], ...rows.map((row) => [row.event_time, row.claimed_id, row.recognized_id, row.similarity, row.decision, row.reason])])}>Export CSV</button><button className="btn sm ghost" onClick={refresh} type="button">↻ Refresh</button></div>
       </div>
 
+      <DataNotice error={error} loading={loading} />
       <motion.div
-        className="panel"
+        className="panel table-panel"
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45 }}
@@ -108,7 +112,7 @@ export default function Logs() {
         </table>
 
         {!isLive && (
-          <p className="alert-time" style={{ marginTop: 12 }}>Backend offline — showing sample trail.</p>
+          <p className="alert-time" style={{ marginTop: 12 }}>Backend unavailable. Previously loaded records may be out of date.</p>
         )}
       </motion.div>
     </div>

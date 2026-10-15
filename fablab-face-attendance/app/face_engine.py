@@ -119,7 +119,8 @@ class FaceEngine:
         # Check 4: Pose estimation (yaw, pitch, roll)
         # InsightFace provides pose information in some models
         if hasattr(face, 'pose') and face.pose is not None:
-            yaw, pitch, roll = face.pose
+            # InsightFace stores Euler angles as pitch, yaw, roll.
+            pitch, yaw, roll = face.pose
             
             if abs(yaw) > self.max_yaw:
                 reasons.append(f"Yaw angle too high: {yaw:.1f}° > {self.max_yaw}°")

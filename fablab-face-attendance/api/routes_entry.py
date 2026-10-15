@@ -1,4 +1,4 @@
-﻿"""
+"""
 Entry Processing API Routes for FacePass FabLab.
 Implements POST /api/entry/process, /api/entry/face-only, /api/entry/simulate.
 
@@ -111,8 +111,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
         embedding = analysis['embedding']
     elif request.face_embedding is not None:
+        from app.security import production_mode
+        if production_mode():
+            raise HTTPException(status_code=400, detail='Upload a face photo; raw embeddings are not accepted in production')
         embedding = np.asarray(request.face_embedding, dtype=np.float64)
-        if embedding.size == 0:
+        if embedding.size == 0 or not np.isfinite(embedding).all():
             raise HTTPException(status_code=400, detail='Empty embedding')
     else:
         raise HTTPException(
@@ -142,7 +145,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     # ---- 3. Identity ------------------------------------------------- #
     # Normalize the claimed token: accept either the raw user_id or a full
     # signed QR payload (§27.3) — the latter is verified server-side here.
-    token_value = request.token_value
+    token_value = (request.token_value or '').strip()
+    claimed_id = token_value
     if mode == 'token_face':
         if not token_value:
             raise HTTPException(status_code=400, detail='Token value required')
@@ -178,7 +182,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                     claimed=verdict['user_id'], evidence=evidence_rel,
                     extra={'face_count': face_count},
                 )
-            token_value = verdict['user_id']
+            claimed_id = verdict['user_id']
+            token_value = canonical
 
     verifier = IdentityVerifier()
     if mode == 'token_face':
@@ -198,6 +203,14 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     # ---- 4. Policy --------------------------------------------------- #
     payment_status = payment_user.get('payment_status', 'inactive')
+    if payment_status == 'active' and payment_user.get('payment_expiry'):
+        from datetime import date
+        from zoneinfo import ZoneInfo
+        try:
+            if date.fromisoformat(payment_user['payment_expiry']) < datetime.now(ZoneInfo('Asia/Kolkata')).date():
+                payment_status = 'expired'
+        except ValueError:
+            payment_status = 'expired'
 
     # security.require_liveness decides whether an unconfirmed liveness result
     # blocks entry. Defaults to False so a single-snapshot match is usable;
@@ -211,7 +224,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
     policy = AccessDecision(require_liveness=require_liveness)
     decision = policy.evaluate_access(
-        claimed_id=token_value,
+        claimed_id=claimed_id,
         face_result=result,
         payment_status=payment_status,
         liveness_status=liveness_status,
@@ -219,6 +232,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     )
 
     user_info = result.get('claimed_user') or result.get('user')
+    if user_info:
+        user_info = {**user_info, 'payment_status': payment_status}
     return await _finalize(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
         decision=decision['decision'],
@@ -228,7 +243,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         user=user_info,
         similarity=result.get('similarity', 0.0),
         liveness_status=liveness_status,
-        claimed=token_value or detected_user,
+        claimed=claimed_id or detected_user,
         evidence=evidence_rel,
         extra={
             'face_count': face_count,
@@ -277,21 +292,13 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         }.get(alert_type, 'medium')
         who = (user or {}).get('name') or claimed or 'unidentified person'
         message = f'{alert_type} at Fab Lab entrance — {who}. {reason}'
-        alert_row_id = service.save_alert_to_db(alert_type, message,
-                                                image_path=evidence,
-                                                severity=severity)
-        try:
-            sent = await service.send_alert(
-                alert_type, message, image_path=evidence, severity=severity)
-            if sent:
-                conn = get_connection()
-                conn.execute(
-                    "UPDATE alerts SET sent_status='sent', sent_at=? WHERE id=?",
-                    (get_current_time_iso(), alert_row_id))
-                conn.commit()
-                conn.close()
-        except Exception as exc:
-            logger.error('Telegram send failed: %s', exc)
+        result = await service.queue_and_deliver(alert_type, message, image_path=evidence, severity=severity)
+        alert_row_id = result['alert_id']
+    elif decision == 'GRANTED' and occupant_state == 'inside':
+        from app.config import get_telegram_config
+        if get_telegram_config().get('notify_on_entry', True):
+            who = (user or {}).get('name') or recognized
+            await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab')
 
     return {
         'decision': decision,
@@ -299,7 +306,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         'tag': tag,
         'alert_type': alert_type,
         'alert_id': alert_row_id,
-        'user': user,
+        'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
         'similarity': round(float(similarity), 4),
         'liveness_status': liveness_status,
         'occupant_state': occupant_state,

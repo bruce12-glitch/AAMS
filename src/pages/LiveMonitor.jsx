@@ -6,6 +6,7 @@ import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_LIVE } from '../api/mock'
 import { IconCheck, IconX } from '../components/icons'
 import CameraCapture from '../components/CameraCapture'
+import DataNotice from '../components/DataNotice'
 
 const PIPELINE = [
   'TOKEN_DETECTED',
@@ -39,7 +40,7 @@ export default function LiveMonitor() {
   const mainRef = useRef(null)
   const burstRef = useRef(null)
 
-  const camera = live.data?.camera ?? MOCK_LIVE.camera
+  const camera = live.data?.camera ?? (IS_STATIC_DEMO ? MOCK_LIVE.camera : {})
   const camOnline = String(camera?.status ?? '').toLowerCase() === 'online' || camera?.fps > 0
 
   // Stable identity for the decision banner. Previously this key embedded
@@ -103,6 +104,7 @@ export default function LiveMonitor() {
 
   return (
     <div className="page-wrap">
+      <DataNotice error={live.error} loading={live.loading} />
       <div className="page-intro">
         <h1 className="page-title">Live Monitor</h1>
         <p className="page-sub">Entrance pipeline status and real CV entry testing.</p>

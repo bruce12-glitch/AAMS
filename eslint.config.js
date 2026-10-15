@@ -76,9 +76,9 @@ export default [
   },
   {
     // Build tooling runs in Node, not the browser: `process` and friends.
-    files: ['vite.config.js', 'eslint.config.js'],
+    files: ['vite.config.js', 'eslint.config.js', 'tests/e2e/*.mjs'],
     languageOptions: {
-      globals: { ...globals.node }
+      globals: { ...globals.node, ...globals.browser }
     }
   }
 ]

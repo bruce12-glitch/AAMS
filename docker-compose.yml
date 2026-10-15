@@ -6,13 +6,14 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     env_file:
       - ./fablab-face-attendance/.env
     environment:
       # Lock the browser console origin; add your LAN/host origin for pilots.
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8090}
       - RATE_LIMIT_PER_MIN=120
+      - AAMS_ENV=production
     volumes:
       - api-db:/app/database        # SQLite + backups
       - api-images:/app/images      # enrollment/evidence photos
@@ -24,7 +25,7 @@ services:
       context: .
       dockerfile: Dockerfile.web
     ports:
-      - "8090:80"
+      - "127.0.0.1:8090:80"
     depends_on:
       - api
     restart: unless-stopped
