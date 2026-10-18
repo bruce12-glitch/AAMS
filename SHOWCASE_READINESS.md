@@ -4,6 +4,16 @@ Repository: https://github.com/bruce12-glitch/AAMS
 Initial reviewed base: `main` at `f0e2ce4503fa7c6c476118b925e616e65d6e28cb`.
 Feature release: PR #8 merged at `9a0a6aed1547a8a49292680ccd3c8ecb58739653`.
 
+## Current local prototype work — 18 October 2026
+
+Oracle/public deployment is paused at the user's request. Continuous laptop webcam attendance is already in main through PR #11. The local-prototype update adds an administrator Dashboard setup panel, nonblocking face-model initialization with retry, personal Telegram chat support with one-use pairing, and a Windows launcher that reuses saved configuration and opens the website. It preserves the separate administrator/shared credentials and exact SRMIST domain restriction.
+
+Local verification of this update: 145 backend tests pass; the separate opt-in real-model test also passes with actual `buffalo_l` models and the public NASA astronaut fixture. That test covers normal photo quality checks, enrollment, face-only identity match, attendance/occupancy, duplicate suppression, checkout/re-entry, expired-payment denial, empty frames and notification queuing. It uses isolated data and disabled real Telegram delivery. Still-image testing explicitly bypasses blink liveness. Frontend lint, production build and static Pages build pass. CI additionally exercises the browser setup/pairing/webcam flows, Windows repeat startup and real-model inference inside the full Docker image; consult the update's PR for its final results.
+
+The Telegram screenshot supplied by the user shows a successful earlier test/report, followed by an `Attendance` message with no reply. The implementation sends AAMS notifications; it does not implement conversational attendance commands. Personal-chat pairing now lets the administrator select the correct recipient through a fresh private `/start` link without manually retrieving a chat ID. Pairing never sends to an arbitrary correspondent or modifies an existing webhook. The live bot token must be entered privately in the local application; a real current delivery has not been claimed.
+
+Laptop acceptance sequence: launch Docker Desktop and Start-AAMS.cmd, sign in, initialize the model on Dashboard, connect Telegram in Communicate and confirm a test arrives, add a consenting member with active payment and enroll webcam photos, then start Live Monitor webcam attendance. Confirm the member's name, attendance log, occupancy and one Telegram entry message. Check out the member before demonstrating re-entry. The remaining physical tests are laptop camera permission/device access, normal live blink detection, recognition in the room's lighting and actual phone receipt.
+
 ## Delivered source
 
 Student add/edit and separate photo enrollment now work together. Profiles include contact and academic fields, account status and payment expiry. Duplicate emails and invalid profile fields are rejected. Student and entry CSV exports, QR download/re-key, manual checkout, daily/weekly/occupancy summaries, incident acknowledgment and Telegram communication remain behind authenticated access.
@@ -34,8 +44,8 @@ The feature completion changes were reviewed and merged through PR #8 following 
 
 ## Remaining external setup
 
-Telegram bot/group setup is deferred at the user's request. No real group delivery has been claimed. The other features do not require a configured bot.
+Telegram now supports personal chats and groups. Current credentials, destination pairing and actual receipt still need to be completed privately in the laptop application. No real current delivery has been claimed. The other features do not require a configured bot.
 
-Public hosting is authorized but still needs an Oracle Cloud Always Free account and private administrator/member authentication variables. The deployment package now targets one always-free Oracle A1 VM with a persistent volume, Caddy HTTPS and a free DuckDNS hostname; no paid resource or public domain has been provisioned. The API needs persistent storage and an always-running process for scheduled reports. Physical webcam access and liveness/recognition calibration need the lab hardware and consented volunteers. Snapshot liveness bypass is a prototype feature. Review pretrained model licensing before commercial use.
+Public hosting is paused pending the local prototype demonstration. The existing Oracle package has not been deployed and no paid resource or public domain has been provisioned. A later deployment needs persistent storage and an always-running process for scheduled reports. Physical webcam access and liveness/recognition calibration need the lab hardware and consented volunteers. Snapshot liveness bypass is a prototype feature. Review pretrained model licensing before commercial use.
 
 New timestamps are written as UTC and displayed/reported in IST. Historical naive timestamps are treated as UTC; assess any existing Windows-local database before importing real historical records. No historical user data was rewritten.

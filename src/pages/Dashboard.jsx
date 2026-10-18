@@ -9,6 +9,7 @@ import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_STATS, MOCK_ACTIVITY, MOCK_ALERTS, MOCK_OCCUPANTS } from '../api/mock'
 import DataNotice from '../components/DataNotice'
 import StatCard from '../components/StatCard'
+import PrototypeSetup from '../components/PrototypeSetup'
 import StatusBadge from '../components/StatusBadge'
 import { IconDoor, IconFace, IconBell, IconUsers } from '../components/icons'
 
@@ -61,6 +62,7 @@ export default function Dashboard({ onNavigate }) {
       </div>
 
       <DataNotice error={exitError || stats.error || activity.error || alerts.error || occupants.error} loading={stats.loading} />
+      {isAdmin && !IS_STATIC_DEMO && <PrototypeSetup onNavigate={onNavigate} />}
       <div className="grid-stats">
         <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#0e7490" tint="#ecfeff" trend={stats.isLive ? 'live' : '—'} trendDir="flat" />
         <StatCard index={1} label="Inside Now" value={s.inside_count} icon={<IconFace width={17} height={17} />} color="#047857" tint="#ecfdf5" trend="live" trendDir="flat" />

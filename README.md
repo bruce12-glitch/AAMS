@@ -1,6 +1,6 @@
 # AAMS — FacePass Fab Lab
 
-A React/Vite console and FastAPI service for the SRMIST Fab Lab. The showcase build includes student profiles, face enrollment, signed QR passes, entry checks, occupancy, security alerts and reporting. Telegram integration is implemented; live bot/group setup is deferred.
+A React/Vite console and FastAPI service for the SRMIST Fab Lab. The prototype includes student profiles, face enrollment, signed QR passes, laptop webcam attendance, occupancy, security alerts and reporting. Work currently focuses on the local prototype; Oracle hosting is paused.
 
 ## Showcase features
 
@@ -9,14 +9,14 @@ A React/Vite console and FastAPI service for the SRMIST Fab Lab. The showcase bu
 - Enroll face photos or capture webcam photos after consent. The server validates images, runs InsightFace, saves embeddings, and issues a signed QR pass. Display/download/re-key passes; old passes are rejected after re-keying.
 - Process signed QR + face or face-only snapshots. Expired payments are denied. Granted entries update occupancy and logs; administrators can check students out.
 - Filter the latest 500 entry logs and export CSV. Export student records. View daily, weekly, security and occupancy reports. Times display in IST.
-- Configure the Telegram group privately in **Communicate**, verify its identity, send a test or announcement, and inspect delivery history. Announcements, student additions/enrollments, granted entries and security alerts use a persistent queue. Failed deliveries remain queued and retry automatically. The daily summary runs at the configured IST time; default 20:00. Background camera notifications are queued for the next retry cycle.
+- Configure a personal Telegram chat or group privately in **Communicate**, verify its identity, send a test or announcement, and inspect delivery history. Personal-chat pairing uses a private, one-use `/start` link that expires after five minutes. Announcements, student additions/enrollments, granted entries and security alerts use a persistent queue. Failed deliveries remain queued and retry automatically. The daily summary runs at the configured IST time; default 20:00. Background camera notifications are queued for the next retry cycle.
 - Clear loading/error states. Live pages retain the last real response on outages instead of substituting sample students or attendance.
 
 ## Private local launch
 
 Requires Docker Desktop or a Docker engine. The supported images use Node 24 and Python 3.12. Configuration and data stay out of Git.
 
-Windows PowerShell:
+On Windows, start Docker Desktop and double-click **Start-AAMS.cmd**. First launch asks for the private sign-in settings; subsequent launches reuse them and preserve QR/session keys. The website opens automatically. This uses the installed PowerShell policy; a policy that blocks local scripts must be resolved by the laptop owner. The equivalent PowerShell command is:
 
 ```powershell
 .\deploy\showcase-windows.ps1 -SkipTelegram
@@ -33,13 +33,17 @@ Open http://localhost:8090 and sign in with the configured administrator account
 
 The shared access credential remains a server-side setting, `AAMS_ACCESS_PASSWORD`. Use the requested value privately; do not commit it. `API_ADMIN_PASSWORD` must be different. Configuration helpers generate separate random QR/session signing secrets.
 
-The first face request may download the configured `buffalo_l` models. Browser webcam capture needs HTTPS or localhost and camera permission. Unattended hardware capture is opt-in through `capture.enabled` in the backend configuration and requires the camera host; it is not needed for snapshot upload demonstrations.
+After sign-in, use **Dashboard → Prototype setup → Initialize face model**. The panel separately reports the database, model, enrolled members and Telegram configuration. The first model download needs internet and several minutes; later starts reuse the saved cache. Initialization runs in a worker so the console remains responsive, and failed initialization can be retried from the panel. API health alone does not indicate that recognition is ready.
+
+For Telegram, privately enter the current bot token in **Communicate**, leave Chat ID blank for personal pairing, enable delivery and save. Click **Connect my Telegram**, open the generated bot link and press **Start**, then return and click **Connect this chat** within five minutes. Click **Verify chat** and **Send test message**, and check the message actually arrives on your phone. Pairing preserves existing webhooks and never selects an arbitrary bot correspondent; bots already used by another polling application should use manual Chat ID entry or a dedicated bot. For a group, add the bot and enter the negative group ID or public group username. The bot username/link itself is not a chat ID. This bot sends AAMS notifications; typing `Attendance` in Telegram does not start a webcam or request a report. Use the website's **Send daily report now** button for a report.
+
+Browser webcam capture needs HTTPS or localhost and camera permission. Unattended hardware capture is opt-in through `capture.enabled` in the backend configuration and requires the camera host; it is not needed for the laptop browser prototype.
 
 ## Development and checks
 
 ### Laptop webcam attendance
 
-In **Members**, add a student and enroll clear face photos after obtaining consent. In **Live Monitor → Laptop Webcam Attendance**, click **Start webcam attendance** and allow camera access. Show one enrolled person at a time. The browser sends a short image burst to the signed-in backend, which checks identity and policy, records granted attendance/occupancy, and queues the existing Telegram entry notification. Configure and verify the private group in **Communicate** before expecting delivery.
+In **Members**, add a student, set payment status to **active**, and enroll clear face photos after obtaining consent. In **Live Monitor → Laptop Webcam Attendance**, click **Start webcam attendance** and allow camera access. Show one enrolled person at a time. The browser sends a short image burst to the signed-in backend, which checks identity and policy, records granted attendance/occupancy, and queues the Telegram entry notification. Configure and test the connected chat in **Communicate** before expecting delivery.
 
 Blink verification is required by default for this mode; look at the camera and blink naturally. The explicit prototype checkbox skips that check and may accept a photograph. Webcam scanning needs HTTPS or localhost and a running backend; static Pages alone cannot perform recognition. Requests run sequentially with a ten-second gap. Empty frames do not create attendance or Telegram alerts. Recognized students already inside do not get another attendance record or entry notification until checked out; repeated denials are throttled for sixty seconds. Stop, navigation away, or hiding the page releases the camera and stops further captures. An entry request already accepted by the backend may finish after stopping.
 
@@ -61,16 +65,24 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-The browser test starts disposable local servers and an isolated database. Its neural inference boundary is controlled for CI; production source continues to use the real model. Set `AAMS_TEST_PYTHON` if the backend packages live in a separate Python environment. Tests must run in the same network namespace as their local servers.
+The browser test starts disposable local servers and an isolated database. Neural inference and Telegram transport are controlled for CI; production source continues to use the real model and SDK. It covers setup, private-chat pairing, the webcam loop and attendance. Set `AAMS_TEST_PYTHON` if the backend packages live in a separate Python environment. Tests must run in the same network namespace as their local servers.
 
-CI includes backend tests, frontend lint/build, browser flows, a disposable Docker startup/persistence/proxy check, and a complete hosted-container check. Deployment smoke tests are restricted to disposable GitHub Actions runners and never configure a real Telegram group.
+An opt-in real-model check uses the bundled public NASA astronaut image from scikit-image, the normal quality thresholds, isolated records/photos and a disabled Telegram transport. From `fablab-face-attendance`, with full requirements installed:
+
+```bash
+AAMS_REAL_VISION_TEST=1 python -m pytest tests/test_real_vision.py -q -s
+```
+
+It verifies actual image enrollment, recognition, attendance/occupancy, notification queuing, repeat-scan suppression, checkout/re-entry and expired-payment denial. It explicitly bypasses blink liveness because the fixture is a still image. Physical webcam, live blink behavior and actual Telegram receipt must still be demonstrated on the laptop.
+
+CI includes backend tests, frontend lint/build, browser flows, Windows repeat-launch checks, a disposable Docker startup/persistence/proxy check with real-model validation, and a complete hosted-container check. Deployment smoke tests are restricted to disposable GitHub Actions runners and never configure a real Telegram destination.
 
 ## Database and hosting
 
 SQLite WAL and additive migrations are retained for the single-host showcase. The database, evidence/enrollment photos and model cache use persistent Docker volumes. Backups use SQLite's online backup API, including committed WAL data. Run one API process to keep the camera, scheduler and in-memory rate limits coherent.
 
-For full website hosting, use [deploy/HOSTING.md](deploy/HOSTING.md), `docker-compose.oracle.yml` and `Dockerfile.showcase`. The selected path is Oracle Cloud Always Free: it serves the website and API together, keeps student records/photos/models/signing keys on one persistent volume, and uses Caddy for HTTPS. Production authentication is configured privately on the host. This option requires no local VS Code or terminal after initial hosting setup.
+Public hosting is paused while the local prototype is validated. The existing [deploy/HOSTING.md](deploy/HOSTING.md), `docker-compose.oracle.yml` and `Dockerfile.showcase` remain available for a later deployment with persistent storage and HTTPS.
 
 GitHub Pages serves only static files. Secure sign-in and persistent features require a backend; a Pages-only build intentionally cannot sign in. The Pages workflow requires a manual dispatch, so publishing source changes does not automatically publish a site.
 
-PR #8 is merged into `main` with the tested feature build. Hosting publication is still pending a connected container-hosting account and private authentication settings. All existing branches are preserved. See [SHOWCASE_READINESS.md](SHOWCASE_READINESS.md) for verified results and remaining external setup.
+The student-management and continuous-webcam features are merged into `main` through PRs #8 and #11. All existing branches are preserved. See [SHOWCASE_READINESS.md](SHOWCASE_READINESS.md) for verified results and remaining laptop checks.

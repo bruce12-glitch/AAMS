@@ -1,4 +1,4 @@
-"""Disposable browser-test API. Only the neural inference boundary is stubbed."""
+"""Disposable browser-test API with controlled inference and Telegram transport."""
 import json
 import os
 import secrets
@@ -20,5 +20,38 @@ vision.analyze_frame = lambda frame: {
     'face_count': 1, 'quality_passed': True, 'quality_reasons': [],
     'embedding': embedding.copy(),
 }
+def initialize_model(*, retry=False):
+    vision._ENGINE = object()
+    return vision._ENGINE
+vision.get_engine = initialize_model
+
+# Exercise the actual Telegram SDK without contacting Telegram or using a token.
+# The browser test supplies only its own pairing command as a fixture update.
+from telegram import Bot as RealBot
+from telegram.request import BaseRequest
+import telegram
+class TelegramRequest(BaseRequest):
+    @property
+    def read_timeout(self): return 5
+    async def initialize(self): pass
+    async def shutdown(self): pass
+    async def do_request(self, url, method, request_data=None, **kwargs):
+        endpoint = url.rsplit('/', 1)[-1]
+        chat = {'id': 7654321, 'type': 'private', 'first_name': 'Browser Test Recipient'}
+        if endpoint == 'getMe':
+            result = {'id': 123456, 'is_bot': True, 'first_name': 'Test Bot', 'username': 'AAMS_test_bot'}
+        elif endpoint == 'getWebhookInfo':
+            result = {'url': '', 'has_custom_certificate': False, 'pending_update_count': 0}
+        elif endpoint == 'getUpdates':
+            fixture = root / 'telegram-update.json'
+            result = json.loads(fixture.read_text()) if fixture.exists() else []
+        elif endpoint == 'getChat':
+            result = {**chat, 'accent_color_id': 1, 'max_reaction_count': 0}
+        elif endpoint == 'sendMessage':
+            result = {'message_id': 1, 'date': 1, 'chat': chat, 'text': request_data.parameters['text']}
+        else:
+            raise AssertionError(endpoint)
+        return 200, json.dumps({'ok': True, 'result': result}).encode()
+telegram.Bot = lambda token, request: RealBot(token=token, request=TelegramRequest(), get_updates_request=TelegramRequest())
 import uvicorn
 uvicorn.run('app.main:app', host='127.0.0.1', port=8000, log_level='warning')

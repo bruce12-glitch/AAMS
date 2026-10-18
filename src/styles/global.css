@@ -1874,3 +1874,10 @@ fieldset.form-grid { border: 0; margin: 0; padding: 0; min-width: 0; }
   .sidebar .nav-glyph { flex: none; display: inline-flex; width: 22px; justify-content: center; }
   .sidebar .nav-label { display: none; }
 }
+/* Local prototype setup: keep the first-run checks readable on phones. */
+.prototype-setup { margin-bottom: 22px; }
+.setup-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 0 0 16px; padding: 0; list-style: none; }
+.setup-checks li { display: flex; flex-direction: column; gap: 6px; }
+.setup-checks li span { font-size: 13px; overflow-wrap: anywhere; }
+.telegram-pairing { margin-top: 16px; padding: 16px; border: 1px solid var(--border, #ddd); border-radius: 12px; overflow-wrap: anywhere; }
+.telegram-pairing .btn { margin: 8px 0; }

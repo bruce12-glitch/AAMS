@@ -33,6 +33,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 docker info *> $null
 if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop is installed but not running.' }
 
+function Initialize-LocalConfiguration {
 if (-not $AdminEmail) { $AdminEmail = Read-Host 'Administrator SRMIST email' }
 $AdminEmail = $AdminEmail.Trim().ToLowerInvariant()
 if ($AdminEmail -notmatch '^[a-z0-9._%+-]+@srmist\.edu\.in$') {
@@ -56,11 +57,6 @@ if (-not $SkipTelegram) {
     }
 }
 
-if (Test-Path $BackendEnv) {
-    $replace = Read-Host "$BackendEnv already exists. Replace it? (y/N)"
-    if ($replace -notmatch '^[Yy]') { throw 'Existing configuration left unchanged.' }
-}
-
 $values = @(
     '# Generated locally by deploy/showcase-windows.ps1; never commit this file.',
     'ADMIN_EMAIL=' + (Format-EnvValue $AdminEmail),
@@ -78,6 +74,13 @@ $values = @(
 $AdminPassword = $null
 $AccessPassword = $null
 $TelegramToken = $null
+}
+
+if (Test-Path $BackendEnv) {
+    Write-Host 'Using saved AAMS configuration. Passwords and QR/session signing keys are preserved.'
+} else {
+    Initialize-LocalConfiguration
+}
 
 Push-Location $RepoRoot
 try {
@@ -100,11 +103,14 @@ try {
     }
 
     Write-Host ''
-    Write-Host 'AAMS is ready: http://localhost:8090' -ForegroundColor Green
+    Write-Host 'AAMS website is running: http://localhost:8090' -ForegroundColor Green
     Write-Host ('Security: admin={0}, sessions={1}' -f `
         $status.security.admin_password_configured, $status.security.session_secret_configured)
     Write-Host ('Telegram configured: {0}' -f $status.telegram.configured)
-    Write-Host 'Use Members -> Enroll -> Use webcam instead for direct Windows camera capture.'
+    Write-Host ('Face model: {0}' -f $status.cv_engine)
+    Write-Host 'Sign in -> Dashboard -> Initialize face model. Complete the Prototype setup checks before your demo.'
+    Write-Host 'Members -> Enroll face -> Use webcam. Then Live Monitor -> Start webcam attendance.'
+    Start-Process 'http://localhost:8090'
 
     if ($PublicUrl) {
         foreach ($attempt in 1..20) {

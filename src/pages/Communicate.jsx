@@ -22,6 +22,7 @@ export default function Communicate() {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [pairing, setPairing] = useState(null)
   const s = status.data ?? EMPTY_STATUS
   const ready = Boolean(s.telegram_enabled && s.bot_configured && s.chat_configured)
 
@@ -53,7 +54,15 @@ export default function Communicate() {
   const save = async (event) => {
     event.preventDefault()
     const response = await perform(() => apiPut('/notify/settings', settings))
-    if (response?.success) { setSettings((current) => ({ ...current, bot_token: '' })); setDirty(false) }
+    if (response?.success) { setSettings((current) => ({ ...current, bot_token: '' })); setDirty(false); setPairing(null) }
+  }
+  const startPairing = async () => {
+    const response = await perform(() => adminPost('/notify/pair/start', {}, 45000))
+    if (response?.success) setPairing(response)
+  }
+  const completePairing = async () => {
+    const response = await perform(() => adminPost('/notify/pair/complete', {}, 45000))
+    if (response?.success) setPairing(null)
   }
   const send = async (event) => {
     event.preventDefault()
@@ -64,25 +73,25 @@ export default function Communicate() {
     <div className="page-wrap">
       <div className="page-intro">
         <h1 className="page-title">Communicate</h1>
-        <p className="page-sub">Student updates, entry alerts and a daily summary for your Telegram group.</p>
+        <p className="page-sub">Student updates, entry alerts and a daily summary for your personal Telegram chat or group.</p>
       </div>
       <DataNotice error={status.error || history.error} loading={status.loading} />
       {error && <div className="form-error" role="alert">{error}</div>}
       {result && <div className={result.telegram_sent === false ? 'form-error' : 'success-note'} role="status">
         {result.telegram_sent === false ? `Saved in the delivery queue: ${result.reason}` : result.reason || result.message || 'Completed.'}
-        {result.group_title && <span> Group: {result.group_title}</span>}
+        {result.chat_title && <span> Destination: {result.chat_title}</span>}
       </div>}
       <div className="grid-main">
         <motion.section className="panel" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <div className="panel-head"><h2 className="panel-title">Group connection</h2><span className={`badge ${ready ? 'active' : 'pending'}`}>{ready ? 'Configured' : 'Setup needed'}</span></div>
+          <div className="panel-head"><h2 className="panel-title">Telegram connection</h2><span className={`badge ${ready ? 'active' : 'pending'}`}>{ready ? 'Configured' : 'Setup needed'}</span></div>
           <div className="kv-row"><span>Daily summary</span><strong>{s.daily_report_time || '20:00'} IST</strong></div>
           <div className="kv-row"><span>Awaiting delivery</span><strong>{s.pending_count ?? '—'}</strong></div>
           <div className="kv-row"><span>Last delivered</span><strong>{s.last_sent_at ? parseTimestamp(s.last_sent_at).toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE }) : 'No delivery yet'}</strong></div>
           {isAdmin ? <form onSubmit={save}>
-            <p className="field-hint">Create a bot with Telegram’s BotFather, add it to your group and allow it to post. Save its token and group ID here, verify the group, then send a test.</p>
+            <p className="field-hint">Save your bot token privately, then choose Connect my Telegram for personal notifications. For a group, add the bot and enter the group ID instead. Verify the chat, send a test and confirm it arrives on your phone.</p>
             <fieldset disabled={busy} className="form-grid">
               <label>Bot token<input type="password" autoComplete="new-password" value={settings.bot_token} onChange={set('bot_token')} placeholder={s.bot_configured ? 'Saved privately · leave blank to keep' : 'Paste bot token'} /></label>
-              <label>Group ID<input required value={settings.chat_id} onChange={set('chat_id')} placeholder="-100… or @public_group" /></label>
+              <label>Chat ID (optional for pairing)<input value={settings.chat_id} onChange={set('chat_id')} placeholder="Personal: 123… · group: -100… or @public_group" /></label>
               <label>Daily report time (IST)<input type="time" required value={settings.daily_report_time} onChange={set('daily_report_time')} /></label>
             </fieldset>
             <label className="consent-row"><input type="checkbox" checked={settings.enabled} onChange={set('enabled')} disabled={busy} />Enable Telegram delivery</label>
@@ -91,11 +100,19 @@ export default function Communicate() {
             <label className="consent-row"><input type="checkbox" checked={settings.send_photo} onChange={set('send_photo')} disabled={busy} />Attach evidence photos to security alerts</label>
             <div className="modal-actions"><button className="btn primary" type="submit" disabled={busy || !status.isLive}>Save settings</button></div>
             <div className="action-row">
-              <button className="btn ghost" type="button" disabled={busy || !ready || dirty} onClick={() => perform(() => adminPost('/notify/verify', {}, 45000))}>Verify group</button>
+              <button className="btn ghost" type="button" disabled={busy || !s.telegram_enabled || !s.bot_configured || dirty} onClick={startPairing}>Connect my Telegram</button>
+              <button className="btn ghost" type="button" disabled={busy || !ready || dirty} onClick={() => perform(() => adminPost('/notify/verify', {}, 45000))}>Verify chat</button>
               <button className="btn ghost" type="button" disabled={busy || !ready || dirty} onClick={() => perform(() => adminPost('/notify/test', {}, 45000))}>Send test message</button>
               <button className="btn ghost" type="button" disabled={busy || !ready || dirty} onClick={() => perform(() => adminPost('/notify/daily-report', {}, 45000))}>Send daily report now</button>
             </div>
-          </form> : <p className="field-hint">Administrators manage the group connection and send announcements.</p>}
+            {pairing && <div className="telegram-pairing" role="region" aria-label="Connect personal Telegram">
+              <p>Open Telegram using this link and press <strong>Start</strong>. Return here and connect within five minutes. Keep this link private.</p>
+              <a className="btn ghost" href={pairing.url} target="_blank" rel="noopener noreferrer">Open my bot in Telegram</a>
+              <p className="field-hint">If the link does not send a command, send this exact text to your bot: <code>{pairing.command}</code></p>
+              <button className="btn primary" type="button" disabled={busy || dirty} onClick={completePairing}>Connect this chat</button>
+            </div>}
+            <p className="field-hint">This bot sends notifications from AAMS. Typing “Attendance” in Telegram does not run the camera or request a report; use Live Monitor or Send daily report now.</p>
+          </form> : <p className="field-hint">Administrators manage the Telegram connection and send announcements.</p>}
         </motion.section>
         <section className="panel">
           <div className="panel-head"><h2 className="panel-title">Announcement</h2></div>
@@ -103,7 +120,7 @@ export default function Communicate() {
             <label className="login-label" htmlFor="announce-box">Message</label>
             <textarea id="announce-box" className="search-input" style={{ width: '100%', minHeight: 160 }}
               value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1000}
-              placeholder="Write an update for the lab group…" disabled={busy || !isAdmin} required />
+              placeholder="Write an update for the connected chat…" disabled={busy || !isAdmin} required />
             <p className="alert-time">{1000 - message.length} characters remaining. Delivery failures remain queued and retry automatically.</p>
             <div className="modal-actions"><button className="btn primary" type="submit" disabled={busy || !isAdmin || !status.isLive || !message.trim()}>{busy ? 'Working…' : 'Send via Telegram'}</button></div>
           </form>
