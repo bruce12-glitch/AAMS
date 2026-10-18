@@ -33,6 +33,7 @@ class EntryRequest(BaseModel):
     # stops an unauthenticated caller from pushing a huge list of payloads.
     liveness_frames_b64: Optional[List[str]] = Field(default=None, max_length=12)
     skip_liveness: bool = False                    # single-snapshot testing
+    continuous: bool = False                       # browser webcam polling
 
 
 class SimulateRequest(BaseModel):
@@ -87,9 +88,13 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
         face_count = analysis['face_count']
-        evidence_rel = save_evidence(frame, 'logs')
-
         if face_count == 0:
+            if request.continuous:
+                # Empty camera frames are normal; do not store photos/logs or
+                # send NOFACE alerts every polling cycle.
+                return {'decision': 'DENIED', 'reason': 'No face detected — waiting for a person',
+                        'tag': 'noface', 'face_count': 0, 'recorded': False}
+            evidence_rel = save_evidence(frame, 'logs')
             return await _finalize(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED', reason='No face detected in image',
@@ -98,6 +103,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 claimed=request.token_value, evidence=evidence_rel,
                 extra={'face_count': 0},
             )
+        evidence_rel = None if request.continuous else save_evidence(frame, 'logs')
         if not analysis['quality_passed']:
             return await _finalize(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
@@ -106,7 +112,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 tag='noface', alert_type=None, user=None,
                 similarity=0.0, liveness_status='unknown',
                 claimed=request.token_value, evidence=evidence_rel,
-                extra={'face_count': face_count, 'quality': analysis['quality_reasons']},
+                extra={'face_count': face_count, 'quality': analysis['quality_reasons'], 'continuous': request.continuous},
             )
 
         embedding = analysis['embedding']
@@ -221,6 +227,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                                 .get('require_liveness', False))
     except Exception:
         require_liveness = False
+    require_liveness = require_liveness or (request.continuous and not request.skip_liveness)
 
     policy = AccessDecision(require_liveness=require_liveness)
     decision = policy.evaluate_access(
@@ -245,25 +252,47 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         liveness_status=liveness_status,
         claimed=claimed_id or detected_user,
         evidence=evidence_rel,
+        evidence_frame=frame if request.continuous else None,
         extra={
             'face_count': face_count,
             'recognized_id': detected_user,
+            'continuous': request.continuous,
         },
     )
 
 
 async def _finalize(decision, reason, tag, alert_type, user, similarity,
                     liveness_status, claimed, evidence, extra,
-                    latency_ms=None) -> dict:
+                    latency_ms=None, evidence_frame=None) -> dict:
     """Persist log + occupancy + alert, then build the response."""
     from app.alerts import AlertService
     from app.database import get_connection
     from app.occupancy import OccupancyTracker
 
     recognized = (extra or {}).get('recognized_id')
+    continuous = bool((extra or {}).get('continuous'))
 
     conn = get_connection()
     cursor = conn.cursor()
+    if continuous:
+        inside = decision == 'GRANTED' and not alert_type and recognized and cursor.execute(
+            "SELECT 1 FROM occupants WHERE user_id = ? AND status = 'inside'", (recognized,)
+        ).fetchone()
+        recent = cursor.execute('''
+            SELECT 1 FROM entry_logs WHERE tag = ?
+            AND COALESCE(recognized_id, '') = ? AND COALESCE(claimed_id, '') = ?
+            AND julianday(event_time) >= julianday('now', '-60 seconds')
+        ''', (tag, recognized or '', claimed or '')).fetchone() if decision != 'GRANTED' else None
+        if inside or recent:
+            conn.close()
+            return {'decision': decision, 'reason': reason, 'tag': tag,
+                    'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
+                    'recognized_id': recognized, 'duplicate': True, 'recorded': False,
+                    'occupant_state': 'already_inside' if inside else None,
+                    'similarity': round(float(similarity), 4), 'liveness_status': liveness_status}
+    if evidence_frame is not None:
+        from app.vision import save_evidence
+        evidence = save_evidence(evidence_frame, 'logs')
     cursor.execute('''
         INSERT INTO entry_logs (claimed_id, recognized_id, similarity,
                                 payment_status, liveness_status, decision,
@@ -302,6 +331,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
 
     return {
         'decision': decision,
+        'recorded': True,
         'reason': reason,
         'tag': tag,
         'alert_type': alert_type,

@@ -25,11 +25,11 @@ async function waitFor(url) {
 }
 try {
   await Promise.all([waitFor('http://127.0.0.1:8000/health'), waitFor('http://127.0.0.1:3000')])
-  browser = await chromium.launch({ headless: true,
+  browser = await chromium.launch({ headless: true, channel: 'chromium',
     ...(process.env.AAMS_BROWSER_EXECUTABLE ? { executablePath: process.env.AAMS_BROWSER_EXECUTABLE } : {}),
-    args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader'],
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   })
-  const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce' })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce', permissions: ['camera'] })
   const page = await context.newPage()
   page.on('pageerror', (error) => errors.push(error.message))
   await page.goto('http://127.0.0.1:3000')
@@ -81,6 +81,21 @@ try {
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
   await page.getByText('Updated Showcase Student', { exact: true }).first().waitFor()
   await page.getByRole('button', { name: 'Check out', exact: true }).click()
+  await page.getByRole('button', { name: 'Live Monitor', exact: true }).click()
+  const webcam = page.getByRole('region', { name: 'Laptop webcam attendance' })
+  await webcam.getByRole('checkbox').check()
+  const firstScan = page.waitForResponse((response) => response.url().endsWith('/api/entry/face-only') && response.request().method() === 'POST')
+  await webcam.getByRole('button', { name: 'Start webcam attendance' }).click()
+  assert.equal((await (await firstScan).json()).recorded, true)
+  const repeatScan = await page.waitForResponse((response) => response.url().endsWith('/api/entry/face-only') && response.request().method() === 'POST', { timeout: 20000 })
+  assert.equal((await repeatScan.json()).duplicate, true)
+  await webcam.getByRole('status').filter({ hasText: 'Already recorded' }).waitFor()
+  await webcam.getByRole('button', { name: 'Stop webcam attendance' }).click()
+  assert.ok(await webcam.locator('video').evaluate((video) => video.srcObject.getTracks().every((track) => track.readyState === 'ended')), 'Stop must release webcam tracks')
+  await webcam.getByRole('button', { name: 'Start webcam attendance' }).click()
+  await webcam.getByRole('button', { name: 'Stop webcam attendance' }).waitFor()
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
+  await page.getByRole('button', { name: 'Check out', exact: true }).click()
   await page.getByRole('button', { name: 'Communicate', exact: true }).click()
   await page.getByRole('heading', { name: 'Communicate', exact: true }).waitFor()
   await page.getByLabel('Message', { exact: true }).fill('AAMS browser validation announcement')
@@ -109,6 +124,8 @@ try {
   console.log(`Screenshots: ${directory}`)
 } catch (error) {
   const page = browser?.contexts()[0]?.pages()[0]
+  if (page) console.log('Browser failure state:', await page.locator('body').innerText().catch(() => 'unavailable'))
+  console.log('Browser runtime errors:', errors)
   if (page) await page.screenshot({ path: path.join(directory, 'failure.png'), fullPage: true }).catch(() => {})
   console.log(`Failure screenshot: ${directory}/failure.png`)
   throw error
