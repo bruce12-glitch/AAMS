@@ -23,6 +23,22 @@ async function waitFor(url) {
   }
   throw new Error(`Test server did not become ready: ${url}`)
 }
+async function assertFitsViewport(page, label) {
+  // Font loading and the WebGL ResizeObserver may finish after setViewportSize.
+  // Wait for the actual layout condition, not an arbitrary fixed sleep.
+  await page.evaluate(async () => { await document.fonts.ready })
+  try {
+    await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth + 1, null, { timeout: 5000 })
+  } catch (error) {
+    const details = await page.evaluate(() => ({
+      viewport: window.innerWidth, page: document.documentElement.scrollWidth,
+      elements: [...document.querySelectorAll('body *')].map((el) => ({
+        tag: el.tagName, className: String(el.className), right: Math.round(el.getBoundingClientRect().right),
+      })).filter((el) => el.right > window.innerWidth + 1).slice(0, 12),
+    }))
+    throw new Error(`${label}: ${JSON.stringify(details)}`, { cause: error })
+  }
+}
 try {
   await Promise.all([waitFor('http://127.0.0.1:8000/health'), waitFor('http://127.0.0.1:3000')])
   browser = await chromium.launch({ headless: true, channel: 'chromium',
@@ -45,7 +61,7 @@ try {
   await setup.getByRole('button', { name: 'Initialize face model' }).click()
   await setup.getByText('Ready', { exact: true }).waitFor()
   await page.setViewportSize({ width: 390, height: 844 })
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Mobile setup panel must not overflow viewport')
+  await assertFitsViewport(page, 'Mobile setup panel must not overflow viewport')
   await page.setViewportSize({ width: 1440, height: 960 })
   await setup.getByRole('button', { name: 'Register members' }).click()
   await page.getByRole('button', { name: '＋ Add student' }).click()
@@ -133,7 +149,7 @@ try {
   }
   await page.setViewportSize({ width: 390, height: 844 })
   await page.screenshot({ path: path.join(directory, 'mobile-reports.png'), fullPage: true })
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Mobile page must not overflow viewport')
+  await assertFitsViewport(page, 'Mobile page must not overflow viewport')
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.getByLabel('SRMIST email', { exact: true }).fill('member@srmist.edu.in')
   await page.getByLabel('Password', { exact: true }).fill(credentials.member_password)
