@@ -25,9 +25,9 @@ async function waitFor(url) {
 }
 try {
   await Promise.all([waitFor('http://127.0.0.1:8000/health'), waitFor('http://127.0.0.1:3000')])
-  browser = await chromium.launch({ headless: true,
+  browser = await chromium.launch({ headless: true, channel: 'chromium',
     ...(process.env.AAMS_BROWSER_EXECUTABLE ? { executablePath: process.env.AAMS_BROWSER_EXECUTABLE } : {}),
-    args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--use-fake-device-for-media-stream'],
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   })
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 }, reducedMotion: 'reduce', permissions: ['camera'] })
   const page = await context.newPage()

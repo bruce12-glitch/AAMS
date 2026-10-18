@@ -69,6 +69,7 @@ export default function WebcamAttendance({ onResult }) {
       await capture()
     }
     const start = async () => {
+      let stage = 'open the camera'
       try {
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
           throw new Error('Webcam attendance needs HTTPS or localhost and a supported browser.')
@@ -79,6 +80,7 @@ export default function WebcamAttendance({ onResult }) {
           video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false,
         })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
+        stage = 'start the camera preview'
         videoRef.current.srcObject = stream
         await videoRef.current.play()
         await scan()
@@ -86,7 +88,7 @@ export default function WebcamAttendance({ onResult }) {
         if (cancelled) return
         setError(err.name === 'NotAllowedError'
           ? 'Camera permission denied. Allow this website to use your camera, then start again.'
-          : err.message || 'Cannot open camera. Close other apps using it and retry.')
+          : `Could not ${stage}: ${err.name || 'camera error'} — ${err.message || 'close other apps using the camera and retry.'}`)
         setRunning(false)
       }
     }
