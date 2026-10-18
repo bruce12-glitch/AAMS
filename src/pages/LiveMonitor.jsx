@@ -7,6 +7,7 @@ import { MOCK_LIVE } from '../api/mock'
 import { IconCheck, IconX } from '../components/icons'
 import CameraCapture from '../components/CameraCapture'
 import DataNotice from '../components/DataNotice'
+import WebcamAttendance from '../components/WebcamAttendance'
 
 const PIPELINE = [
   'TOKEN_DETECTED',
@@ -112,6 +113,7 @@ export default function LiveMonitor() {
 
       <div className="grid-main">
         <div className="stack">
+          <WebcamAttendance onResult={setResult} />
           <motion.section
             className="panel"
             initial={{ opacity: 0, y: 18 }}

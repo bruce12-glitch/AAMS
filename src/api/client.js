@@ -48,6 +48,10 @@ async function request(path, options = {}, timeoutMs) {
   const timeout = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS
 
   const controller = new AbortController()
+  const externalSignal = options.signal
+  const abort = () => controller.abort()
+  externalSignal?.addEventListener('abort', abort, { once: true })
+  if (externalSignal?.aborted) controller.abort()
   const timer = setTimeout(() => controller.abort(), timeout)
   try {
     const { headers: suppliedHeaders = {}, ...rest } = options
@@ -74,6 +78,7 @@ async function request(path, options = {}, timeoutMs) {
     return await res.json()
   } finally {
     clearTimeout(timer)
+    externalSignal?.removeEventListener('abort', abort)
   }
 }
 
@@ -86,8 +91,8 @@ export function adminGet(path, timeoutMs) {
   return request(path, { method: 'GET', headers: adminHeaders() }, timeoutMs)
 }
 
-export function apiPost(path, body, timeoutMs) {
-  return request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }, timeoutMs)
+export function apiPost(path, body, timeoutMs, signal) {
+  return request(path, { method: 'POST', body: JSON.stringify(body ?? {}), signal }, timeoutMs)
 }
 
 /** POST carrying the admin token header (mutating endpoints). */

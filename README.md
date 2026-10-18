@@ -37,6 +37,14 @@ The first face request may download the configured `buffalo_l` models. Browser w
 
 ## Development and checks
 
+### Laptop webcam attendance
+
+In **Members**, add a student and enroll clear face photos after obtaining consent. In **Live Monitor → Laptop Webcam Attendance**, click **Start webcam attendance** and allow camera access. Show one enrolled person at a time. The browser sends a short image burst to the signed-in backend, which checks identity and policy, records granted attendance/occupancy, and queues the existing Telegram entry notification. Configure and verify the private group in **Communicate** before expecting delivery.
+
+Blink verification is required by default for this mode; look at the camera and blink naturally. The explicit prototype checkbox skips that check and may accept a photograph. Webcam scanning needs HTTPS or localhost and a running backend; static Pages alone cannot perform recognition. Requests run sequentially with a ten-second gap. Empty frames do not create attendance or Telegram alerts. Recognized students already inside do not get another attendance record or entry notification until checked out; repeated denials are throttled for sixty seconds. Stop, navigation away, or hiding the page releases the camera and stops further captures. An entry request already accepted by the backend may finish after stopping.
+
+Images used for a new decision follow the backend evidence retention settings. Camera access never starts automatically on page load. This is an attended prototype, not a validated anti-spoofing or production door-control system.
+
 ```bash
 npm ci
 pip install -r fablab-face-attendance/requirements.txt
