@@ -124,6 +124,8 @@ try {
   console.log(`Screenshots: ${directory}`)
 } catch (error) {
   const page = browser?.contexts()[0]?.pages()[0]
+  if (page) console.log('Browser failure state:', await page.locator('body').innerText().catch(() => 'unavailable'))
+  console.log('Browser runtime errors:', errors)
   if (page) await page.screenshot({ path: path.join(directory, 'failure.png'), fullPage: true }).catch(() => {})
   console.log(`Failure screenshot: ${directory}/failure.png`)
   throw error
