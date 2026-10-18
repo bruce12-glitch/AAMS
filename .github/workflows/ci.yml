@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify repeat startup preserves credentials
-        shell: pwsh
+        shell: powershell
         run: ./deploy/test-windows-launcher.ps1
 
   backend-tests:
