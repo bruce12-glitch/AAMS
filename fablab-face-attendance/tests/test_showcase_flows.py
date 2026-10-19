@@ -112,7 +112,11 @@ def test_queue_deduplicates_and_claims_once(showcase):
     assert len(calls) == 1
 
 
-def test_real_telegram_sdk_transport_contract(showcase, monkeypatch):
+@pytest.mark.parametrize('chat', [
+    {'id': -100123, 'type': 'supergroup', 'title': 'AAMS Test Group'},
+    {'id': 12345678, 'type': 'private', 'first_name': 'AAMS Test Recipient'},
+])
+def test_real_telegram_sdk_transport_contract(showcase, monkeypatch, chat):
     """Exercise SDK response parsing without sending to a real group."""
     from telegram import Bot as RealBot
     from telegram.request import BaseRequest
@@ -129,17 +133,190 @@ def test_real_telegram_sdk_transport_contract(showcase, monkeypatch):
             if endpoint == 'getMe': result = {'id': 123456, 'is_bot': True, 'first_name': 'AAMS Test Bot'}
             elif endpoint == 'sendMessage':
                 deliveries.append(request_data.parameters['text'])
-                result = {'message_id': 1, 'date': 1, 'chat': {'id': -100123, 'type': 'supergroup', 'title': 'AAMS Test Group'}, 'text': deliveries[-1]}
-            elif endpoint == 'getChat': result = {'id': -100123, 'type': 'supergroup', 'title': 'AAMS Test Group', 'accent_color_id': 1, 'max_reaction_count': 0}
+                result = {'message_id': 1, 'date': 1, 'chat': chat, 'text': deliveries[-1]}
+            elif endpoint == 'getChat': result = {**chat, 'accent_color_id': 1, 'max_reaction_count': 0}
             else: raise AssertionError(endpoint)
             return 200, json.dumps({'ok': True, 'result': result}).encode()
     monkeypatch.setattr(telegram, 'Bot', lambda token, request: RealBot(token=token, request=TelegramRequest(), get_updates_request=TelegramRequest()))
-    monkeypatch.setattr(alerts, 'get_telegram_config', lambda: {'enabled': True, 'bot_token': '123456:' + 'a' * 30, 'chat_id': '-100123'})
+    monkeypatch.setattr(alerts, 'get_telegram_config', lambda: {'enabled': True, 'bot_token': '123456:' + 'a' * 30, 'chat_id': str(chat['id'])})
     client, admin, _member, _db = showcase
     response = client.post('/api/notify/test', headers=admin)
     assert response.status_code == 200 and response.json()['telegram_sent'] is True
     assert len(deliveries) == 1 and 'AAMS connection test' in deliveries[0]
-    assert client.post('/api/notify/verify', headers=admin).json()['group_title'] == 'AAMS Test Group'
+    destination = client.post('/api/notify/verify', headers=admin).json()
+    assert destination['chat_type'] == chat['type']
+    assert destination['chat_title'] == chat.get('title', chat.get('first_name'))
+
+
+@pytest.fixture
+def pairing_transport(monkeypatch):
+    """Real SDK with controlled getUpdates; no personal messages are fetched."""
+    from telegram import Bot as RealBot
+    from telegram.request import BaseRequest
+    import telegram
+    state = {'updates': [], 'webhook': '', 'calls': []}
+    class TelegramRequest(BaseRequest):
+        @property
+        def read_timeout(self): return 5
+        async def initialize(self): pass
+        async def shutdown(self): pass
+        async def do_request(self, url, method, request_data=None, **kwargs):
+            endpoint = url.rsplit('/', 1)[-1]
+            state['calls'].append(endpoint)
+            if endpoint == 'getMe':
+                result = {'id': 123456, 'is_bot': True, 'first_name': 'Test Bot', 'username': 'AAMS_test_bot'}
+            elif endpoint == 'getWebhookInfo':
+                result = {'url': state['webhook'], 'has_custom_certificate': False, 'pending_update_count': 0}
+            elif endpoint == 'getUpdates':
+                assert 'offset' not in request_data.parameters
+                result = state['updates']
+            else: raise AssertionError(endpoint)
+            return 200, json.dumps({'ok': True, 'result': result}).encode()
+    monkeypatch.setattr(telegram, 'Bot', lambda token, request: RealBot(token=token, request=TelegramRequest(), get_updates_request=TelegramRequest()))
+    return state
+
+
+def pairing_message(command, *, chat_type='private', stamp=None):
+    import time
+    return {'update_id': 123, 'message': {'message_id': 1, 'date': int(time.time()) if stamp is None else stamp,
+            'chat': {'id': 7654321, 'type': chat_type, 'first_name': 'Prototype Recipient'}, 'text': command}}
+
+
+def test_personal_chat_pairing_requires_fresh_exact_code_and_is_one_use(showcase, pairing_transport):
+    client, admin, member, _db = showcase
+    values = {'bot_token': '123456:' + 'a' * 30, 'enabled': True}
+    assert client.put('/api/notify/settings', json=values, headers=admin).status_code == 200
+    assert client.post('/api/notify/pair/start', headers=member).status_code == 403
+    assert client.post('/api/notify/pair/start').status_code == 401
+    start = client.post('/api/notify/pair/start', headers=admin).json()
+    assert start['url'].startswith('https://t.me/AAMS_test_bot?start=aams_')
+    assert values['bot_token'] not in str(start)
+    for message in [pairing_message('Attendance'), pairing_message(start['command'], stamp=1),
+                    pairing_message(start['command'], chat_type='group')]:
+        pairing_transport['updates'] = [message]
+        response = client.post('/api/notify/pair/complete', headers=admin)
+        assert response.status_code == 409
+        assert '7654321' not in response.text and 'Prototype Recipient' not in response.text
+    pairing_transport['updates'] = [pairing_message(start['command'])]
+    response = client.post('/api/notify/pair/complete', headers=admin)
+    assert response.status_code == 200 and response.json()['chat_title'] == 'Prototype Recipient'
+    status = client.get('/api/notify/status', headers=admin).json()
+    assert status['chat_id'] == '7654321'
+    assert status['bot_configured'] is True and status['chat_configured'] is True
+    assert 'chat_id' not in client.get('/api/notify/status', headers=member).json()
+    assert client.post('/api/notify/pair/complete', headers=admin).status_code == 409
+    assert 'sendMessage' not in pairing_transport['calls']
+
+
+def test_pairing_expires_is_owner_scoped_and_preserves_webhook(showcase, pairing_transport):
+    client, admin, _member, _db = showcase
+    client.put('/api/notify/settings', json={'bot_token': '123456:' + 'a' * 30}, headers=admin)
+    pairing_transport['webhook'] = 'https://existing.example/webhook'
+    assert client.post('/api/notify/pair/start', headers=admin).status_code == 409
+    assert 'deleteWebhook' not in pairing_transport['calls']
+    pairing_transport['webhook'] = ''
+    start = client.post('/api/notify/pair/start', headers=admin).json()
+    pairing_transport['updates'] = [pairing_message(start['command'])]
+    from app.security import issue_session
+    other = {'Authorization': 'Bearer ' + issue_session(email='other@srmist.edu.in', user_id='OTHER', name='Other', role='admin')['token']}
+    assert client.post('/api/notify/pair/complete', headers=other).status_code == 409
+    app.state.telegram_pairing['created_at'] -= 301
+    assert client.post('/api/notify/pair/complete', headers=admin).status_code == 409
+    client.post('/api/notify/pair/start', headers=admin)
+    # Changing settings invalidates the outstanding link instead of pairing a new bot.
+    client.put('/api/notify/settings', json={'bot_token': '123456:' + 'b' * 30}, headers=admin)
+    assert client.post('/api/notify/pair/complete', headers=admin).status_code == 409
+
+
+@pytest.mark.parametrize('chat_id,expected', [('123456789', 200), ('-1001234567', 200), ('@aams_group', 200),
+                                              ('0', 422), ('-0', 422), ('https://t.me/AAMS12_bot', 422)])
+def test_telegram_chat_id_validation(showcase, chat_id, expected):
+    client, admin, _member, _db = showcase
+    response = client.put('/api/notify/settings', json={'bot_token': '123456:' + 'a' * 30, 'chat_id': chat_id}, headers=admin)
+    assert response.status_code == expected
+
+
+def test_prototype_readiness_counts_active_enrolled_members_and_guards_roles(showcase, monkeypatch):
+    import app.vision as vision
+    client, admin, member, db = showcase
+    monkeypatch.setattr(vision, '_ENGINE', None)
+    monkeypatch.setattr(vision, '_ENGINE_FAILED', False)
+    monkeypatch.setattr(vision, '_ENGINE_LOADING', False)
+    assert client.get('/api/admin/readiness', headers=member).status_code == 403
+    with db.get_connection() as conn:
+        conn.execute("INSERT INTO users(user_id,name,face_embedding) VALUES ('READY','Enrolled',?)", (b'embedding',))
+        conn.execute("INSERT INTO users(user_id,name) VALUES ('NEW','Not enrolled')")
+        conn.execute("INSERT INTO users(user_id,name,face_embedding,active) VALUES ('DISABLED','Disabled',?,0)", (b'embedding',))
+    result = client.get('/api/admin/readiness', headers=admin)
+    assert result.status_code == 200
+    assert result.json()['active_members'] == 2 and result.json()['enrolled_members'] == 1
+    assert result.json()['cv_engine'] == 'not_loaded'
+    assert 'bot_token' not in result.text and 'chat_id' not in result.text
+
+
+def test_model_warmup_keeps_api_responsive_and_does_not_duplicate_downloads(showcase, monkeypatch):
+    import threading
+    import httpx
+    import app.vision as vision
+    import app.face_engine as engine
+    _client, admin, member, _db = showcase
+    entered, release = threading.Event(), threading.Event()
+    calls = []
+    def load():
+        calls.append('initialize')
+        entered.set()
+        assert release.wait(5), 'Test did not release the model loader'
+        return object()
+    monkeypatch.setattr(vision, '_ENGINE', None)
+    monkeypatch.setattr(vision, '_ENGINE_FAILED', False)
+    monkeypatch.setattr(vision, '_ENGINE_LOADING', False)
+    monkeypatch.setattr(engine, 'FaceEngine', load)
+    monkeypatch.setattr(app.state, 'vision_warmup_task', None, raising=False)
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            assert (await client.post('/api/admin/vision/warmup', headers=member)).status_code == 403
+            try:
+                response = await client.post('/api/admin/vision/warmup', headers=admin)
+                assert response.status_code == 202
+                async with asyncio.timeout(2):
+                    while not entered.is_set():
+                        await asyncio.sleep(.01)
+                    assert (await client.get('/health')).json()['status'] == 'ok'
+                    assert (await client.get('/model-status')).json()['cv_engine'] == 'loading'
+                    assert (await client.post('/api/admin/vision/warmup', headers=admin)).status_code == 202
+                assert len(calls) == 1
+            finally:
+                release.set()
+                if app.state.vision_warmup_task:
+                    await app.state.vision_warmup_task
+            assert (await client.get('/api/admin/readiness', headers=admin)).json()['cv_engine'] == 'ready'
+            assert (await client.post('/api/admin/vision/warmup', headers=admin)).json()['cv_engine'] == 'ready'
+            assert len(calls) == 1
+    asyncio.run(exercise())
+
+
+def test_failed_model_load_can_be_retried_without_api_restart(monkeypatch):
+    import app.vision as vision
+    import app.face_engine as engine
+    monkeypatch.setattr(vision, '_ENGINE', None)
+    monkeypatch.setattr(vision, '_ENGINE_FAILED', False)
+    monkeypatch.setattr(vision, '_ENGINE_LOADING', False)
+    calls = []
+    def load():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError('PRIVATE-internal-download-url')
+        return object()
+    monkeypatch.setattr(engine, 'FaceEngine', load)
+    with pytest.raises(vision.VisionUnavailableError) as failed:
+        vision.get_engine()
+    assert 'PRIVATE' not in str(failed.value)
+    assert vision.engine_state() == 'failed'
+    with pytest.raises(vision.VisionUnavailableError):
+        vision.get_engine()
+    assert len(calls) == 1
+    vision.get_engine(retry=True)
+    assert vision.engine_state() == 'ready' and len(calls) == 2
 
 
 def test_daily_report_includes_sqlite_timestamps_and_ist_boundaries(showcase):

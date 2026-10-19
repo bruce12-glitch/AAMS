@@ -42,7 +42,7 @@ def test_readiness_reports_database(client):
     payload = response.json()
     assert payload['status'] == 'ready'
     assert payload['database'] == 'ready'
-    assert payload['cv_engine'] in {'not_loaded', 'ready', 'failed'}
+    assert payload['cv_engine'] in {'not_loaded', 'loading', 'ready', 'failed'}
     assert isinstance(payload['telegram']['configured'], bool)
 
 

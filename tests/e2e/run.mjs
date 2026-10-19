@@ -23,6 +23,22 @@ async function waitFor(url) {
   }
   throw new Error(`Test server did not become ready: ${url}`)
 }
+async function assertFitsViewport(page, label) {
+  // Font loading and the WebGL ResizeObserver may finish after setViewportSize.
+  // Wait for the actual layout condition, not an arbitrary fixed sleep.
+  await page.evaluate(async () => { await document.fonts.ready })
+  try {
+    await page.waitForFunction(() => document.documentElement.scrollWidth <= window.innerWidth + 1, null, { timeout: 5000 })
+  } catch (error) {
+    const details = await page.evaluate(() => ({
+      viewport: window.innerWidth, page: document.documentElement.scrollWidth,
+      elements: [...document.querySelectorAll('body *')].map((el) => ({
+        tag: el.tagName, className: String(el.className), right: Math.round(el.getBoundingClientRect().right),
+      })).filter((el) => el.right > window.innerWidth + 1).slice(0, 12),
+    }))
+    throw new Error(`${label}: ${JSON.stringify(details)}`, { cause: error })
+  }
+}
 try {
   await Promise.all([waitFor('http://127.0.0.1:8000/health'), waitFor('http://127.0.0.1:3000')])
   browser = await chromium.launch({ headless: true, channel: 'chromium',
@@ -40,7 +56,14 @@ try {
   await page.getByLabel('SRMIST email', { exact: true }).fill(credentials.email)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await page.getByRole('heading', { name: 'Mission Overview' }).waitFor()
-  await page.getByRole('button', { name: 'Members', exact: true }).click()
+  const setup = page.getByRole('region', { name: 'Prototype setup', exact: true })
+  await setup.getByText('Setup needed', { exact: true }).waitFor()
+  await setup.getByRole('button', { name: 'Initialize face model' }).click()
+  await setup.getByText('Ready', { exact: true }).waitFor()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await assertFitsViewport(page, 'Mobile setup panel must not overflow viewport')
+  await page.setViewportSize({ width: 1440, height: 960 })
+  await setup.getByRole('button', { name: 'Register members' }).click()
   await page.getByRole('button', { name: '＋ Add student' }).click()
   const dialog = page.getByRole('dialog', { name: 'Add student' })
   await dialog.getByLabel('Student ID').fill('E2E-STUDENT')
@@ -79,6 +102,7 @@ try {
   await page.getByRole('button', { name: /Process entry/i }).click()
   await page.getByText('Authorized entry - verified face', { exact: false }).waitFor()
   await page.getByRole('button', { name: 'Dashboard', exact: true }).click()
+  await setup.getByText('1 enrolled / 1 active', { exact: true }).waitFor()
   await page.getByText('Updated Showcase Student', { exact: true }).first().waitFor()
   await page.getByRole('button', { name: 'Check out', exact: true }).click()
   await page.getByRole('button', { name: 'Live Monitor', exact: true }).click()
@@ -102,6 +126,22 @@ try {
   await page.getByRole('button', { name: 'Send via Telegram' }).click()
   await page.getByRole('status').filter({ hasText: 'Saved in the delivery queue' }).waitFor()
   await page.getByRole('cell', { name: 'ANNOUNCE', exact: true }).first().waitFor()
+  await page.getByLabel('Bot token', { exact: true }).fill('123456:' + 'a'.repeat(30))
+  await page.getByRole('button', { name: 'Save settings', exact: true }).click()
+  await page.getByRole('button', { name: 'Connect my Telegram', exact: true }).click()
+  const pairing = page.getByRole('region', { name: 'Connect personal Telegram', exact: true })
+  const command = await pairing.locator('code').textContent()
+  assert.match(command, /^\/start aams_/)
+  await writeFile(path.join(directory, 'telegram-update.json'), JSON.stringify([{
+    update_id: 1, message: { message_id: 1, date: Math.floor(Date.now() / 1000),
+      chat: { id: 7654321, type: 'private', first_name: 'Browser Test Recipient' }, text: command },
+  }]))
+  await pairing.getByRole('button', { name: 'Connect this chat', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Personal chat connected' }).waitFor()
+  await page.getByRole('button', { name: 'Verify chat', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Chat found' }).waitFor()
+  await page.getByRole('button', { name: 'Send test message', exact: true }).click()
+  await page.getByRole('status').filter({ hasText: 'Delivered to Telegram' }).waitFor()
   await page.screenshot({ path: path.join(directory, 'communicate.png'), fullPage: true })
   for (const [button, title] of [['Dashboard', 'Mission Overview'], ['Live Monitor', 'Live Monitor'], ['Entry Logs', 'Entry Logs'], ['Alerts', 'Security Alerts'], ['Reports', 'Reports']]) {
     await page.getByRole('button', { name: button, exact: true }).click()
@@ -109,7 +149,7 @@ try {
   }
   await page.setViewportSize({ width: 390, height: 844 })
   await page.screenshot({ path: path.join(directory, 'mobile-reports.png'), fullPage: true })
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'Mobile page must not overflow viewport')
+  await assertFitsViewport(page, 'Mobile page must not overflow viewport')
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await page.getByLabel('SRMIST email', { exact: true }).fill('member@srmist.edu.in')
   await page.getByLabel('Password', { exact: true }).fill(credentials.member_password)
@@ -120,7 +160,7 @@ try {
   assert.equal(await page.getByRole('button', { name: '＋ Add student' }).count(), 0)
   assert.equal(await page.getByRole('button', { name: 'Edit', exact: true }).count(), 0)
   assert.deepEqual(errors, [], 'No browser runtime errors')
-  console.log('Browser showcase flows: PASS (domain gate, student add/edit, photo enrollment boundary, QR, CSV, notifications queue, seven pages, mobile layout, member role).')
+  console.log('Browser showcase flows: PASS (domain gate, model setup, student add/edit, photo enrollment boundary, QR, CSV, continuous webcam, notification queue, private Telegram pairing/test with controlled transport, seven pages, mobile layout, member role).')
   console.log(`Screenshots: ${directory}`)
 } catch (error) {
   const page = browser?.contexts()[0]?.pages()[0]

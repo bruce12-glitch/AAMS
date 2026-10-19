@@ -18,9 +18,9 @@ def configured(value):
 def delivery_error(exc):
     # Telegram/network exceptions may contain request URLs with bot tokens.
     names = {
-        'Forbidden': 'Bot cannot post to the group. Add it and allow messages.',
+        'Forbidden': 'Bot cannot message this chat. Press Start in a personal chat, or add it to the group and allow messages.',
         'InvalidToken': 'The Telegram bot token is invalid.',
-        'BadRequest': 'Telegram rejected the destination or message. Check the group ID.',
+        'BadRequest': 'Telegram rejected the destination or message. Check the chat ID.',
         'TimedOut': 'Telegram timed out; the message remains queued for retry.',
         'NetworkError': 'Telegram is unreachable; the message remains queued for retry.',
         'RetryAfter': 'Telegram rate limit reached; the message remains queued for retry.',

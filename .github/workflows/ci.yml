@@ -6,6 +6,15 @@ on:
   pull_request:
 
 jobs:
+  windows-launcher:
+    name: Windows local launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify repeat startup preserves credentials
+        shell: powershell
+        run: ./deploy/test-windows-launcher.ps1
+
   backend-tests:
     name: Backend (pytest)
     runs-on: ubuntu-latest

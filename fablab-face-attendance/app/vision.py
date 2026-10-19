@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _ENGINE = None
 _ENGINE_FAILED = False
+_ENGINE_LOADING = False
 _ENGINE_LOCK = threading.Lock()
 
 
@@ -35,35 +36,45 @@ class VisionUnavailableError(RuntimeError):
 def engine_state() -> str:
     """
     Report engine status WITHOUT initializing anything.
-    'not_loaded' | 'ready' | 'failed' — safe for health probes.
+    'not_loaded' | 'loading' | 'ready' | 'failed' — safe for health probes.
     """
     if _ENGINE is not None:
         return 'ready'
+    if _ENGINE_LOADING:
+        return 'loading'
     if _ENGINE_FAILED:
         return 'failed'
     return 'not_loaded'
 
 
-def get_engine():
+def get_engine(*, retry=False):
     """Return the shared FaceEngine singleton, initializing lazily."""
-    global _ENGINE, _ENGINE_FAILED
+    global _ENGINE, _ENGINE_FAILED, _ENGINE_LOADING
     with _ENGINE_LOCK:
         if _ENGINE is not None:
             return _ENGINE
-        if _ENGINE_FAILED:
+        if _ENGINE_FAILED and not retry:
             raise VisionUnavailableError(
                 "Face engine failed to initialize earlier "
                 "(InsightFace models missing or invalid)."
             )
         try:
+            _ENGINE_LOADING = True
+            _ENGINE_FAILED = False
             from app.face_engine import FaceEngine
             _ENGINE = FaceEngine()
             logger.info("FaceEngine initialized")
             return _ENGINE
         except Exception as exc:  # pragma: no cover - depends on model download
             _ENGINE_FAILED = True
-            logger.error("FaceEngine init failed: %s", exc)
-            raise VisionUnavailableError(str(exc)) from exc
+            logger.error("FaceEngine init failed (%s)", type(exc).__name__)
+            raise VisionUnavailableError(
+                'Face model could not be loaded. Check the internet connection, '
+                'available disk space and model cache, then retry Initialize face model '
+                'on the Dashboard.'
+            ) from exc
+        finally:
+            _ENGINE_LOADING = False
 
 
 # Upload guards. The console downscales photos to 1280 px / JPEG q0.9, which

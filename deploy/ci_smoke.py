@@ -64,6 +64,10 @@ def main():
         with urllib.request.urlopen('http://127.0.0.1:8090') as response:
             assert b'<div id="root"' in response.read()
         print('Docker startup, secure login, student persistence after restart and nginx proxy: PASS')
+        # Full dependencies and the persistent model volume are available here.
+        # This test never sends to a real bot or modifies the stack's student DB.
+        compose('exec', '-T', '-e', 'AAMS_REAL_VISION_TEST=1', 'api',
+                'python', '-m', 'pytest', 'tests/test_real_vision.py', '-q', '-s', '--tb=short')
     finally:
         compose('down', '--volumes')
         target.unlink(missing_ok=True)
