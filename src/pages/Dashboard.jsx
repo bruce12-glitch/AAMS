@@ -1,169 +1,80 @@
-import { parseTimestamp, LAB_TIME_ZONE } from '../utils/time'
 import { useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { adminPost } from '../api/client'
-import { motion } from 'framer-motion'
+import { adminPost, toArray } from '../api/client'
 import { usePolling } from '../hooks/useApi'
-import { toArray } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
-import { MOCK_STATS, MOCK_ACTIVITY, MOCK_ALERTS, MOCK_OCCUPANTS } from '../api/mock'
 import DataNotice from '../components/DataNotice'
 import StatCard from '../components/StatCard'
 import PrototypeSetup from '../components/PrototypeSetup'
 import StatusBadge from '../components/StatusBadge'
+import AlertList from '../components/AlertList'
+import { formatEventTime, decisionLabel, readableText, sourceLabel, historyCount } from '../utils/records'
 import { IconDoor, IconFace, IconBell, IconUsers } from '../components/icons'
 
-// Static Pages build has no backend; skip polling so the console shows its
-// sample data without firing requests that can only 404.
 const LIVE = { enabled: !IS_STATIC_DEMO }
 
-// NOTE: must test d.getTime(), not isNaN(d). isNaN coerces its argument to a
-// number, and Number(dateObject) is a timestamp (or NaN only for Invalid Date),
-// so isNaN(d) is unreliable. Worse, `isNaN(d)` on a valid Date returns false by
-// accident via coercion but `isNaN` on an Invalid Date returns true - the
-// inverse of what callers expect - which made every timestamp render as an em
-// dash. getTime() returns NaN precisely when the date is invalid.
-const fmtTime = (iso) => {
-  const d = parseTimestamp(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleTimeString('en-IN', { timeZone: LAB_TIME_ZONE, hour: '2-digit', minute: '2-digit' })
-}
-
-const initials = (id) => (id ? id.replace(/[^a-z]/gi, '').slice(0, 2).toUpperCase() : '??')
-
 export default function Dashboard({ onNavigate }) {
-  // Fallbacks are module-level constants with stable identity, so passing them
-  // directly is safe for the fallbackRef in usePolling.
-  const stats = usePolling('/dashboard/stats', MOCK_STATS, 8000, LIVE)
-  const activity = usePolling('/dashboard/activity', MOCK_ACTIVITY, 8000, LIVE)
-  const alerts = usePolling('/alerts', MOCK_ALERTS, 8000, LIVE)
-  const occupants = usePolling('/occupants', MOCK_OCCUPANTS, 8000, LIVE)
-
+  const stats = usePolling('/dashboard/stats?scope=recorded', null, 8000, LIVE)
+  const activity = usePolling('/dashboard/activity?scope=recorded', { activities: [] }, 8000, LIVE)
+  const alerts = usePolling('/alerts?scope=recorded&status=open', { alerts: [] }, 8000, LIVE)
+  const occupants = usePolling('/occupants', { occupants: [] }, 8000, LIVE)
   const { isAdmin } = useAuth()
   const [exitError, setExitError] = useState('')
   const [exiting, setExiting] = useState(null)
   const checkout = async (id) => {
     setExiting(id); setExitError('')
-    try {
-      await adminPost(`/occupants/${encodeURIComponent(id)}/exit`, {})
-      occupants.refresh(); stats.refresh()
-    } catch (err) { setExitError(err.message) }
+    try { await adminPost(`/occupants/${encodeURIComponent(id)}/exit`, {}); await occupants.refresh(); stats.refresh() }
+    catch (err) { setExitError(err.message) }
     finally { setExiting(null) }
   }
-  const s = stats.data ?? {}
+  const s = stats.data || {}
   const acts = toArray(activity.data, 'activities').slice(0, 8)
   const alertList = toArray(alerts.data, 'alerts').slice(0, 5)
-  const occList = toArray(occupants.data, 'occupants').filter((o) => o.status === 'inside')
-
+  const occList = toArray(occupants.data, 'occupants').filter((row) => row.status === 'inside')
+  const trend = stats.isLive ? 'recorded' : 'unavailable'
   return (
-    <div className="page-wrap">
-      <div className="page-intro">
-        <h1 className="page-title">Mission Overview</h1>
-        <p className="page-sub">Real-time Fab Lab access control — entries, occupancy and security events.</p>
-      </div>
-
+    <div className="page-wrap records-surface">
+      <div className="page-intro"><h1 className="page-title">Mission Overview</h1><p className="page-sub">Recorded access decisions, open visits and items needing review.</p></div>
       <DataNotice error={exitError || stats.error || activity.error || alerts.error || occupants.error} loading={stats.loading} />
       {isAdmin && !IS_STATIC_DEMO && <PrototypeSetup onNavigate={onNavigate} />}
       <div className="grid-stats">
-        <StatCard index={0} label="Entries Today" value={s.total_entries} icon={<IconDoor width={17} height={17} />} color="#0e7490" tint="#ecfeff" trend={stats.isLive ? 'live' : '—'} trendDir="flat" />
-        <StatCard index={1} label="Inside Now" value={s.inside_count} icon={<IconFace width={17} height={17} />} color="#047857" tint="#ecfdf5" trend="live" trendDir="flat" />
-        <StatCard index={2} label="Open Alerts" value={s.alert_count} icon={<IconBell width={17} height={17} />} color="#b91c1c" tint="#fef2f2" trend="live" trendDir="flat" />
-        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} height={17} />} color="#6d28d9" tint="#f5f3ff" trend="live" trendDir="flat" />
+        <StatCard index={0} label="Granted Entries Today" value={s.total_entries} icon={<IconDoor width={17} />} color="#0e7490" tint="#ecfeff" trend={trend} trendDir="flat" />
+        <StatCard index={1} label="Open Visits" value={s.inside_count} icon={<IconFace width={17} />} color="#047857" tint="#ecfdf5" trend={trend} trendDir="flat" />
+        <StatCard index={2} label="Needs Review" value={s.alert_count} icon={<IconBell width={17} />} color="#b91c1c" tint="#fef2f2" trend={trend} trendDir="flat" />
+        <StatCard index={3} label="Paid Members" value={s.member_count} icon={<IconUsers width={17} />} color="#6d28d9" tint="#f5f3ff" trend={trend} trendDir="flat" />
       </div>
-
       <div className="grid-main">
-        <motion.section
-          className="panel"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-        >
-          <div className="panel-head">
-            <h2 className="panel-title"><span className="tick" />Recent Activity</h2>
-            <button className="panel-link" onClick={() => onNavigate('logs')} type="button">View all →</button>
+        <section className="panel records-panel" aria-label="Recent access decisions">
+          <div className="panel-head"><h2 className="panel-title">Recent access decisions</h2><button className="panel-link" type="button" onClick={() => onNavigate('logs')}>Entry Logs →</button></div>
+          <div className="records-table-scroll" tabIndex={0} aria-label="Recent access decisions table">
+            <table className="data-table ops-table">
+              <thead><tr><th>Time (IST)</th><th>Person</th><th>Decision</th><th>Reason</th></tr></thead>
+              <tbody>{acts.map((row) => <tr key={row.id}>
+                <td>{formatEventTime(row.event_time)}</td>
+                <td><strong>{row.recognized_name || row.recognized_id || 'Not identified'}</strong><small>{sourceLabel(row.event_source)}</small></td>
+                <td><StatusBadge value={row.decision} label={decisionLabel(row.decision)} /></td>
+                <td>{readableText(row.reason) || 'Not recorded'}</td>
+              </tr>)}</tbody>
+            </table>
           </div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Time</th><th>Claimed ID</th><th>Similarity</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {acts.map((a, i) => (
-                <motion.tr
-                  key={a.id ?? i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + i * 0.05 }}
-                >
-                  <td className="mono">{fmtTime(a.event_time)}</td>
-                  <td className="mono">{a.claimed_id || a.recognized_id || '—'}</td>
-                  <td className="mono">{typeof a.similarity === 'number' ? a.similarity.toFixed(2) : '—'}</td>
-                  <td><StatusBadge value={a.tag || a.decision} /></td>
-                </motion.tr>
-              ))}
-              {acts.length === 0 && (
-                <tr><td colSpan={4}><div className="empty-state">No entries recorded yet.<span className="mono">AWAITING FIRST ENTRY</span></div></td></tr>
-              )}
-            </tbody>
-          </table>
-        </motion.section>
-
+          {!acts.length && <p className="records-empty">{activity.loading ? 'Loading access decisions…' : activity.error || IS_STATIC_DEMO ? 'No live access records available.' : 'No access decisions recorded in the current capture history.'}</p>}
+          <p className="event-meta">{historyCount(activity.data?.source_counts)} older or demo records are preserved in Entry Logs history. Denied attempts are not counted as attendance.</p>
+        </section>
         <div className="stack">
-          <motion.section
-            className="panel"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.35 }}
-          >
-            <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Currently Inside</h2>
-              <span className="panel-link">{occList.length} present</span>
-            </div>
-            {occList.length === 0 && (
-              <div className="empty-state">Lab is empty right now.<span className="mono">OCCUPANCY 0</span></div>
-            )}
-            {occList.slice(0, 6).map((o, i) => (
-              <div className="occupant-row" key={o.user_id ?? i}>
-                <div className={`avatar ${i % 2 ? 'dim' : ''}`}>{initials(o.name ?? o.user_id)}</div>
-                <div>
-                  <div className="occupant-name">{o.name ?? o.user_id}</div>
-                  <div className="occupant-meta">{o.name ? `${o.user_id} · ` : ''}In at {fmtTime(o.entry_time)}</div>
-                </div>
-                <span className="occupant-dur">{Math.round(o.duration_minutes ?? 0)}m</span>
-                {isAdmin && <button className="btn sm ghost" type="button" disabled={exiting === o.user_id} onClick={() => checkout(o.user_id)}>Check out</button>}
-              </div>
-            ))}
-          </motion.section>
-
-          <motion.section
-            className="panel"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.45 }}
-          >
-            <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Latest Alerts</h2>
-              <button className="panel-link" onClick={() => onNavigate('alerts')} type="button">All alerts →</button>
-            </div>
-            <div className="stack" style={{ gap: 10 }}>
-              {alertList.map((al, i) => (
-                <motion.div
-                  className={`alert-card ${(al.severity ?? 'low').toLowerCase()}`}
-                  key={al.id ?? i}
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.4 + i * 0.06 }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div className="alert-type">{String(al.alert_type ?? 'EVENT').replace(/_/g, ' ')}</div>
-                    <div className="alert-msg">{al.message ?? '—'}</div>
-                    <div className="alert-time">{fmtTime(al.created_at)}</div>
-                  </div>
-                </motion.div>
-              ))}
-              {alertList.length === 0 && <div className="empty-state">All clear.<span className="mono">NO ACTIVE ALERTS</span></div>}
-            </div>
-          </motion.section>
+          <section className="panel records-panel" aria-label="Open visits">
+            <div className="panel-head"><h2 className="panel-title">Open visits</h2><span className="event-meta">{occList.length} recorded</span></div>
+            {!occList.length && <p className="records-empty">{occupants.error || IS_STATIC_DEMO ? 'Visit records are unavailable.' : occupants.loading ? 'Loading visits…' : 'No open visits recorded.'}</p>}
+            {occList.slice(0, 6).map((row) => <div className="event-row" key={row.user_id}>
+              <div className="event-row-main"><strong>{row.name || row.user_id}</strong><p className="event-meta">{row.user_id} · {formatEventTime(row.entry_time)}</p></div>
+              {isAdmin && <button className="btn sm ghost" type="button" disabled={exiting === row.user_id} onClick={() => checkout(row.user_id)}>Check out</button>}
+            </div>)}
+          </section>
+          <section className="panel records-panel" aria-label="Recent security reviews">
+            <div className="panel-head"><h2 className="panel-title">Needs review</h2><button className="panel-link" type="button" onClick={() => onNavigate('alerts')}>View queue →</button></div>
+            <AlertList items={alertList} compact />
+            {!alertList.length && <p className="records-empty">{alerts.error || IS_STATIC_DEMO ? 'Review records are unavailable.' : alerts.loading ? 'Loading reviews…' : 'No open review items for current recorded events.'}</p>}
+            <p className="event-meta">{historyCount(alerts.data?.source_counts)} older or demo alerts kept in history. A review item is not proof of misconduct.</p>
+          </section>
         </div>
       </div>
     </div>
