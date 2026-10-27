@@ -52,21 +52,21 @@ class ReportGenerator:
         # Total entries
         cursor.execute('''
             SELECT COUNT(*) as count FROM entry_logs 
-            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
+            WHERE event_source<>'sample' AND decision='GRANTED' AND datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
         ''', (start_ts, end_ts))
         total_entries = cursor.fetchone()['count']
         
         # Unique users
         cursor.execute('''
             SELECT COUNT(DISTINCT recognized_id) as count FROM entry_logs 
-            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?) AND recognized_id IS NOT NULL
+            WHERE event_source<>'sample' AND decision='GRANTED' AND datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?) AND recognized_id IS NOT NULL
         ''', (start_ts, end_ts))
         unique_users = cursor.fetchone()['count']
         
         # Count by tag
         cursor.execute('''
             SELECT tag, COUNT(*) as count FROM entry_logs 
-            WHERE datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
+            WHERE event_source<>'sample' AND datetime(event_time) >= datetime(?) AND datetime(event_time) < datetime(?)
             GROUP BY tag
         ''', (start_ts, end_ts))
         
@@ -129,7 +129,7 @@ class ReportGenerator:
             SELECT DATE(event_time, '+330 minutes') as date, COUNT(*) as entries,
                    COUNT(DISTINCT recognized_id) as unique_users
             FROM entry_logs
-            WHERE datetime(event_time) >= datetime(?)
+            WHERE event_source<>'sample' AND decision='GRANTED' AND datetime(event_time) >= datetime(?)
             GROUP BY DATE(event_time, '+330 minutes')
             ORDER BY date DESC
         ''', (start_dt.isoformat(),))
@@ -159,7 +159,7 @@ class ReportGenerator:
             SELECT el.*, u.name as claimed_name
             FROM entry_logs el
             LEFT JOIN users u ON el.claimed_id = u.user_id
-            WHERE el.tag = 'proxy'
+            WHERE el.tag = 'proxy' AND el.event_source<>'sample'
             ORDER BY el.event_time DESC
             LIMIT 50
         ''')
@@ -182,7 +182,7 @@ class ReportGenerator:
             SELECT el.*, u.name
             FROM entry_logs el
             LEFT JOIN users u ON el.recognized_id = u.user_id
-            WHERE el.tag = 'unpaid'
+            WHERE el.tag = 'unpaid' AND el.event_source<>'sample'
             ORDER BY el.event_time DESC
             LIMIT 50
         ''')
