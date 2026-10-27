@@ -34,11 +34,11 @@ export default function WebcamAttendance({ onResult }) {
         if (cancelled) return
         try {
           const canvas = document.createElement('canvas')
-          const scale = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight))
+          const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight))
           canvas.width = Math.round(video.videoWidth * scale)
           canvas.height = Math.round(video.videoHeight * scale)
           canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
-          frames.push(canvas.toDataURL('image/jpeg', 0.85))
+          frames.push(canvas.toDataURL('image/jpeg', 0.92))
           if (!bypass && frames.length < 10) {
             setStatus('Look at the camera and blink naturally…')
             schedule(capture, 200)
@@ -82,7 +82,7 @@ export default function WebcamAttendance({ onResult }) {
         setError('')
         setStatus('Opening camera…')
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false,
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
         })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
         stage = 'start the camera preview'
