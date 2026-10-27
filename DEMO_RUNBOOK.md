@@ -103,6 +103,41 @@ that evaluation and does not establish a false-accept rate.
 
 ## Keep existing data safe
 
+### Account and payment controls
+
+The top bar must say **ADMIN** to edit people. A shared member-password login
+is deliberately read-only: sign out and use the configured administrator email
+and its separate private password. Knowing an SRMIST address alone does not grant
+administrator rights. On **Members**, **Account** controls Enabled/Disabled;
+**Payment** separately controls active/pending/expired/inactive. Changes display
+a saved confirmation or an error; refresh/reload to confirm persistence.
+
+Disabling an account revokes its passes, closes any open visit and keeps its
+face enrollment. Re-enabling does **not** revive revoked QR passes; issue a new
+pass if required. Active payment can still be blocked by a past payment expiry.
+
+### Current records and older examples
+
+Entry Logs show names, decisions, reasons, IST timestamps and capture sources.
+**Not compared** is not a similarity of zero, and missing historical comparison
+information is shown as **Not recorded**. A denied attempt is not attendance.
+No-face, low-quality and invalid-pass failures are not automatically security
+incidents. The dashboard and Alerts show a factual review queue; **Mark reviewed**
+does not authorize entry or prove misconduct.
+
+The update does not guess whether old rows were genuine. Previously stored rows
+without source information are kept under **Older / unverified records**;
+explicit sample records are labelled **Demo data**. Select **All records** when
+needed. Counts and a history notice make this separation visible. The original
+records are not deleted or rewritten. Capture-source labels describe the request
+path (the browser reports webcam use); they do not establish physical presence
+or tamper-proof camera provenance. Dashboard attendance counts only granted,
+current recorded events; reports exclude explicitly labelled sample entries.
+
+Do not run the demo seeder on your presentation database. It now refuses production
+or non-empty databases, creates no fake face embeddings or occupied visits, and
+labels its isolated development examples so they cannot be sent to Telegram.
+
 When updating a downloaded copy, keep your existing private
 `fablab-face-attendance/.env` file; copy it locally into the same relative path
 in the updated folder without sending it to anyone. The Compose project is
