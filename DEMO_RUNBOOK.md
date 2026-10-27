@@ -26,8 +26,10 @@ http://localhost:8090. Public deployment is not part of this rehearsal.
    someone has read it. “Queued” is not a successful delivery.
 6. **Members → Add student:** use a unique student ID, full name, real SRMIST
    email and the required details. Set payment **active** with no past expiry.
-   **Enroll face**, obtain consent, and capture one clear front-facing face
-   (more views help). Good lighting and no other person in the frame matter.
+   **Enroll face**, obtain consent, and capture 3 clear original photos with
+   the same laptop webcam used for attendance. Do not use AI-enhanced portraits
+   or sharpen a failed image to force it through the quality gate. Good lighting,
+   proximity and no other person in the frame matter.
 7. Dashboard must show at least one member with an enrolled face and current
    active payment. Close other applications using the camera. Keep the laptop
    powered, the browser tab visible and internet connected for Telegram.
@@ -59,6 +61,8 @@ recognition.
 | Model not ready | Dashboard → initialize/retry. Check internet and available storage; allow time for first download. |
 | Camera denied/in use | Allow camera in the browser’s site controls and close Camera/Teams/Zoom; stop/start webcam attendance. |
 | No face / low quality | Move closer, face the camera, improve lighting, keep only one person in frame. |
+| Identity result INVALID_TOKEN | Use Face only for recognition testing. For Member + Face, select the actual member and regenerate their QR if expired/revoked. This is not a failed face comparison. |
+| NO_EMBEDDINGS / EMPTY_GALLERY | A profile is not a face enrollment. Members → Enroll face, and wait for embeddings stored. |
 | Matched but denied | Check account is active, payment is active/unexpired and blink is confirmed. |
 | Already recorded | This is expected duplicate protection. Stop webcam, check out on Dashboard, then start again for re-entry. |
 | Telegram queued | Communicate → check enabled destination, Verify chat, Send test. Check bot/group permissions and internet; failed sends retry automatically. |
@@ -70,6 +74,32 @@ the website. The browser stops capturing when hidden or when you navigate away;
 an already accepted request may still finish. Avoid changing tabs until the
 result has returned. Local recognition can work offline once models are cached;
 Telegram requires internet.
+
+## Check recognition before recording attendance
+
+Live Monitor → **Photo & camera check** defaults to **Face only**. Upload an
+original photo or capture from the webcam, then **Check photo — no attendance**.
+The backend performs the same quality, embedding, identity and policy checks
+but does not save evidence, attendance, occupancy or a Telegram notification.
+Results show the detected face box, quality measurements, identity result and
+cosine score versus threshold. A score is not an accuracy percentage. If the
+token is invalid or enrollment is missing, comparison is explicitly “Not performed”.
+
+Use **Member + Face** only to test a particular member's current pass and face.
+The member selector identifies profiles without face enrollment. An arbitrary
+number in the student-ID field will not create a valid enrollment or pass.
+
+The still-photo option explicitly bypasses liveness. Uncheck it and choose
+**Capture blink sequence** to capture 10 frames automatically; blink naturally,
+then **Use sequence**. A static burst or inconclusive blink stays denied when
+liveness is requested. Lack of a blink is not labelled proof of a spoof.
+**Record entry** is a separate deliberate action and uses duplicate suppression.
+
+Before claiming accuracy, test consenting volunteers with different enrollment
+and probe captures. Record genuine accept/reject and different-person accept/reject
+counts, with the same camera and lighting as the demo. Do not tune and evaluate
+the threshold on the same captures. The bundled two-portrait regression is not
+that evaluation and does not establish a false-accept rate.
 
 ## Keep existing data safe
 
