@@ -30,7 +30,7 @@ def make_face_106(left_open=0.32, right_open=None):
         pass
 
     f = Face()
-    f.lmk = lmk
+    f.landmark_2d_106 = lmk
     return f
 
 
@@ -70,13 +70,40 @@ def test_blink_detected_on_dip_and_recovery(checker):
     assert result['frames_analyzed'] == len(seq)
 
 
-def test_no_blink_over_long_sequence_is_spoof(checker):
+def test_no_blink_is_inconclusive_not_proof_of_spoof(checker):
     seq = [make_face_106(0.34)] * 8  # eyes wide open the whole time
 
     result = checker.check_liveness(faces_sequence=seq)
 
-    assert result['status'] == 'spoof'
+    assert result['status'] == 'unknown'
     assert result['blink_detected'] is False
+
+
+def test_reads_top_level_configuration(monkeypatch):
+    import app.liveness as liveness
+    monkeypatch.setattr(liveness, 'get_config', lambda: {'liveness': {'enabled': False, 'open_ratio_closed': 0.11}})
+    checker = LivenessChecker()
+    assert checker.enabled is False and checker.open_ratio_closed == 0.11
+
+
+def test_motion_fallback_works_without_eye_contours(checker):
+    assert checker.check_liveness(faces_sequence=[make_face_with_kps(offset) for offset in (-4, -2, 0, 2, 4)])['status'] == 'real'
+
+
+def test_liveness_rejects_a_different_person_in_the_burst(checker):
+    reference = np.zeros(512)
+    reference[0] = 1
+    other = np.roll(reference, 1)
+    class Engine:
+        def extract_embedding(self, face):
+            return face.embedding
+    sequence = [make_face_106(openness) for openness in (.34, .08, .08, .34)]
+    for face in sequence:
+        face.embedding = reference
+    sequence[1].embedding = other
+    result = checker.check_liveness(faces_sequence=sequence, face_engine=Engine(), reference_embedding=reference)
+    assert result['status'] != 'real'
+    assert 'Face changed' in result['reason']
 
 
 def test_short_sequence_stays_unknown(checker):
@@ -112,7 +139,7 @@ def test_single_frame_api_never_claims_real(checker):
 
 
 # ---------------------------------------------------------------- #
-# Head-motion challenge (§13 Method 2)
+# Head-motion challenge (13 Method 2)
 # ---------------------------------------------------------------- #
 
 def make_face_with_kps(nose_offset):
