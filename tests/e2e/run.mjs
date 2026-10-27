@@ -63,11 +63,14 @@ try {
   await setup.getByText('Ready', { exact: true }).waitFor()
   await page.setViewportSize({ width: 390, height: 844 })
   await assertFitsViewport(page, 'Mobile setup panel must not overflow viewport')
+  const recentBounds = await page.getByRole('region', { name: 'Recent access decisions', exact: true }).boundingBox()
+  assert.ok(recentBounds && recentBounds.x + recentBounds.width <= 391, 'Dashboard records panel must fit the phone; only its table should scroll')
   await page.setViewportSize({ width: 1440, height: 960 })
 
   // The real UI must distinguish current decisions from unverified history,
   // and a review action must persist rather than only hiding a card locally.
   await page.getByRole('button', { name: 'Alerts', exact: true }).click()
+  await page.getByRole('heading', { name: 'Security Alerts', exact: true }).waitFor()
   await page.getByText('Controlled browser review item', { exact: true }).waitFor()
   assert.equal(await page.getByText('Historical fixture: origin unrecorded', { exact: true }).count(), 0)
   assert.equal(await page.getByText('Demo fixture: not security evidence', { exact: true }).count(), 0)
