@@ -50,6 +50,7 @@ export default function WebcamAttendance({ onResult }) {
             liveness_frames_b64: bypass ? [] : frames,
             skip_liveness: bypass,
             continuous: true,
+            capture_source: 'webcam',
           }, 120000, controller.signal)
           if (cancelled) return
           resultRef.current?.({ ...result, source: 'api' })
