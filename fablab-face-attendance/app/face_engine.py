@@ -72,7 +72,7 @@ class FaceEngine:
         
         return faces
     
-    def quality_check(self, face, frame: np.ndarray) -> tuple:
+    def quality_check(self, face, frame: np.ndarray, *, with_metrics=False) -> tuple:
         """
         Check if a detected face meets quality standards.
         Implements §17.3 Quality Checks.
@@ -94,6 +94,9 @@ class FaceEngine:
         # Calculate face width
         face_width = x2 - x1
         face_height = y2 - y1
+        metrics = {'face_width_px': int(face_width), 'face_height_px': int(face_height),
+                   'min_face_width_px': self.min_face_size, 'blur_min': self.blur_threshold,
+                   'brightness_min': self.brightness_min, 'brightness_max': self.brightness_max}
         
         # Check 1: Face size (must be >= min_face_size pixels)
         if face_width < self.min_face_size:
@@ -101,10 +104,17 @@ class FaceEngine:
             passed = False
         
         # Check 2: Blur detection using Laplacian variance
-        face_roi = frame[y1:y2, x1:x2]
+        # Negative NumPy indices wrap around; a partially off-screen face used
+        # to get an empty crop and silently skip blur/brightness validation.
+        height, width = frame.shape[:2]
+        face_roi = frame[max(0, y1):min(height, y2), max(0, x1):min(width, x2)]
+        if x1 < 0 or y1 < 0 or x2 > width or y2 > height or face_roi.size == 0:
+            reasons.append('Face is cut off; keep your full face inside the image')
+            passed = False
         if face_roi.size > 0:
             gray_face = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
             laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+            metrics['blur_variance'] = round(float(laplacian_var), 1)
             
             if laplacian_var < self.blur_threshold:
                 reasons.append(f"Face too blurry: variance {laplacian_var:.1f} < {self.blur_threshold}")
@@ -113,6 +123,7 @@ class FaceEngine:
         # Check 3: Brightness check
         if face_roi.size > 0:
             mean_brightness = np.mean(cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY))
+            metrics['brightness'] = round(float(mean_brightness), 1)
             
             if mean_brightness < self.brightness_min:
                 reasons.append(f"Face too dark: {mean_brightness:.1f} < {self.brightness_min}")
@@ -137,7 +148,7 @@ class FaceEngine:
                 reasons.append(f"Roll angle too high: {roll:.1f}° > {self.max_roll}°")
                 passed = False
         
-        return passed, reasons
+        return (passed, reasons, metrics) if with_metrics else (passed, reasons)
     
     def extract_embedding(self, face) -> np.ndarray:
         """
@@ -173,8 +184,14 @@ class FaceEngine:
         Returns:
             Cosine similarity score (-1.0 to 1.0)
         """
-        # Cosine similarity = dot product of normalized vectors
-        similarity = np.dot(embedding_a, embedding_b)
+        a = np.asarray(embedding_a, dtype=np.float64)
+        b = np.asarray(embedding_b, dtype=np.float64)
+        if a.ndim != 1 or a.shape != b.shape or not a.size or not np.isfinite(a).all() or not np.isfinite(b).all():
+            raise ValueError('Face embedding must be a finite vector of the expected dimension')
+        norm = np.linalg.norm(a) * np.linalg.norm(b)
+        if not np.isfinite(norm) or norm <= 0:
+            raise ValueError('Face embedding has zero or invalid magnitude')
+        similarity = np.dot(a, b) / norm
         
         # Clip to valid range due to floating point precision
         similarity = np.clip(similarity, -1.0, 1.0)
@@ -197,7 +214,7 @@ class FaceEngine:
             Tuple of (best_user_id or None, best_score)
         """
         best_user_id = None
-        best_score = 0.0
+        best_score = -1.0
         
         for user_id, user_embeddings in all_embeddings.items():
             # Compare against all stored embeddings for this user
