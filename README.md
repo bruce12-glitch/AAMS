@@ -2,6 +2,8 @@
 
 A React/Vite console and FastAPI service for the SRMIST Fab Lab. The prototype includes student profiles, face enrollment, signed QR passes, laptop webcam attendance, occupancy, security alerts and reporting. Work currently focuses on the local prototype; Oracle hosting is paused.
 
+**Demonstrating soon?** Follow [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) for the no-terminal setup, five-minute presentation, duplicate test, Telegram checks and quick recovery steps. Demo data checks run in isolated tests, not in your real member database.
+
 ## Showcase features
 
 - SRMIST-only sign-in. Members use a privately configured shared access credential; the configured administrator uses a different private administrator credential. The shared credential does not grant administrator privileges.

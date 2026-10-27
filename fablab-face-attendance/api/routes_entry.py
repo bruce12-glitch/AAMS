@@ -313,6 +313,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         occupant_state = 'inside' if marked.get('success') else 'already_inside'
 
     alert_row_id = None
+    notification = {'status': 'not_requested', 'reason': 'No Telegram notification for this decision.'}
     if alert_type:
         service = AlertService()
         severity = {
@@ -323,11 +324,17 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         message = f'{alert_type} at Fab Lab entrance — {who}. {reason}'
         result = await service.queue_and_deliver(alert_type, message, image_path=evidence, severity=severity)
         alert_row_id = result['alert_id']
+        notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
     elif decision == 'GRANTED' and occupant_state == 'inside':
         from app.config import get_telegram_config
         if get_telegram_config().get('notify_on_entry', True):
             who = (user or {}).get('name') or recognized
-            await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab')
+            from zoneinfo import ZoneInfo
+            when = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')
+            result = await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab\nTime: {when}')
+            notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
+        else:
+            notification = {'status': 'disabled', 'reason': 'Automatic entry messages are turned off in Communicate.'}
 
     return {
         'decision': decision,
@@ -336,6 +343,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         'tag': tag,
         'alert_type': alert_type,
         'alert_id': alert_row_id,
+        'notification': notification,
         'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
         'similarity': round(float(similarity), 4),
         'liveness_status': liveness_status,

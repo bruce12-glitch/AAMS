@@ -14,6 +14,7 @@ Webcam CLI enrollment remains available: python -m enrollment.enroll_user
 import asyncio
 import base64
 import logging
+import sqlite3
 from typing import List, Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Body
@@ -324,6 +325,9 @@ async def create_user(user: UserCreate, _: None = Depends(require_admin)):
         conn.commit()
         await _notify_student(user.user_id, user.name, 'Student added')
         return {'success': True, 'user_id': user.user_id}
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise HTTPException(status_code=409, detail='This student ID or email is already registered') from None
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
     finally:

@@ -39,6 +39,8 @@ def test_actual_photo_enrollment_attendance_and_notification_queue(showcase, tmp
     assert response.status_code == 200, response.text
     assert response.json()['decision'] == 'GRANTED' and response.json()['recorded'] is True
     assert response.json()['user']['user_id'] == student_payload()['user_id']
+    assert response.json()['notification']['status'] == 'queued'
+    assert response.json()['notification']['telegram_sent'] is False
     assert client.post('/api/entry/face-only', json=payload, headers=admin).json()['duplicate'] is True
     with db.get_connection() as conn:
         assert conn.execute('SELECT COUNT(*) FROM entry_logs').fetchone()[0] == 1

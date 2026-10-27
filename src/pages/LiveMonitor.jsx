@@ -43,6 +43,13 @@ export default function LiveMonitor() {
 
   const camera = live.data?.camera ?? (IS_STATIC_DEMO ? MOCK_LIVE.camera : {})
   const camOnline = String(camera?.status ?? '').toLowerCase() === 'online' || camera?.fps > 0
+  const notification = result?.notification
+  const notificationText = {
+    sent: 'Telegram: message sent',
+    queued: `Telegram: queued — ${notification?.reason || 'Check Communicate for delivery details.'}`,
+    disabled: 'Telegram: automatic entry messages are off',
+    not_requested: 'Telegram: no new message needed',
+  }[notification?.status]
 
   // Stable identity for the decision banner. Previously this key embedded
   // Math.random(), so every render produced a new key and React tore down and
@@ -50,11 +57,6 @@ export default function LiveMonitor() {
   const resultKey = result
     ? `${result.decision ?? 'x'}-${result.tag ?? 'x'}-${result.event_time ?? result.similarity ?? ''}`
     : 'none'
-
-  // Pipeline highlight: only mark steps as reached once the API has actually
-  // reported a decision. Deliberately not keyed off local step names, which
-  // previously produced an always-true expression (see git history).
-  const pipelineHot = Boolean(result?.decision)
 
   const runScenario = async (scenario) => {
     setBusy(true)
@@ -76,6 +78,8 @@ export default function LiveMonitor() {
     if (!photoUri) return setCvError('Pick a face photo first')
     if (mode === 'token_face' && !tokenValue.trim())
       return setCvError('Enter a token value (user ID or full signed QR JSON)')
+    if (!skipLiveness && burstUris.length < 2)
+      return setCvError('Add at least two blink-burst frames, or explicitly select Skip blink liveness for a snapshot demo.')
 
     setBusy(true)
     try {
@@ -90,7 +94,7 @@ export default function LiveMonitor() {
       const body = {
         image_b64: photoUri,
         liveness_frames_b64: skipLiveness ? [] : burstUris,
-        skip_liveness: skipLiveness || burstUris.length < 2
+        skip_liveness: skipLiveness
       }
       const path = mode === 'token_face' ? '/entry/process' : '/entry/face-only'
       if (mode === 'token_face') body.token_value = tokenValue.trim()
@@ -121,7 +125,7 @@ export default function LiveMonitor() {
             transition={{ duration: 0.45 }}
           >
             <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Entrance Camera</h2>
+              <h2 className="panel-title"><span className="tick" />Optional Lab Camera</h2>
               <span className={`badge ${camOnline ? 'active' : 'neutral'}`}>
                 <span className="badge-dot" />
                 {camOnline ? 'online' : 'standby'}
@@ -140,25 +144,26 @@ export default function LiveMonitor() {
               />
               <div style={{ textAlign: 'center', position: 'relative' }}>
                 <div className="mono" style={{ color: 'var(--text-low)', fontSize: 11, letterSpacing: 3 }}>
-                  {camOnline ? `CAM ${camera.source ?? 0} · ${camera.fps} FPS · 1280×720` : 'CAMERA LINK — REMAINING STEP'}
+                  {camOnline ? `CAM ${camera.source ?? 0} · ${camera.fps} FPS` : 'OPTIONAL HARDWARE CAMERA — STANDBY'}
                 </div>
                 <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-mid)' }}>
-                  {camOnline ? 'Monitoring entrance…' : 'Connect the lab camera to enable live capture'}
+                  {camOnline ? 'Monitoring entrance…' : 'Use Laptop Webcam Attendance above for your demo'}
                 </div>
               </div>
             </div>
 
             {!camOnline && (
               <div className="camera-path-hint">
-                <strong>Camera not linked.</strong> Set <code>camera.source</code> +{' '}
+                <strong>A lab camera is not required for the laptop demo.</strong> For a separate door camera, set <code>camera.source</code> +{' '}
                 <code>capture.enabled: true</code> in <code>config.yaml</code>, restart the API.
-                Snapshot test below works without a camera.
+                This status is separate from your browser webcam.
               </div>
             )}
 
+            <p className="field-hint">Pipeline overview, not live telemetry. Token and blink steps depend on the selected entry mode.</p>
             <div className="pipeline" style={{ marginTop: 16 }}>
               {PIPELINE.map((step) => (
-                <div key={step} className={`pipeline-step ${pipelineHot ? 'hot' : ''}`}>
+                <div key={step} className="pipeline-step">
                   <span className="step-node" />
                   {step.replace(/_/g, ' ')}
                 </div>
@@ -187,6 +192,10 @@ export default function LiveMonitor() {
                     Access {result.decision}
                   </div>
                   <div className="decision-reason">{result.reason}</div>
+                  {result.user?.name && <div className="decision-reason">{result.user.name} · {result.user.user_id}</div>}
+                  {result.recorded === true && <div className="alert-time">Attendance decision saved</div>}
+                  {result.duplicate && <div className="alert-time">Repeat scan ignored · no new attendance or Telegram message</div>}
+                  {notificationText && <div className="alert-time" data-testid="entry-notification">{notificationText}</div>}
                   {typeof result.similarity === 'number' && (
                     <div className="alert-time mono">
                       similarity {result.similarity.toFixed(2)} · liveness {result.liveness_status ?? 'n/a'}

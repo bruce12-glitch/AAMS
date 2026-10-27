@@ -53,10 +53,15 @@ export default function WebcamAttendance({ onResult }) {
           }, 120000, controller.signal)
           if (cancelled) return
           resultRef.current?.({ ...result, source: 'api' })
+          const notificationText = {
+            sent: 'Telegram message sent.',
+            queued: 'Telegram message queued — check Communicate.',
+            disabled: 'Automatic Telegram entry messages are off.',
+          }[result.notification?.status] || ''
           setStatus(result.duplicate
             ? result.decision === 'GRANTED' ? 'Already recorded — waiting for the next person' : `Repeated check: ${result.reason}`
             : result.decision === 'GRANTED'
-              ? `Attendance recorded: ${result.user?.name || result.recognized_id}. Telegram follows your Communicate settings.`
+              ? `Attendance recorded: ${result.user?.name || result.recognized_id}. ${notificationText}`
               : result.reason || 'No match — face the camera and try again')
           // Sequential requests, bounded camera traffic and time to change person.
           schedule(scan, 10000)
