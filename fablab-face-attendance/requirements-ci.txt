@@ -2,7 +2,7 @@
 # so the heavy packages are excluded to keep the pipeline fast and
 # dependency-light. Full stack: see requirements.txt (pinned).
 
-opencv-python==5.0.0.93
+opencv-python==4.10.0.84
 numpy==2.4.6
 fastapi==0.141.1
 uvicorn==0.52.4
