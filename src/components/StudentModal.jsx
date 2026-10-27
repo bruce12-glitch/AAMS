@@ -54,8 +54,9 @@ export default function StudentModal({ student, onClose, onSaved }) {
           <label>Member type<select value={form.user_type} onChange={set('user_type')}>{['student', 'faculty', 'staff', 'guest'].map((type) => <option key={type}>{type}</option>)}</select></label>
           <label>Payment status<select value={form.payment_status} onChange={set('payment_status')}>{['active', 'pending', 'expired', 'inactive'].map((status) => <option key={status}>{status}</option>)}</select></label>
           <label>Payment expiry<input type="date" value={form.payment_expiry} onChange={set('payment_expiry')} /></label>
-          {editing && <label>Account status<select value={form.active} onChange={set('active')}><option value={1}>Active</option><option value={0}>Disabled</option></select></label>}
+          {editing && <label>Account status<select value={form.active} onChange={set('active')}><option value={1}>Enabled</option><option value={0}>Disabled</option></select></label>}
         </fieldset>
+        {editing && <p className="field-hint">Disabling access revokes passes and checks out an open visit. Re-enabling does not restore a revoked QR pass.</p>}
         {error && <div className="form-error" role="alert">{error}</div>}
         <div className="modal-actions">
           <button className="btn ghost" type="button" onClick={close} disabled={busy}>Cancel</button>
