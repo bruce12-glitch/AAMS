@@ -78,6 +78,12 @@ jobs:
       - run: pip install -r fablab-face-attendance/requirements-ci.txt
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-demo-screenshots
+          path: /tmp/aams-e2e-*/*.png
+          if-no-files-found: ignore
 
   docker-smoke:
     name: Docker stack and persistence
