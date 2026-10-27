@@ -846,6 +846,14 @@ body {
 @media (max-width: 1080px) { .grid-main { grid-template-columns: 1fr; } }
 
 .stack { display: flex; flex-direction: column; gap: 16px; }
+.stack, .stack > * { min-width: 0; }
+.snapshot-preview { text-align: center; border: 1px solid var(--rule); border-radius: 12px; padding: 12px; }
+.snapshot-preview img { display: block; max-width: 100%; max-height: 280px; border-radius: 8px; }
+.snapshot-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.snapshot-actions .btn { flex: 1 1 150px; }
+.recognition-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 10px; font-size: 12px; margin: 14px 0; }
+.recognition-metrics dt { color: var(--text-mid); }
+.recognition-metrics dd { margin: 4px 0 0; font-family: var(--font-mono); }
 
 /* ---------- Stat card ---------- */
 
