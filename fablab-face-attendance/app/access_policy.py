@@ -71,7 +71,7 @@ class AccessDecision:
         if face_result.get('result') in setup_reasons:
             return {'decision': 'DENIED', 'reason': setup_reasons[face_result['result']], 'alert_type': None, 'tag': 'setup'}
         if face_result.get('result') == 'INVALID_TOKEN' and not face_result.get('detected_user'):
-            return {'decision': 'DENIED', 'reason': 'Student ID/pass not valid or expired. Select an enrolled member and regenerate their QR pass, or use Face only.', 'alert_type': 'UNKNOWN', 'tag': 'unknown'}
+            return {'decision': 'DENIED', 'reason': 'Student ID/pass not valid or expired. Select an enrolled member and regenerate their QR pass, or use Face only.', 'alert_type': None, 'tag': 'token'}
 
         # Row 9: Multiple faces → GRANT (to verified) + TAILGATE alert
         if face_count > 1:
