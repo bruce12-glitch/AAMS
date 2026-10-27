@@ -118,8 +118,10 @@ export default function LiveMonitor() {
       <div className="grid-main">
         <div className="stack">
           <WebcamAttendance onResult={setResult} />
+          <details className="panel">
+            <summary className="panel-title" style={{ cursor: 'pointer' }}>Optional lab camera and pipeline overview</summary>
           <motion.section
-            className="panel"
+            style={{ marginTop: 20 }}
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45 }}
@@ -170,6 +172,7 @@ export default function LiveMonitor() {
               ))}
             </div>
           </motion.section>
+          </details>
 
           <AnimatePresence mode="wait">
             {result && (
