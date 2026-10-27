@@ -57,5 +57,24 @@ class TelegramRequest(BaseRequest):
             raise AssertionError(endpoint)
         return 200, json.dumps({'ok': True, 'result': result}).encode()
 telegram.Bot = lambda token, request: RealBot(token=token, request=TelegramRequest(), get_updates_request=TelegramRequest())
+
+# Controlled records live ONLY in this disposable browser-test database. They
+# verify that a previously seeded database is not presented as current evidence.
+from app.database import init_db, get_connection
+init_db()
+with get_connection() as conn:
+    for source, reason, compared in [
+        ('legacy', 'Historical fixture: origin unrecorded', None),
+        ('sample', 'Demo fixture: not security evidence', 1),
+        ('webcam', 'Controlled browser review item', 1),
+        ('snapshot', 'No face detected in controlled capture', 0),
+    ]:
+        event_id = conn.execute('''INSERT INTO entry_logs
+            (decision, reason, tag, similarity, event_source, comparison_performed)
+            VALUES ('DENIED', ?, 'unknown', 0.25, ?, ?)''', (reason, source, compared)).lastrowid
+        if source != 'snapshot':
+            conn.execute('''INSERT INTO alerts
+                (alert_type, message, event_source, entry_log_id, sent_status)
+                VALUES ('UNKNOWN', ?, ?, ?, 'fixture')''', (reason, source, event_id))
 import uvicorn
 uvicorn.run('app.main:app', host='127.0.0.1', port=8000, log_level='warning')
