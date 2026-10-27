@@ -59,16 +59,16 @@ if (-not $SkipTelegram) {
 
 $values = @(
     '# Generated locally by deploy/showcase-windows.ps1; never commit this file.',
-    'ADMIN_EMAIL=' + (Format-EnvValue $AdminEmail),
-    'API_ADMIN_PASSWORD=' + (Format-EnvValue $AdminPassword),
-    'AAMS_ACCESS_PASSWORD=' + (Format-EnvValue $AccessPassword),
-    'QR_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
-    'SESSION_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret)),
+    ('ADMIN_EMAIL=' + (Format-EnvValue $AdminEmail)),
+    ('API_ADMIN_PASSWORD=' + (Format-EnvValue $AdminPassword)),
+    ('AAMS_ACCESS_PASSWORD=' + (Format-EnvValue $AccessPassword)),
+    ('QR_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret))),
+    ('SESSION_SECRET_KEY=' + (Format-EnvValue (New-RandomSecret))),
     'SESSION_TTL_SECONDS=28800',
     'AAMS_ENV=production',
     'DATABASE_PATH=database/fablab.db',
-    'TELEGRAM_BOT_TOKEN=' + (Format-EnvValue $TelegramToken),
-    'TELEGRAM_CHAT_ID=' + (Format-EnvValue $TelegramChat)
+    ('TELEGRAM_BOT_TOKEN=' + (Format-EnvValue $TelegramToken)),
+    ('TELEGRAM_CHAT_ID=' + (Format-EnvValue $TelegramChat))
 )
 [IO.File]::WriteAllLines($BackendEnv, $values, (New-Object Text.UTF8Encoding($false)))
 $AdminPassword = $null
