@@ -137,6 +137,9 @@ current recorded events; reports exclude explicitly labelled sample entries.
 Do not run the demo seeder on your presentation database. It now refuses production
 or non-empty databases, creates no fake face embeddings or occupied visits, and
 labels its isolated development examples so they cannot be sent to Telegram.
+Old member profiles and stored face vectors are not automatically classified as
+real or sample. Disable unused sample profiles and re-enroll your consenting demo
+volunteers with genuine webcam captures before testing recognition.
 
 When updating a downloaded copy, keep your existing private
 `fablab-face-attendance/.env` file; copy it locally into the same relative path
