@@ -1,122 +1,48 @@
-import { parseTimestamp, LAB_TIME_ZONE } from '../utils/time'
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { usePolling } from '../hooks/useApi'
-import { toArray, adminPost, withAdminPrompt } from '../api/client'
+import { toArray, adminPost } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
-import { MOCK_ALERTS } from '../api/mock'
 import { useAuth } from '../auth/AuthContext'
 import DataNotice from '../components/DataNotice'
-
-const SEV = ['all', 'high', 'medium', 'low']
-
-// Guard invalid timestamps: new Date(bad).toLocaleString() returns the literal
-// string "Invalid Date", which would render straight into the UI.
-const fmtStamp = (iso) => {
-  const d = parseTimestamp(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE })
-}
+import RecordScope from '../components/RecordScope'
+import AlertList from '../components/AlertList'
 
 export default function Alerts() {
-  const { data, isLive, error, refresh } = usePolling(
-    '/alerts',
-    MOCK_ALERTS,
-    6000,
-    { enabled: !IS_STATIC_DEMO }
-  )
+  const [scope, setScope] = useState('recorded')
+  const [review, setReview] = useState('open')
+  const [priority, setPriority] = useState('all')
+  const [busyId, setBusyId] = useState(null)
+  const [actionError, setActionError] = useState('')
+  const [success, setSuccess] = useState('')
   const { isAdmin } = useAuth()
-  const [sev, setSev] = useState('all')
-  const [acked, setAcked] = useState({})
-  const [ackError, setAckError] = useState('')
-
-  const list = toArray(data, 'alerts').filter((a) => sev === 'all' || String(a.severity ?? '').toLowerCase() === sev)
-
-  const ack = async (id) => {
-    setAckError('')
-    // Update the UI first so the click always feels responsive.
-    setAcked((m) => ({ ...m, [id]: true }))
-    // In the static demo there is no endpoint to call; stop here rather than
-    // firing a request that can only fail.
-    if (IS_STATIC_DEMO) return
-    try {
-      // Acknowledging is an admin action (otherwise anyone could clear the
-      // board); withAdminPrompt collects the token on a 401.
-      await withAdminPrompt(() => adminPost(`/alerts/${id}/ack`))
-      refresh()
-    } catch (err) {
-      // The server never saw it — put the button back and say why.
-      setAcked((m) => { const next = { ...m }; delete next[id]; return next })
-      setAckError(err.status === 401
-        ? 'Admin token required to acknowledge alerts.'
-        : (err.message || 'Could not acknowledge this alert'))
-    }
+  const { data, error, loading, refresh } = usePolling(`/alerts?scope=${scope}&status=${review}`, { alerts: [] }, 8000, { enabled: !IS_STATIC_DEMO })
+  const list = data?.scope === scope ? toArray(data, 'alerts').filter((row) =>
+    (priority === 'all' || row.severity === priority) && (review === 'all' || Boolean(row.acked) === (review === 'reviewed'))) : []
+  const markReviewed = async (id) => {
+    setBusyId(id); setActionError(''); setSuccess('')
+    try { await adminPost(`/alerts/${id}/ack`); await refresh(); setSuccess(`Review #${id} marked reviewed.`) }
+    catch (err) { setActionError(err.message || 'Could not save review status.') }
+    finally { setBusyId(null) }
   }
-
   return (
-    <div className="page-wrap">
-      <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
-        <div>
-          <h1 className="page-title">Security Alerts</h1>
-          <p className="page-sub">Proxy attempts, unpaid entries, unknown persons and spoof detections.</p>
-        </div>
-        <div className="chip-row">
-          {SEV.map((s) => (
-            <button key={s} className={`filter-chip ${sev === s ? 'on' : ''}`} onClick={() => setSev(s)} type="button">
-              {s}
-            </button>
-          ))}
-        </div>
+    <div className="page-wrap records-surface">
+      <div className="records-page-head">
+        <div><h1 className="page-title">Security Alerts</h1><p className="page-sub">Access decisions that need review—not proof of misconduct.</p></div>
+        <button className="btn ghost" type="button" onClick={refresh}>Refresh</button>
       </div>
-
-      <DataNotice error={error} />
-      <div className="report-grid">
-        {ackError && (
-          <div className="form-error" style={{ gridColumn: '1 / -1' }} role="alert">
-            {ackError}
-            <button className="btn sm ghost" type="button" style={{ marginLeft: 10 }}
-              onClick={() => setAckError('')}>Dismiss</button>
-          </div>
-        )}
-        <AnimatePresence mode="popLayout">
-          {list.map((a, i) => {
-            const isAcked = a.acked === 1 || acked[a.id]
-            return (
-              <motion.div
-                key={`${a.id}-${i}`}
-                layout
-                className={`alert-card ${(a.severity ?? 'low').toLowerCase()}`}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ delay: Math.min(i * 0.05, 0.35), type: 'spring', stiffness: 300, damping: 28 }}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="alert-type">{String(a.alert_type ?? 'EVENT').replace(/_/g, ' ')}</div>
-                  <div className="alert-msg">{a.message ?? '—'}</div>
-                  <div className="alert-time mono">
-                    {fmtStamp(a.created_at)} · severity {a.severity ?? 'low'}
-                  </div>
-                </div>
-                {!isAcked && isAdmin && (
-                  <button className="btn sm" onClick={() => ack(a.id)} type="button" style={{ alignSelf: 'center' }}>
-                    Ack
-                  </button>
-                )}
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-
-        {list.length === 0 && (
-          <motion.div className="panel" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="empty-state">
-              No {sev === 'all' ? '' : sev + '-severity '}alerts.
-              <span className="mono">SYSTEM NOMINAL</span>
-            </div>
-            {!isLive && <p className="alert-time">Backend unavailable. Previously loaded records may be out of date.</p>}
-          </motion.div>
-        )}
-      </div>
+      <DataNotice error={error || actionError} loading={loading} />
+      {success && <p className="success-note" role="status">{success}</p>}
+      <section className="panel records-panel" aria-label="Security review queue">
+        <RecordScope scope={scope} onChange={setScope} counts={data?.source_counts} />
+        <div className="records-toolbar">
+          <label>Review status<select value={review} onChange={(event) => setReview(event.target.value)}><option value="open">Needs review</option><option value="reviewed">Reviewed</option><option value="all">All review states</option></select></label>
+          <label>Priority<select value={priority} onChange={(event) => setPriority(event.target.value)}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          <span className="event-meta">{list.length} shown · latest 100</span>
+        </div>
+        {!isAdmin && <p className="read-only-note">Read-only member view. An administrator can mark an item reviewed.</p>}
+        <AlertList items={list} busyId={busyId} onReview={isAdmin && !IS_STATIC_DEMO ? markReviewed : undefined} />
+        {!list.length && <p className="records-empty">{loading ? 'Loading review items…' : error ? 'Review records are unavailable. Refresh to retry.' : 'No review items in this view. Older and demo records remain in history.'}</p>}
+      </section>
     </div>
   )
 }
