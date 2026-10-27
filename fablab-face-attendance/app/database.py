@@ -151,12 +151,18 @@ def _ensure_columns():
     migrations = {
         'entry_logs': {
             'latency_ms': 'REAL',          # §23.3 decision-time tracking
+            # Existing rows have no verifiable capture provenance. Do not
+            # relabel them as real camera events or delete historical data.
+            'event_source': "TEXT NOT NULL DEFAULT 'legacy'",
+            'comparison_performed': 'INTEGER',
         },
         'alerts': {
             'delivery_attempts': 'INTEGER DEFAULT 0',
             'last_error': 'TEXT',
             'last_attempt_at': 'TEXT',
             'dedupe_key': 'TEXT',
+            'event_source': "TEXT NOT NULL DEFAULT 'legacy'",
+            'entry_log_id': 'INTEGER',
         },
         'users': {
             'password_hash': 'TEXT',       # console sign-in (email + password)
