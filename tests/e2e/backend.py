@@ -11,7 +11,11 @@ os.environ.update(AAMS_ENV='production', ADMIN_EMAIL=credentials['email'],
                   AAMS_ACCESS_PASSWORD=credentials['member_password'],
                   SESSION_SECRET_KEY=secrets.token_urlsafe(48),
                   QR_SECRET_KEY=secrets.token_urlsafe(48),
-                  DATABASE_PATH=str(root / 'showcase.db'))
+                  DATABASE_PATH=str(root / 'showcase.db'),
+                  # Test navigation/polling compresses a full rehearsal into a
+                  # minute. Keep production's default 120/min protection intact;
+                  # use a larger budget only in this disposable test subprocess.
+                  RATE_LIMIT_PER_MIN='1000')
 import numpy as np
 import app.vision as vision
 embedding = np.linspace(-1, 1, 512)
