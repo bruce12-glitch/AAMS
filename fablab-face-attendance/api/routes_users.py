@@ -213,7 +213,16 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
             f'Rejected because: {reason_text}'))
 
     # ---- Pick best 3 embeddings (§17.4) ------------------------------ #
-    picked = passes[:3]
+    # Do not put different people's faces under one member. Checking every
+    # pair prevents a mixed enrollment from granting either person's entry.
+    from app.face_engine import FaceEngine
+    from app.config import get_face_config
+    threshold = float(get_face_config().get('match_threshold', 0.45))
+    for index, (_, analysis) in enumerate(passes):
+        for _, other in passes[index + 1:]:
+            if FaceEngine.match_embeddings(analysis['embedding'], other['embedding']) < threshold:
+                raise HTTPException(status_code=422, detail='Enrollment photos do not consistently match the same person. Retake clear original photos of one member, using the same webcam.')
+    picked = sorted(passes, key=lambda item: item[1].get('quality_metrics', {}).get('blur_variance', 0), reverse=True)[:3]
     embeddings = [a['embedding'].astype(np.float64) for _, a in picked]
 
     conn = get_connection()
