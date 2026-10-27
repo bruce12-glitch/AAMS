@@ -122,7 +122,7 @@ export default function EnrollModal({ open, onClose, onEnrolled, member }) {
               <>
                 <h3 className="modal-title" id={titleId}>Enroll Member</h3>
                 <p className="modal-sub">
-                  Add a clear face photo to enable face recognition and create a signed QR pass.
+                  Capture 3 clear original photos with the same webcam you will demonstrate. Do not use AI-enhanced portraits; they can change facial identity.
                 </p>
 
                 <div className="form-grid">
