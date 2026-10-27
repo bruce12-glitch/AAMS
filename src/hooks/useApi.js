@@ -18,8 +18,8 @@ export function usePolling(path, fallback, intervalMs = 8000, options = {}) {
   const requestRef = useRef(0)
   const inFlightRef = useRef(false)
 
-  const fetchOnce = useCallback(async (silent = false) => {
-    if (!enabled || inFlightRef.current) return
+  const fetchOnce = useCallback(async (silent = false, force = false) => {
+    if (!enabled || (inFlightRef.current && !force)) return
     inFlightRef.current = true
     const requestId = ++requestRef.current
     if (!silent) setLoading(true)
@@ -65,7 +65,9 @@ export function usePolling(path, fallback, intervalMs = 8000, options = {}) {
 
   // refresh() is exposed to callers as a stable callback so it can be used in
   // dependency arrays without re-running every render.
-  const refresh = useCallback(() => fetchOnce(true), [fetchOnce])
+  // An explicit refresh after a mutation supersedes an older in-flight poll;
+  // its stale response must not undo the status the server just saved.
+  const refresh = useCallback(() => fetchOnce(true, true), [fetchOnce])
 
   return { data, isLive, loading, error, refresh }
 }
