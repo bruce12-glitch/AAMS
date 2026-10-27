@@ -5,6 +5,11 @@ Uses InsightFace library for face analysis.
 """
 
 import os
+# Face processing is local. Opt out before importing InsightFace/ONNX Runtime:
+# the native runtime reads this at initialization, not after session creation.
+# https://github.com/microsoft/onnxruntime/blob/main/docs/Privacy.md
+os.environ['ORT_DISABLE_TELEMETRY'] = '1'
+
 import cv2
 import numpy as np
 
@@ -13,6 +18,8 @@ from app.config import get_face_config
 # Lazy/guarded import: importing this module must not require InsightFace,
 # so unit tests (and CI) can exercise the pure matching math without models.
 try:
+    import onnxruntime as _ort
+    _ort.disable_telemetry_events()  # Also disable legacy platform events.
     from insightface.app import FaceAnalysis as _FaceAnalysis
 except Exception as _exc:  # pragma: no cover - depends on environment
     _FaceAnalysis = None
