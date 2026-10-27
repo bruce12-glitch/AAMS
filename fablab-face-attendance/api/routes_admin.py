@@ -5,6 +5,8 @@ Mutating endpoints require X-Admin-Token (§27.2).
 """
 
 import asyncio
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -36,23 +38,31 @@ async def prototype_readiness(_: dict = Depends(require_admin)):
 
     conn = get_connection()
     try:
-        total, enrolled = conn.execute('''
-            SELECT COUNT(*), COALESCE(SUM(
-                CASE WHEN length(face_embedding)>0 OR length(face_embedding_2)>0
-                     OR length(face_embedding_3)>0 THEN 1 ELSE 0 END), 0)
-            FROM users WHERE active=1
-        ''').fetchone()
+        total, enrolled, eligible = conn.execute('''
+            SELECT COUNT(*), COALESCE(SUM(enrolled), 0),
+                   COALESCE(SUM(CASE WHEN enrolled AND payment_status='active'
+                       AND (payment_expiry IS NULL OR payment_expiry=''
+                            OR date(payment_expiry)>=?) THEN 1 ELSE 0 END), 0)
+            FROM (SELECT payment_status, payment_expiry,
+                         (COALESCE(length(face_embedding),0)>0
+                          OR COALESCE(length(face_embedding_2),0)>0
+                          OR COALESCE(length(face_embedding_3),0)>0) AS enrolled
+                  FROM users WHERE active=1)
+        ''', (datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat(),)).fetchone()
         last_sent = conn.execute("SELECT MAX(sent_at) FROM alerts WHERE sent_status='sent'").fetchone()[0]
+        pending = conn.execute("SELECT COUNT(*) FROM alerts WHERE sent_status IN ('pending','sending')").fetchone()[0]
     finally:
         conn.close()
     cfg = get_telegram_config()
     return {
         'database': 'ready', 'cv_engine': engine_state(),
-        'active_members': total, 'enrolled_members': enrolled,
+        'active_members': total, 'enrolled_members': enrolled, 'eligible_members': eligible,
         'telegram': {
             'configured': bool(cfg.get('enabled') and configured(cfg.get('bot_token'))
                                and configured(cfg.get('chat_id'))),
             'last_sent_at': last_sent,
+            'notify_on_entry': bool(cfg.get('notify_on_entry', True)),
+            'pending_count': pending,
         },
     }
 

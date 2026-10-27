@@ -34,6 +34,7 @@ class EntryRequest(BaseModel):
     liveness_frames_b64: Optional[List[str]] = Field(default=None, max_length=12)
     skip_liveness: bool = False                    # single-snapshot testing
     continuous: bool = False                       # browser webcam polling
+    dry_run: bool = False                          # diagnostic only; never persist or notify
 
 
 class SimulateRequest(BaseModel):
@@ -72,6 +73,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     evidence_rel = None
     face_count = 0
     quality_note = None
+    diagnostics = {'mode': mode, 'identity_result': 'NOT_COMPARED',
+                   'comparison_performed': False, 'liveness': {'status': 'unknown'}}
+
+    async def finish(**kwargs):
+        return await _finalize(**kwargs, diagnostics=diagnostics, dry_run=request.dry_run)
 
     if request.image_b64:
         try:
@@ -88,14 +94,21 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
         face_count = analysis['face_count']
+        diagnostics['face_count'] = face_count
+        diagnostics['image_size'] = {'width': int(frame.shape[1]), 'height': int(frame.shape[0])}
+        diagnostics['bbox'] = analysis.get('bbox')
+        diagnostics['quality'] = {'passed': bool(analysis.get('quality_passed')),
+                                  'reasons': analysis.get('quality_reasons', []),
+                                  **analysis.get('quality_metrics', {})}
         if face_count == 0:
             if request.continuous:
                 # Empty camera frames are normal; do not store photos/logs or
                 # send NOFACE alerts every polling cycle.
                 return {'decision': 'DENIED', 'reason': 'No face detected — waiting for a person',
-                        'tag': 'noface', 'face_count': 0, 'recorded': False}
-            evidence_rel = save_evidence(frame, 'logs')
-            return await _finalize(
+                        'tag': 'noface', 'face_count': 0, 'recorded': False,
+                        'diagnostics': diagnostics}
+            evidence_rel = None if request.dry_run else save_evidence(frame, 'logs')
+            return await finish(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED', reason='No face detected in image',
                 tag='noface', alert_type='NOFACE', user=None,
@@ -103,9 +116,9 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 claimed=request.token_value, evidence=evidence_rel,
                 extra={'face_count': 0},
             )
-        evidence_rel = None if request.continuous else save_evidence(frame, 'logs')
+        evidence_rel = None if request.continuous or request.dry_run else save_evidence(frame, 'logs')
         if not analysis['quality_passed']:
-            return await _finalize(
+            return await finish(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED',
                 reason=f"Low quality face: {'; '.join(analysis['quality_reasons'])}",
@@ -135,18 +148,23 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         frames, bad = frames_from_payloads(request.liveness_frames_b64 or [])
         if bad:
             logger.warning('%d liveness frames failed to decode', bad)
-        if len(frames) >= 2:
+        if len(frames) >= 4:
             engine = get_engine()
             checker = LivenessChecker()
             live = await asyncio.to_thread(
                 checker.check_liveness,
                 frames_sequence=frames,
                 face_engine=engine,
+                reference_embedding=embedding,
             )
             liveness_status = live['status']
+            diagnostics['liveness'] = {key: live[key] for key in ('status', 'blink_detected', 'frames_analyzed', 'reason')}
         else:
             liveness_status = 'unknown'
-            quality_note = 'send >=2 frames for blink liveness'
+            quality_note = 'capture at least 4 frames for blink liveness'
+            diagnostics['liveness'] = {'status': 'unknown', 'reason': quality_note}
+    if request.skip_liveness:
+        diagnostics['liveness'] = {'status': 'skipped', 'reason': 'Still photo — liveness not checked; this does not prove a live person.'}
 
     # ---- 3. Identity ------------------------------------------------- #
     # Normalize the claimed token: accept either the raw user_id or a full
@@ -161,7 +179,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             qr_manager = QRManager()
             verdict = qr_manager.verify_token(token_value)
             if not verdict.get('valid'):
-                return await _finalize(
+                diagnostics['identity_result'] = 'INVALID_TOKEN'
+                return await finish(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                     decision='DENIED',
                     reason=f"Invalid token: {verdict.get('reason', 'rejected')}",
@@ -180,7 +199,8 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 (canonical, verdict['user_id'])).fetchone()
             conn.close()
             if not active:
-                return await _finalize(
+                diagnostics['identity_result'] = 'INVALID_TOKEN'
+                return await finish(
                     latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                     decision='DENIED', reason='Invalid token: pass revoked',
                     tag='unknown', alert_type='UNKNOWN', user=None,
@@ -199,6 +219,11 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     else:
         result = await asyncio.to_thread(verifier.verify_face_only, embedding)
         payment_user = result.get('user') or {}
+
+    diagnostics.update(identity_result=result.get('result'), threshold=verifier.match_threshold,
+                       comparison_performed=result.get('result') in ('MATCH', 'PROXY', 'UNKNOWN'))
+    if 'enrolled_users' in result:
+        diagnostics['enrolled_users'] = result['enrolled_users']
 
     detected_user = result.get('detected_user') or (
         result.get('user') or {}).get('user_id')
@@ -227,7 +252,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                                 .get('require_liveness', False))
     except Exception:
         require_liveness = False
-    require_liveness = require_liveness or (request.continuous and not request.skip_liveness)
+    require_liveness = require_liveness or (frame is not None and not request.skip_liveness)
 
     policy = AccessDecision(require_liveness=require_liveness)
     decision = policy.evaluate_access(
@@ -241,7 +266,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     user_info = result.get('claimed_user') or result.get('user')
     if user_info:
         user_info = {**user_info, 'payment_status': payment_status}
-    return await _finalize(
+    return await finish(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
         decision=decision['decision'],
         reason=decision['reason'] + (f' ({quality_note})' if quality_note else ''),
@@ -263,7 +288,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
 async def _finalize(decision, reason, tag, alert_type, user, similarity,
                     liveness_status, claimed, evidence, extra,
-                    latency_ms=None, evidence_frame=None) -> dict:
+                    latency_ms=None, evidence_frame=None, diagnostics=None, dry_run=False) -> dict:
     """Persist log + occupancy + alert, then build the response."""
     from app.alerts import AlertService
     from app.database import get_connection
@@ -271,6 +296,15 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
 
     recognized = (extra or {}).get('recognized_id')
     continuous = bool((extra or {}).get('continuous'))
+
+    if dry_run:
+        return {'decision': decision, 'reason': reason, 'tag': tag,
+                'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
+                'similarity': round(float(similarity), 4), 'liveness_status': liveness_status,
+                'recorded': False, 'dry_run': True, 'diagnostics': diagnostics,
+                'latency_ms': latency_ms,
+                'notification': {'status': 'not_requested', 'reason': 'Check only: no attendance, evidence or Telegram message saved.'},
+                **(extra or {})}
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -289,7 +323,8 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
                     'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
                     'recognized_id': recognized, 'duplicate': True, 'recorded': False,
                     'occupant_state': 'already_inside' if inside else None,
-                    'similarity': round(float(similarity), 4), 'liveness_status': liveness_status}
+                    'similarity': round(float(similarity), 4), 'liveness_status': liveness_status,
+                    'diagnostics': diagnostics}
     if evidence_frame is not None:
         from app.vision import save_evidence
         evidence = save_evidence(evidence_frame, 'logs')
@@ -313,6 +348,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         occupant_state = 'inside' if marked.get('success') else 'already_inside'
 
     alert_row_id = None
+    notification = {'status': 'not_requested', 'reason': 'No Telegram notification for this decision.'}
     if alert_type:
         service = AlertService()
         severity = {
@@ -323,11 +359,17 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         message = f'{alert_type} at Fab Lab entrance — {who}. {reason}'
         result = await service.queue_and_deliver(alert_type, message, image_path=evidence, severity=severity)
         alert_row_id = result['alert_id']
+        notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
     elif decision == 'GRANTED' and occupant_state == 'inside':
         from app.config import get_telegram_config
         if get_telegram_config().get('notify_on_entry', True):
             who = (user or {}).get('name') or recognized
-            await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab')
+            from zoneinfo import ZoneInfo
+            when = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')
+            result = await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab\nTime: {when}')
+            notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
+        else:
+            notification = {'status': 'disabled', 'reason': 'Automatic entry messages are turned off in Communicate.'}
 
     return {
         'decision': decision,
@@ -336,12 +378,14 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         'tag': tag,
         'alert_type': alert_type,
         'alert_id': alert_row_id,
+        'notification': notification,
         'user': {key: user.get(key) for key in ('user_id', 'name', 'payment_status')} if user else None,
         'similarity': round(float(similarity), 4),
         'liveness_status': liveness_status,
         'occupant_state': occupant_state,
         'evidence_path': evidence,
         'latency_ms': latency_ms,
+        'diagnostics': diagnostics,
         **(extra or {}),
     }
 

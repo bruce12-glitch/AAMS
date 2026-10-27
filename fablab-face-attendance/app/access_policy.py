@@ -59,7 +59,19 @@ class AccessDecision:
             }
         
         if self.require_liveness and face_result.get('result') == 'MATCH' and liveness_status != 'real':
-            return {'decision': 'DENIED', 'reason': 'Liveness not verified', 'alert_type': 'SPOOF', 'tag': 'spoof'}
+            return {'decision': 'DENIED', 'reason': 'Liveness not verified — retry and blink naturally', 'alert_type': None, 'tag': 'liveness'}
+
+        # Setup/token failures must not masquerade as a zero-similarity face
+        # comparison. Keep entry denied, but give the operator the real cause.
+        setup_reasons = {
+            'NO_EMBEDDINGS': 'This member has no usable face enrollment. Open Members → Enroll face.',
+            'EMPTY_GALLERY': 'No active enrolled faces to compare. Enroll a member in Members first.',
+            'USER_NOT_FOUND': 'The pass belongs to a missing or disabled member.',
+        }
+        if face_result.get('result') in setup_reasons:
+            return {'decision': 'DENIED', 'reason': setup_reasons[face_result['result']], 'alert_type': None, 'tag': 'setup'}
+        if face_result.get('result') == 'INVALID_TOKEN' and not face_result.get('detected_user'):
+            return {'decision': 'DENIED', 'reason': 'Student ID/pass not valid or expired. Select an enrolled member and regenerate their QR pass, or use Face only.', 'alert_type': 'UNKNOWN', 'tag': 'unknown'}
 
         # Row 9: Multiple faces → GRANT (to verified) + TAILGATE alert
         if face_count > 1:
