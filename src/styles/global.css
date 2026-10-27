@@ -855,6 +855,53 @@ body {
 .recognition-metrics dt { color: var(--text-mid); }
 .recognition-metrics dd { margin: 4px 0 0; font-family: var(--font-mono); }
 
+/* Operational records: existing Fab Lab colors, calm table/list hierarchy.
+   No additional theme tokens, shadows, gradients or decorative row motion. */
+.records-surface { background: var(--bg-0); }
+.records-surface .records-panel, .records-surface .table-panel { box-shadow: none; }
+.records-surface .data-table, .records-toolbar, .record-scope, .event-list, .read-only-note, .records-empty {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text-hi); font-size: 13px; line-height: 1.5;
+}
+.records-page-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.records-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 16px 0; }
+.records-toolbar label, .record-scope label { display: grid; gap: 4px; color: var(--text-mid); font-weight: 600; }
+.records-toolbar input, .records-toolbar select, .record-scope select, .records-surface .mini-select {
+  min-height: 44px; padding: 8px 12px; color: var(--text-hi); background: var(--bg-1);
+  border: 1px solid var(--border-bright); border-radius: 4px; font: inherit;
+}
+.record-search { flex: 1; min-width: min(240px, 100%); }
+.record-scope { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.record-scope p { flex: 1 1 240px; margin: 0; color: var(--text-mid); }
+.records-surface button, .records-surface .panel-link { min-height: 44px; }
+.records-surface .panel-link { padding: 8px; }
+.records-table-scroll { max-width: 100%; overflow-x: auto; }
+.ops-table { min-width: 640px; }
+.ops-table td { vertical-align: top; min-width: 110px; white-space: normal; }
+.ops-table td:nth-child(3) { min-width: 200px; }
+.ops-table th { font-family: inherit; letter-spacing: 0; text-transform: none; font-weight: 600; font-size: 12px; }
+.ops-table td small { display: block; color: var(--text-mid); margin-top: 4px; }
+.ops-table .badge { letter-spacing: 0; font-family: inherit; text-transform: none; }
+.event-list { padding: 0; margin: 0; list-style: none; }
+.event-row { display: flex; gap: 16px; align-items: start; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.event-row:last-child { border-bottom: 0; }
+.event-row-main { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.event-row-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.event-reason { font-size: 13px; line-height: 1.55; margin: 6px 0; color: var(--text-mid); overflow-wrap: anywhere; }
+.event-meta { font-size: 12px; line-height: 1.5; color: var(--text-mid); margin: 4px 0; }
+.review-state { border: 1px solid var(--border-bright); padding: 2px 8px; border-radius: 4px; color: var(--amber-text); background: var(--amber-bg); font-size: 12px; }
+.review-state.reviewed { color: var(--text-mid); background: var(--bg-2); }
+.records-empty { color: var(--text-mid); padding: 20px 0; margin: 0; }
+.read-only-note { padding: 12px 16px; border: 1px solid var(--border-bright); border-radius: 4px; margin: 12px 0; background: var(--bg-1); }
+.read-only-note button { margin-left: 12px; }
+@media (max-width: 720px) {
+  .event-row { flex-wrap: wrap; }
+  .event-row .btn { width: 100%; }
+  .record-scope label, .record-scope select, .records-toolbar label, .records-toolbar input, .records-toolbar select { width: 100%; min-width: 0; }
+  .records-toolbar { gap: 12px; }
+  .read-only-note button { display: block; margin: 8px 0 0; white-space: normal; max-width: 100%; }
+}
+
 /* ---------- Stat card ---------- */
 
 .stat-card { overflow: hidden; }
