@@ -16,7 +16,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -35,6 +35,7 @@ class EntryRequest(BaseModel):
     skip_liveness: bool = False                    # single-snapshot testing
     continuous: bool = False                       # browser webcam polling
     dry_run: bool = False                          # diagnostic only; never persist or notify
+    capture_source: Literal['snapshot', 'webcam'] = 'snapshot'
 
 
 class SimulateRequest(BaseModel):
@@ -77,7 +78,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                    'comparison_performed': False, 'liveness': {'status': 'unknown'}}
 
     async def finish(**kwargs):
-        return await _finalize(**kwargs, diagnostics=diagnostics, dry_run=request.dry_run)
+        return await _finalize(**kwargs, diagnostics=diagnostics, dry_run=request.dry_run, event_source=request.capture_source)
 
     if request.image_b64:
         try:
@@ -111,7 +112,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
             return await finish(
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED', reason='No face detected in image',
-                tag='noface', alert_type='NOFACE', user=None,
+                tag='noface', alert_type=None, user=None,
                 similarity=0.0, liveness_status='unknown',
                 claimed=request.token_value, evidence=evidence_rel,
                 extra={'face_count': 0},
@@ -122,7 +123,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                 decision='DENIED',
                 reason=f"Low quality face: {'; '.join(analysis['quality_reasons'])}",
-                tag='noface', alert_type=None, user=None,
+                tag='quality', alert_type=None, user=None,
                 similarity=0.0, liveness_status='unknown',
                 claimed=request.token_value, evidence=evidence_rel,
                 extra={'face_count': face_count, 'quality': analysis['quality_reasons'], 'continuous': request.continuous},
@@ -184,7 +185,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                     decision='DENIED',
                     reason=f"Invalid token: {verdict.get('reason', 'rejected')}",
-                    tag='unknown', alert_type='UNKNOWN', user=None,
+                    tag='token', alert_type=None, user=None,
                     similarity=0.0, liveness_status=liveness_status,
                     claimed=None, evidence=evidence_rel,
                     extra={'face_count': face_count},
@@ -203,7 +204,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
                 return await finish(
                     latency_ms=round((time.perf_counter() - t0) * 1000, 1),
                     decision='DENIED', reason='Invalid token: pass revoked',
-                    tag='unknown', alert_type='UNKNOWN', user=None,
+                    tag='token', alert_type=None, user=None,
                     similarity=0.0, liveness_status=liveness_status,
                     claimed=verdict['user_id'], evidence=evidence_rel,
                     extra={'face_count': face_count},
@@ -288,7 +289,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
 
 async def _finalize(decision, reason, tag, alert_type, user, similarity,
                     liveness_status, claimed, evidence, extra,
-                    latency_ms=None, evidence_frame=None, diagnostics=None, dry_run=False) -> dict:
+                    latency_ms=None, evidence_frame=None, diagnostics=None, dry_run=False, event_source='snapshot') -> dict:
     """Persist log + occupancy + alert, then build the response."""
     from app.alerts import AlertService
     from app.database import get_connection
@@ -331,13 +332,15 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
     cursor.execute('''
         INSERT INTO entry_logs (claimed_id, recognized_id, similarity,
                                 payment_status, liveness_status, decision,
-                                reason, tag, image_path, latency_ms)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                reason, tag, image_path, latency_ms, event_source, comparison_performed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         claimed, recognized, similarity,
         (user or {}).get('payment_status'),
-        liveness_status, decision, reason, tag, evidence, latency_ms,
+        liveness_status, decision, reason, tag, evidence, latency_ms, event_source,
+        int(diagnostics['comparison_performed']) if diagnostics else None,
     ))
+    entry_id = cursor.lastrowid
     conn.commit()
     conn.close()
 
@@ -356,8 +359,8 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
             'UNKNOWN': 'medium', 'UNPAID': 'medium', 'TAILGATE': 'medium',
         }.get(alert_type, 'medium')
         who = (user or {}).get('name') or claimed or 'unidentified person'
-        message = f'{alert_type} at Fab Lab entrance — {who}. {reason}'
-        result = await service.queue_and_deliver(alert_type, message, image_path=evidence, severity=severity)
+        message = f'AAMS entry review\nPerson: {who}\nReason: {reason}\nAttempt: #{entry_id}'
+        result = await service.queue_and_deliver(alert_type, message, image_path=evidence, severity=severity, event_source=event_source, entry_log_id=entry_id)
         alert_row_id = result['alert_id']
         notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
     elif decision == 'GRANTED' and occupant_state == 'inside':
@@ -366,7 +369,7 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
             who = (user or {}).get('name') or recognized
             from zoneinfo import ZoneInfo
             when = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%d %b %Y, %I:%M:%S %p IST')
-            result = await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab\nTime: {when}')
+            result = await AlertService().queue_and_deliver('ENTRY', f'AAMS — Entry granted\nName: {who}\nStudent ID: {recognized}\nLocation: Fab Lab\nTime: {when}', event_source=event_source, entry_log_id=entry_id)
             notification = {'status': 'sent' if result.get('telegram_sent') else 'queued', **result}
         else:
             notification = {'status': 'disabled', 'reason': 'Automatic entry messages are turned off in Communicate.'}
@@ -385,6 +388,8 @@ async def _finalize(decision, reason, tag, alert_type, user, similarity,
         'occupant_state': occupant_state,
         'evidence_path': evidence,
         'latency_ms': latency_ms,
+        'id': entry_id,
+        'event_source': event_source,
         'diagnostics': diagnostics,
         **(extra or {}),
     }
