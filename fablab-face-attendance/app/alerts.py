@@ -86,13 +86,13 @@ class AlertService:
         # Plain text avoids Markdown parse errors caused by names/punctuation.
         return (await self._send(report_text))[0]
 
-    def save_alert_to_db(self, alert_type, message, image_path=None, severity='medium', dedupe_key=None):
+    def save_alert_to_db(self, alert_type, message, image_path=None, severity='medium', dedupe_key=None, *, event_source='system', entry_log_id=None):
         conn = get_connection()
         try:
             cur = conn.execute('''
-                INSERT OR IGNORE INTO alerts (alert_type, severity, message, image_path, sent_status, dedupe_key)
-                VALUES (?, ?, ?, ?, 'pending', ?)
-            ''', (alert_type, severity, message, image_path, dedupe_key))
+                INSERT OR IGNORE INTO alerts (alert_type, severity, message, image_path, sent_status, dedupe_key, event_source, entry_log_id)
+                VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)
+            ''', (alert_type, severity, message, image_path, dedupe_key, event_source, entry_log_id))
             alert_id = cur.lastrowid
             if cur.rowcount == 0:
                 alert_id = conn.execute('SELECT id FROM alerts WHERE dedupe_key=?', (dedupe_key,)).fetchone()[0]
@@ -107,11 +107,13 @@ class AlertService:
         conn = get_connection()
         try:
             # Atomic claim prevents scheduler/manual retry races in one host.
-            cur = conn.execute("UPDATE alerts SET sent_status='sending', delivery_attempts=delivery_attempts+1, last_attempt_at=datetime('now') WHERE id=? AND sent_status='pending'", (alert_id,))
+            cur = conn.execute("UPDATE alerts SET sent_status='sending', delivery_attempts=delivery_attempts+1, last_attempt_at=datetime('now') WHERE id=? AND sent_status='pending' AND event_source<>'sample'", (alert_id,))
             conn.commit()
             row = conn.execute('SELECT * FROM alerts WHERE id=?', (alert_id,)).fetchone()
             if not row:
                 return False, 'Notification not found'
+            if row['event_source'] == 'sample':
+                return False, 'Sample records are never sent to Telegram'
             if cur.rowcount == 0:
                 return row['sent_status'] == 'sent', 'Already delivered' if row['sent_status'] == 'sent' else 'Delivery is already in progress'
         finally:
@@ -132,8 +134,8 @@ class AlertService:
             conn.close()
         return sent, reason
 
-    async def queue_and_deliver(self, alert_type, message, severity='low', image_path=None, dedupe_key=None):
-        alert_id = self.save_alert_to_db(alert_type, message, image_path, severity, dedupe_key)
+    async def queue_and_deliver(self, alert_type, message, severity='low', image_path=None, dedupe_key=None, *, event_source='system', entry_log_id=None):
+        alert_id = self.save_alert_to_db(alert_type, message, image_path, severity, dedupe_key, event_source=event_source, entry_log_id=entry_log_id)
         sent, reason = await self.deliver(alert_id)
         return {'alert_id': alert_id, 'telegram_sent': sent, 'reason': reason}
 
@@ -146,7 +148,7 @@ class AlertService:
             # idempotency key: ambiguous network outcomes can be redelivered.
             conn.execute("UPDATE alerts SET sent_status='pending' WHERE sent_status='sending' AND datetime(last_attempt_at)<datetime('now','-5 minutes')")
             conn.execute("UPDATE alerts SET sent_status='expired' WHERE sent_status='pending' AND datetime(created_at)<datetime('now',?)", (f'-{int(max_age_hours)} hours',))
-            rows = conn.execute("SELECT id FROM alerts WHERE sent_status='pending' AND (last_attempt_at IS NULL OR datetime(last_attempt_at)<=datetime('now','-1 minute')) ORDER BY id LIMIT 50").fetchall()
+            rows = conn.execute("SELECT id FROM alerts WHERE sent_status='pending' AND event_source<>'sample' AND (last_attempt_at IS NULL OR datetime(last_attempt_at)<=datetime('now','-1 minute')) ORDER BY id LIMIT 50").fetchall()
             conn.commit()
         finally:
             conn.close()
