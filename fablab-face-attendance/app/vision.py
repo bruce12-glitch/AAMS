@@ -141,6 +141,7 @@ def analyze_frame(frame: np.ndarray) -> dict:
         "embedding": None,
         "landmarks": None,
         "bbox": None,
+        "quality_metrics": {},
         "latency_ms": latency_ms,
     }
 
@@ -150,9 +151,10 @@ def analyze_frame(frame: np.ndarray) -> dict:
     # Largest face = closest to camera (§9.2 multiple-face rule)
     best = max(detected, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))
 
-    passed, reasons = engine.quality_check(best, frame)
+    passed, reasons, metrics = engine.quality_check(best, frame, with_metrics=True)
     result["quality_passed"] = passed
     result["quality_reasons"] = reasons
+    result["quality_metrics"] = metrics
     result["embedding"] = engine.extract_embedding(best)
     result["landmarks"] = getattr(best, "kps", None)
     result["bbox"] = best.bbox.astype(int).tolist()

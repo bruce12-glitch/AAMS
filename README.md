@@ -75,7 +75,9 @@ An opt-in real-model check uses the bundled public NASA astronaut image from sci
 AAMS_REAL_VISION_TEST=1 python -m pytest tests/test_real_vision.py -q -s
 ```
 
-It verifies actual image enrollment, recognition, attendance/occupancy, notification queuing, repeat-scan suppression, checkout/re-entry and expired-payment denial. It explicitly bypasses blink liveness because the fixture is a still image. Physical webcam, live blink behavior and actual Telegram receipt must still be demonstrated on the laptop.
+It verifies actual image enrollment, recognition, attendance/occupancy, notification queuing, repeat-scan suppression, checkout/re-entry and expired-payment denial. A second test downloads Matplotlib's versioned public-domain Grace Hopper portrait, checks two identities and photo variants, rejects the unenrolled identity and denies a static burst when liveness is requested. Still-image identity checks explicitly bypass liveness. These are regression fixtures, not an accuracy benchmark. Physical webcam, live blink behavior and actual Telegram receipt must still be demonstrated on the laptop.
+
+For troubleshooting, **Live Monitor → Photo & camera check → Check photo — no attendance** runs the real recognition pipeline without saving attendance, evidence or notifications. Results show why comparison stopped or the measured score versus threshold. See [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md).
 
 CI includes backend tests, frontend lint/build, browser flows, Windows repeat-launch checks, a disposable Docker startup/persistence/proxy check with real-model validation, and a complete hosted-container check. Deployment smoke tests are restricted to disposable GitHub Actions runners and never configure a real Telegram destination.
 

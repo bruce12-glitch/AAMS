@@ -35,6 +35,26 @@ try {
     if ($global:AamsLauncherTestState.Opened.Count -ne 2 -or $global:AamsLauncherTestState.Opened[0] -ne 'http://localhost:8090') { throw 'Launcher did not open the local website.' }
     if (($global:AamsLauncherTestState.DockerCalls | Where-Object { $_ -eq 'compose up --build -d' }).Count -ne 2) { throw 'Launcher did not start Compose.' }
     Write-Host 'Windows repeat startup preserves saved configuration and opens the local website: PASS'
+
+    # First-run setup must serialize KEY=value as ONE line, including empty
+    # Telegram fields. The old test only covered an already-existing .env.
+    Remove-Item -LiteralPath $envPath
+    function Read-Host {
+        param([string]$Prompt, [switch]$AsSecureString)
+        if ($Prompt -eq 'Administrator SRMIST email') { return 'launcher-test@srmist.edu.in' }
+        $value = if ($Prompt -like 'Choose administrator*') { 'launcher-test-admin-credential' } else { 'launcher-test-member-credential' }
+        return ConvertTo-SecureString $value -AsPlainText -Force
+    }
+    & $scriptPath -SkipTelegram
+    $lines = [IO.File]::ReadAllLines($envPath)
+    if ($lines.Length -ne 11) { throw 'First-run environment values were split over multiple lines.' }
+    foreach ($line in $lines | Select-Object -Skip 1) {
+        if ($line -notmatch '^[A-Z_]+=.*$') { throw 'First-run environment contains an invalid assignment.' }
+    }
+    $generated = [IO.File]::ReadAllText($envPath)
+    & $scriptPath -SkipTelegram
+    if ([IO.File]::ReadAllText($envPath) -cne $generated) { throw 'Restart changed first-run credentials.' }
+    Write-Host 'Windows first-run configuration produces complete dotenv assignments: PASS'
 } finally {
     Remove-Item -Recurse -Force $temporaryRoot
     Remove-Variable -Name AamsLauncherTestState -Scope Global

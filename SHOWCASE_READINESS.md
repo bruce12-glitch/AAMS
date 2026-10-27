@@ -4,7 +4,39 @@ Repository: https://github.com/bruce12-glitch/AAMS
 Initial reviewed base: `main` at `f0e2ce4503fa7c6c476118b925e616e65d6e28cb`.
 Feature release: PR #8 merged at `9a0a6aed1547a8a49292680ccd3c8ecb58739653`.
 
-## Final demo polish — 27 October 2026
+## Snapshot/CV correction — 27 October 2026
+
+The user's failed rehearsal exposed misleading snapshot feedback. The previous
+demo checks did not establish physical-webcam accuracy. This correction:
+
+- Defaults photo testing to Face only, separates a no-write diagnostic check
+  from recording entry, and shows quality measurements, detected box, comparison
+  status and score versus threshold. Invalid tokens and missing enrollments are
+  no longer disguised as zero-similarity unknown people. Simulation is explicitly
+  separated from actual photo analysis.
+- Fixes the reproduced real-model landmark mismatch (`landmark_2d_106` versus
+  `lmk`) and reads the top-level liveness configuration. Webcam burst liveness
+  must be tied to the same identity; inconclusive bursts stay denied without
+  falsely alleging a spoof. Still photos explicitly bypass liveness only in
+  the attended demo mode.
+- Rejects mixed-person enrollment, retains the 0.45 matching threshold and
+  normal quality gates, handles legacy float32/corrupt stored vectors, and rejects
+  off-image face crops that previously skipped quality checks.
+- Fixes first-run Windows dotenv serialization (the old test covered only
+  existing files), tests initial setup too, and uses OpenCV 4.10.0.84 in both
+  dependency sets to match the user's working build recovery.
+
+Local full-model suite: **164 passed**. Actual photo regression enrolls two
+public-domain fixture identities and correctly matches original/crop/brightness/
+JPEG variants; the unenrolled portrait is rejected. Scores from the test run:
+0.985–1.000 for related variants, -0.0046 for the different unenrolled portrait,
+threshold unchanged at 0.45. This is a functional regression, **not** an accuracy
+benchmark: transformed copies are not independent held-out captures. Actual
+webcam/lighting, live blink behavior, volunteer false accepts/rejects and Telegram
+phone receipt still need the physical laptop. Consult the PR checks for browser,
+Windows and Docker results.
+
+## Earlier demo polish — 27 October 2026
 
 This update starts from merged main `79b8e0e991ea23ee0d984fe467d2f4aa97ebadf0`.
 It keeps the current authentication and SQLite/volume architecture. No public
