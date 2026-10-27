@@ -858,7 +858,9 @@ body {
 /* Operational records: existing Fab Lab colors, calm table/list hierarchy.
    No additional theme tokens, shadows, gradients or decorative row motion. */
 .records-surface { background: var(--bg-0); }
-.records-surface .records-panel, .records-surface .table-panel { box-shadow: none; }
+.records-surface .records-panel, .records-surface .table-panel { box-shadow: none; background: var(--bg-1); }
+.records-surface .records-panel::before, .records-surface .table-panel::before { display: none; }
+.records-surface .grid-main > * { min-width: 0; }
 .records-surface .data-table, .records-toolbar, .record-scope, .event-list, .read-only-note, .records-empty {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text-hi); font-size: 13px; line-height: 1.5;
