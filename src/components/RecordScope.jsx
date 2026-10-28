@@ -5,7 +5,7 @@ export default function RecordScope({ scope, onChange, counts }) {
   return (
     <div className="record-scope">
       <label>Records
-        <select value={scope} onChange={(event) => onChange(event.target.value)}>
+        <select aria-label="Records" value={scope} onChange={(event) => onChange(event.target.value)}>
           <option value="recorded">Current recorded events</option>
           <option value="history">Older / unverified records</option>
           <option value="all">All records</option>
