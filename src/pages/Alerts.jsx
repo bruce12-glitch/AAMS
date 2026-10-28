@@ -35,8 +35,8 @@ export default function Alerts() {
       <section className="panel records-panel" aria-label="Security review queue">
         <RecordScope scope={scope} onChange={setScope} counts={data?.source_counts} />
         <div className="records-toolbar">
-          <label>Review status<select value={review} onChange={(event) => setReview(event.target.value)}><option value="open">Needs review</option><option value="reviewed">Reviewed</option><option value="all">All review states</option></select></label>
-          <label>Priority<select value={priority} onChange={(event) => setPriority(event.target.value)}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+          <label>Review status<select aria-label="Review status" value={review} onChange={(event) => setReview(event.target.value)}><option value="open">Needs review</option><option value="reviewed">Reviewed</option><option value="all">All review states</option></select></label>
+          <label>Priority<select aria-label="Priority" value={priority} onChange={(event) => setPriority(event.target.value)}><option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
           <span className="event-meta">{list.length} shown · latest 100</span>
         </div>
         {!isAdmin && <p className="read-only-note">Read-only member view. An administrator can mark an item reviewed.</p>}
