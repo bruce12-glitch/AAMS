@@ -34,10 +34,10 @@ export default function Logs() {
       <section className="panel records-panel" aria-label="Access decision records">
         <RecordScope scope={scope} onChange={setScope} counts={data?.source_counts} />
         <div className="records-toolbar">
-          <label>Decision<select value={decision} onChange={(event) => setDecision(event.target.value)}>
+          <label>Decision<select aria-label="Decision" value={decision} onChange={(event) => setDecision(event.target.value)}>
             <option value="all">All decisions</option><option value="GRANTED">Granted</option><option value="DENIED">Denied</option>
           </select></label>
-          <label className="record-search">Search records<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, student ID or reason" /></label>
+          <label className="record-search">Search records<input aria-label="Search records" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name, student ID or reason" /></label>
           <span className="event-meta">{rows.length} shown · latest 500</span>
         </div>
         <div className="records-table-scroll" tabIndex={0} aria-label="Entry log table, scroll horizontally on small screens">
