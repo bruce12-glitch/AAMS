@@ -5,12 +5,13 @@ Implements GET stats, live-status, activity, research.
 
 from fastapi import APIRouter, Depends, Query
 from app.security import require_user
+from app.event_records import RecordScope, scope_sql, source_counts, SECURITY_ALERTS
 
 router = APIRouter(prefix='/api/dashboard', tags=['dashboard'],
                    dependencies=[Depends(require_user)])
 
 @router.get('/stats')
-async def get_stats():
+async def get_stats(scope: RecordScope = 'all'):
     """Get KPI stats (entries, inside, alerts, members)."""
     from app.database import get_connection
     
@@ -21,9 +22,7 @@ async def get_stats():
     from datetime import datetime
     from zoneinfo import ZoneInfo
     today = datetime.now(ZoneInfo('Asia/Kolkata')).strftime('%Y-%m-%d')
-    cursor.execute('''
-        SELECT COUNT(*) FROM entry_logs WHERE DATE(event_time, '+330 minutes') = ?
-    ''', (today,))
+    cursor.execute("SELECT COUNT(*) FROM entry_logs WHERE decision='GRANTED' AND event_source<>'sample' AND DATE(event_time, '+330 minutes') = ? AND " + scope_sql(scope), (today,))
     total_entries = cursor.fetchone()[0]
     
     # Currently inside
@@ -31,7 +30,7 @@ async def get_stats():
     inside_count = cursor.fetchone()[0]
     
     # Unacknowledged alerts
-    cursor.execute("SELECT COUNT(*) FROM alerts WHERE acked=0 AND alert_type NOT IN ('ANNOUNCE','REPORT','ENROLLMENT','ENTRY','TEST')")
+    cursor.execute("SELECT COUNT(*) FROM alerts WHERE acked=0 AND event_source<>'sample' AND " + SECURITY_ALERTS + ' AND ' + scope_sql(scope))
     alert_count = cursor.fetchone()[0]
     
     # Active members
@@ -48,7 +47,7 @@ async def get_stats():
     }
 
 @router.get('/activity')
-async def get_activity(limit: int = Query(default=20, ge=1, le=500)):
+async def get_activity(limit: int = Query(default=20, ge=1, le=500), scope: RecordScope = 'all'):
     """Get recent activity feed."""
     from app.database import get_connection
     
@@ -56,12 +55,16 @@ async def get_activity(limit: int = Query(default=20, ge=1, le=500)):
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT * FROM entry_logs ORDER BY id DESC LIMIT ?
-    ''', (limit,))
+        SELECT e.*, u.name AS recognized_name, c.name AS claimed_name
+        FROM entry_logs e
+        LEFT JOIN users u ON u.user_id=e.recognized_id
+        LEFT JOIN users c ON c.user_id=e.claimed_id
+        WHERE ''' + scope_sql(scope, 'e.event_source') + ' ORDER BY e.id DESC LIMIT ?', (limit,))
     activities = [dict(row) for row in cursor.fetchall()]
+    counts = source_counts(conn, 'entry_logs')
     conn.close()
     
-    return {'activities': activities}
+    return {'activities': activities, 'source_counts': counts, 'scope': scope}
 
 @router.get('/live')
 async def get_live_status():

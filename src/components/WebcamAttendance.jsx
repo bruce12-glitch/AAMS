@@ -34,11 +34,11 @@ export default function WebcamAttendance({ onResult }) {
         if (cancelled) return
         try {
           const canvas = document.createElement('canvas')
-          const scale = Math.min(1, 960 / Math.max(video.videoWidth, video.videoHeight))
+          const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight))
           canvas.width = Math.round(video.videoWidth * scale)
           canvas.height = Math.round(video.videoHeight * scale)
           canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height)
-          frames.push(canvas.toDataURL('image/jpeg', 0.85))
+          frames.push(canvas.toDataURL('image/jpeg', 0.92))
           if (!bypass && frames.length < 10) {
             setStatus('Look at the camera and blink naturally…')
             schedule(capture, 200)
@@ -50,13 +50,19 @@ export default function WebcamAttendance({ onResult }) {
             liveness_frames_b64: bypass ? [] : frames,
             skip_liveness: bypass,
             continuous: true,
+            capture_source: 'webcam',
           }, 120000, controller.signal)
           if (cancelled) return
           resultRef.current?.({ ...result, source: 'api' })
+          const notificationText = {
+            sent: 'Telegram message sent.',
+            queued: 'Telegram message queued — check Communicate.',
+            disabled: 'Automatic Telegram entry messages are off.',
+          }[result.notification?.status] || ''
           setStatus(result.duplicate
             ? result.decision === 'GRANTED' ? 'Already recorded — waiting for the next person' : `Repeated check: ${result.reason}`
             : result.decision === 'GRANTED'
-              ? `Attendance recorded: ${result.user?.name || result.recognized_id}. Telegram follows your Communicate settings.`
+              ? `Attendance recorded: ${result.user?.name || result.recognized_id}. ${notificationText}`
               : result.reason || 'No match — face the camera and try again')
           // Sequential requests, bounded camera traffic and time to change person.
           schedule(scan, 10000)
@@ -77,7 +83,7 @@ export default function WebcamAttendance({ onResult }) {
         setError('')
         setStatus('Opening camera…')
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 960 }, height: { ideal: 720 } }, audio: false,
+          video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
         })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
         stage = 'start the camera preview'

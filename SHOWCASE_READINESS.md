@@ -4,6 +4,81 @@ Repository: https://github.com/bruce12-glitch/AAMS
 Initial reviewed base: `main` at `f0e2ce4503fa7c6c476118b925e616e65d6e28cb`.
 Feature release: PR #8 merged at `9a0a6aed1547a8a49292680ccd3c8ecb58739653`.
 
+## Snapshot/CV correction — 27 October 2026
+
+The user's failed rehearsal exposed misleading snapshot feedback. The previous
+demo checks did not establish physical-webcam accuracy. This correction:
+
+- Defaults photo testing to Face only, separates a no-write diagnostic check
+  from recording entry, and shows quality measurements, detected box, comparison
+  status and score versus threshold. Invalid tokens and missing enrollments are
+  no longer disguised as zero-similarity unknown people. Simulation is explicitly
+  separated from actual photo analysis.
+- Fixes the reproduced real-model landmark mismatch (`landmark_2d_106` versus
+  `lmk`) and reads the top-level liveness configuration. Webcam burst liveness
+  must be tied to the same identity; inconclusive bursts stay denied without
+  falsely alleging a spoof. Still photos explicitly bypass liveness only in
+  the attended demo mode.
+- Rejects mixed-person enrollment, retains the 0.45 matching threshold and
+  normal quality gates, handles legacy float32/corrupt stored vectors, and rejects
+  off-image face crops that previously skipped quality checks.
+- Fixes first-run Windows dotenv serialization (the old test covered only
+  existing files), tests initial setup too, and uses OpenCV 4.10.0.84 in both
+  dependency sets to match the user's working build recovery.
+
+Local full-model suite: **164 passed**. Actual photo regression enrolls two
+public-domain fixture identities and correctly matches original/crop/brightness/
+JPEG variants; the unenrolled portrait is rejected. Scores from the test run:
+0.985–1.000 for related variants, -0.0046 for the different unenrolled portrait,
+threshold unchanged at 0.45. This is a functional regression, **not** an accuracy
+benchmark: transformed copies are not independent held-out captures. Actual
+webcam/lighting, live blink behavior, volunteer false accepts/rejects and Telegram
+phone receipt still need the physical laptop. Consult the PR checks for browser,
+Windows and Docker results.
+
+## Earlier demo polish — 27 October 2026
+
+This update starts from merged main `79b8e0e991ea23ee0d984fe467d2f4aa97ebadf0`.
+It keeps the current authentication and SQLite/volume architecture. No public
+deployment, database reset, branch deletion or live Telegram send is performed.
+
+- Dashboard distinguishes active/enrolled members from those actually eligible
+  to enter (enrolled, enabled account and current active payment), and shows
+  automatic-entry notification settings and queued-message count.
+- Entry responses and Live Monitor show whether Telegram accepted the message,
+  queued it or has automatic entry messages disabled. Entry messages include
+  the person's name, student ID, location and IST time. Repeat scans never
+  claim a new notification was sent.
+- The optional door-camera status no longer suggests the browser webcam is
+  broken. The pipeline overview is explicitly not live telemetry. Snapshot
+  testing no longer silently skips blink verification when burst frames are
+  missing; the operator must explicitly select bypass.
+- All scheduled jobs now explicitly use Asia/Kolkata instead of depending on
+  the host timezone. The reproduced scheduler-construction failure is covered
+  by a regression test. Duplicate student IDs return a clear conflict message.
+- Vite is updated within the 8.2 patch line to address the current development
+  server advisories; no runtime hosting service or paid dependency is added.
+- [DEMO_RUNBOOK.md](DEMO_RUNBOOK.md) gives a no-terminal setup, presentation
+  sequence, duplicate demonstration, troubleshooting and data-preserving update
+  instructions.
+
+Verification is performed using isolated member records. The regular backend
+suite passes 151 tests; the separate actual InsightFace model check passes
+enrollment, recognition, occupancy, duplicate suppression, re-entry, payment
+denial, empty frames and persistent notification queuing. That check explicitly
+bypasses blink for a still-image fixture and never sends to a real Telegram chat.
+Frontend lint and production/Pages builds are checked. The expanded browser test
+covers duplicate-registration rejection, explicit blink-bypass selection,
+automatic Telegram entry, sent/queued feedback and repeat-scan suppression
+using the real SDK with a controlled transport. Consult the final-polish PR's CI
+results for browser, Windows and Docker validation of the final commit.
+
+Still required on the demonstration laptop: camera permissions and real-room
+recognition/blink rehearsal, plus actual receipt of a test and automatic entry
+message in the privately configured Telegram destination. "Sent" means API
+acceptance, not a phone read receipt. This is an attended prototype, not a
+validated anti-spoofing or production access-control system.
+
 ## Current local prototype work — 18 October 2026
 
 Oracle/public deployment is paused at the user's request. Continuous laptop webcam attendance is already in main through PR #11. The local-prototype update adds an administrator Dashboard setup panel, nonblocking face-model initialization with retry, personal Telegram chat support with one-use pairing, and a Windows launcher that reuses saved configuration and opens the website. It preserves the separate administrator/shared credentials and exact SRMIST domain restriction.

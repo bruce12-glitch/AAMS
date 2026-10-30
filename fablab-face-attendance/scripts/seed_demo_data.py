@@ -10,29 +10,25 @@ sys.path.insert(0, '..')
 
 import os
 
-import numpy as np
 from app.database import get_connection
-
-def generate_random_embedding() -> bytes:
-    """Generate a random normalized 512-d embedding."""
-    emb = np.random.randn(512)
-    emb = emb / np.linalg.norm(emb)
-    return emb.tobytes()
 
 def main():
     """Seed the database with demo data."""
+    from app.security import production_mode
+    from app.database import init_db
+    if production_mode():
+        raise RuntimeError('Demo seeding is disabled in production. Use an empty disposable development database.')
+    init_db()
     conn = get_connection()
     cursor = conn.cursor()
     
     print("Seeding demo data...")
     
-    # Clear existing data
-    cursor.execute('DELETE FROM admin_actions')
-    cursor.execute('DELETE FROM alerts')
-    cursor.execute('DELETE FROM entry_logs')
-    cursor.execute('DELETE FROM occupants')
-    cursor.execute('DELETE FROM tokens')
-    cursor.execute('DELETE FROM users')
+    # Never erase an existing member list, attendance history or credentials.
+    for table in ('admin_actions', 'alerts', 'entry_logs', 'occupants', 'tokens', 'users'):
+        if cursor.execute(f'SELECT 1 FROM {table} LIMIT 1').fetchone():
+            conn.close()
+            raise RuntimeError('Refusing to seed a non-empty database; existing data is preserved.')
     
     # 6 Demo users
     users = [
@@ -56,11 +52,10 @@ def main():
         pwd_hash = hash_password(seed_password)
 
     for user in users:
-        embedding = generate_random_embedding()
         cursor.execute('''
-            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, face_embedding, password_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (*user, embedding, pwd_hash))
+            INSERT INTO users (user_id, name, phone, email, user_type, payment_status, payment_expiry, password_hash, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        ''', (*user, pwd_hash))
 
     print(f"[OK] Created {len(users)} users"
           + (" (with demo password)" if pwd_hash else " (no password — set via reset endpoint)"))
@@ -96,30 +91,13 @@ def main():
     for i, log in enumerate(logs):
         event_time = (now - timedelta(hours=i*2)).isoformat()
         cursor.execute('''
-            INSERT INTO entry_logs (event_time, claimed_id, recognized_id, similarity, payment_status, liveness_status, decision, reason, tag)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO entry_logs (event_time, claimed_id, recognized_id, similarity, payment_status, liveness_status, decision, reason, tag, event_source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sample')
         ''', (event_time, *log))
     
     print(f"[OK] Created {len(logs)} entry logs")
     
-    # 5 Demo occupants (3 inside, 2 exited)
-    occupants = [
-        ('RA2111003010123', 'inside'),
-        ('RA2111003010125', 'inside'),
-        ('RA2111003010127', 'inside'),
-        ('RA2111003010124', 'exited'),
-        ('RA2111003010126', 'exited'),
-    ]
-    
-    for occ in occupants:
-        entry_time = (now - timedelta(hours=3)).isoformat()
-        exit_time = (now - timedelta(hours=1)).isoformat() if occ[1] == 'exited' else None
-        cursor.execute('''
-            INSERT INTO occupants (user_id, entry_time, last_seen_time, exit_time, status)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (occ[0], entry_time, entry_time, exit_time, occ[1]))
-    
-    print(f"[OK] Created {len(occupants)} occupancy records")
+    # Sample records must not place fictitious people inside the real lab.
     
     # 5 Demo alerts
     alerts = [
@@ -132,8 +110,8 @@ def main():
     
     for alert in alerts:
         cursor.execute('''
-            INSERT INTO alerts (alert_type, severity, message, sent_status)
-            VALUES (?, ?, ?, 'sent')
+            INSERT INTO alerts (alert_type, severity, message, sent_status, event_source)
+            VALUES (?, ?, ?, 'sample', 'sample')
         ''', alert)
     
     print(f"[OK] Created {len(alerts)} alerts")

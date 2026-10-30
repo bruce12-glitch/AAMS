@@ -176,7 +176,7 @@ class CaptureService:
         require_liveness = get_config().get('security', {}).get('require_liveness', False)
         granted = payment == 'active' and not require_liveness
         decision = 'GRANTED' if granted else 'DENIED'
-        tag = 'authorized' if granted else ('spoof' if require_liveness and payment == 'active' else 'unpaid')
+        tag = 'authorized' if granted else ('liveness' if require_liveness and payment == 'active' else 'unpaid')
         similarity = round(result.get('similarity', 0.0), 4)
         now_iso = _now_iso()
 
@@ -196,16 +196,17 @@ class CaptureService:
             cur.execute('''
                 INSERT INTO entry_logs (event_time, claimed_id, recognized_id,
                     similarity, payment_status, liveness_status, decision,
-                    reason, tag, image_path, location)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reason, tag, image_path, location, event_source, comparison_performed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'door_camera', 1)
             ''', (
                 now_iso,
                 user.get('user_id'), user.get('user_id'), similarity,
                 payment, 'unknown',
                 decision,
-                'Automatic entry (camera)' if granted else ('Liveness not verified' if tag == 'spoof' else f'Payment {payment}'),
+                'Automatic entry (camera)' if granted else ('Liveness not verified' if tag == 'liveness' else f'Payment {payment}'),
                 tag, evidence, location,
             ))
+            entry_id = cur.lastrowid
 
             if granted:
                 # Only track occupancy for people allowed in.
@@ -232,13 +233,13 @@ class CaptureService:
 
         from app.alerts import AlertService
         from app.config import get_telegram_config
-        if not granted or (newly_inside and get_telegram_config().get('notify_on_entry', True)):
-            event = 'ENTRY' if granted else ('SPOOF' if tag == 'spoof' else 'UNPAID')
+        if (not granted and tag == 'unpaid') or (newly_inside and get_telegram_config().get('notify_on_entry', True)):
+            event = 'ENTRY' if granted else 'UNPAID'
             message = f"AAMS — Camera entry {decision.lower()}\nName: {user.get('name')}\nStudent ID: {user.get('user_id')}\nPayment: {payment}"
             try:
                 # The capture worker queues without awaiting network traffic.
                 # The scheduler delivers the durable queue automatically.
-                AlertService().save_alert_to_db(event, message, image_path=evidence, severity='low' if granted else 'medium')
+                AlertService().save_alert_to_db(event, message, image_path=evidence, severity='low' if granted else 'medium', event_source='door_camera', entry_log_id=entry_id)
             except Exception as exc:
                 logger.warning('Camera notification queue failed (%s)', type(exc).__name__)
 

@@ -25,7 +25,7 @@ const DEMO_MSG = 'Not available in the static demo build — these actions need 
 const TOKEN_MSG = 'Administrator access is required for this action.'
 
 export default function Users() {
-  const { isAdmin } = useAuth()
+  const { isAdmin, logout } = useAuth()
   const { data, loading, error, refresh } = usePolling('/users', MOCK_USERS, 8000, { enabled: !IS_STATIC_DEMO })
   const [query, setQuery] = useState('')
   const [showEnroll, setShowEnroll] = useState(false)
@@ -88,15 +88,28 @@ export default function Users() {
   const setPayment = async (u, status) => {
     setBusyId(u.user_id)
     setRowError('')
+    setSuccess('')
     if (IS_STATIC_DEMO) { setBusyId(null); return setRowError(DEMO_MSG) }
     try {
-      await withAdminPrompt(() => apiPut(`/users/${encodeURIComponent(u.user_id)}?payment_status=${status}`))
-      refresh()
+      await apiPut(`/users/${encodeURIComponent(u.user_id)}`, { payment_status: status })
+      await refresh()
+      setSuccess(`${u.name || u.user_id}: payment status saved as ${status}.`)
     } catch (err) {
       // Was silently swallowed, leaving the dropdown showing a value the
       // server never accepted. Tell the user instead.
       setRowError(err.status === 401 ? TOKEN_MSG : (err.message || 'Could not update payment status'))
     }
+    finally { setBusyId(null) }
+  }
+
+  const setAccount = async (u, active) => {
+    if (!active && !window.confirm(`Disable access for ${u.name || u.user_id}? Their passes will be revoked and any open visit checked out. Face enrollment is kept.`)) return
+    setBusyId(u.user_id); setRowError(''); setSuccess('')
+    try {
+      await apiPut(`/users/${encodeURIComponent(u.user_id)}`, { active })
+      await refresh()
+      setSuccess(active ? `${u.name || u.user_id}: access enabled. Revoked QR passes remain invalid; issue a new pass if needed.` : `${u.name || u.user_id}: access disabled. Passes revoked and open visit checked out.`)
+    } catch (err) { setRowError(err.message || 'Could not save account status.') }
     finally { setBusyId(null) }
   }
 
@@ -115,15 +128,16 @@ export default function Users() {
   }
 
   return (
-    <div className="page-wrap">
-      <div className="page-intro" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16 }}>
+    <div className="page-wrap records-surface">
+      <div className="records-page-head">
         <div>
           <h1 className="page-title">Members</h1>
           <p className="page-sub">Student profiles, face enrollment, payment status and signed access passes.</p>
         </div>
-        <div style={{ display: 'flex', gap: 10 }}>
+        <div className="action-row">
           <input
             className="search-input"
+            aria-label="Search members"
             placeholder="Search name / ID / phone…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -134,6 +148,10 @@ export default function Users() {
       </div>
 
       <DataNotice error={error} loading={loading} />
+      {!isAdmin && <div className="read-only-note" role="note">
+        <strong>Read-only member view.</strong> Only an administrator can change account or payment status.
+        <button className="btn ghost" type="button" onClick={logout}>Sign out to use administrator login</button>
+      </div>}
       {success && <p className="success-note" role="status">{success}</p>}
       <motion.div
         className="panel table-panel"
@@ -153,7 +171,7 @@ export default function Users() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Student</th><th>ID</th><th>Details</th><th>Biometrics</th><th>Payment</th><th>Actions</th>
+              <th>Student</th><th>ID</th><th>Details</th><th>Face enrollment</th><th>Account</th><th>Payment</th>{isAdmin && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -172,12 +190,17 @@ export default function Users() {
                 </td>
                 <td className="mono">{u.user_id}</td>
                 <td><div>{u.email || '—'}</div><small className="alert-time">{[u.phone, u.department, u.year && `Year ${u.year}`, u.section].filter(Boolean).join(' · ')}</small></td>
-                <td><StatusBadge value={u.enrolled ? 'active' : 'noface'} /></td>
+                <td><StatusBadge value={u.enrolled ? 'active' : undefined} label={u.enrolled ? 'Enrolled' : 'Not enrolled'} /></td>
+                <td>{isAdmin && !IS_STATIC_DEMO ? <select className="mini-select" aria-label={`Account status for ${u.name || u.user_id}`}
+                  value={u.active === 1 ? '1' : '0'} disabled={busyId === u.user_id}
+                  onChange={(event) => setAccount(u, Number(event.target.value))}>
+                  <option value="1">Enabled</option><option value="0">Disabled</option>
+                </select> : <span>{u.active === 1 ? 'Enabled' : 'Disabled'}</span>}</td>
                 <td>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <StatusBadge value={u.payment_status} />
-                    <select
+                    {!isAdmin || IS_STATIC_DEMO ? <span>{u.payment_status || 'Not recorded'}</span> : <select
                       className="mini-select"
+                      aria-label={`Payment status for ${u.name || u.user_id}`}
                       value={String(u.payment_status ?? 'inactive')}
                       disabled={!isAdmin || busyId === u.user_id}
                       onChange={(e) => setPayment(u, e.target.value)}
@@ -186,10 +209,10 @@ export default function Users() {
                       <option value="pending">pending</option>
                       <option value="expired">expired</option>
                       <option value="inactive">inactive</option>
-                    </select>
+                    </select>}
                   </span>
                 </td>
-                <td>
+                {isAdmin && <td>
                   {isAdmin && <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, maxWidth: 230 }}>
                     <button className="btn sm ghost" type="button" onClick={() => setEditStudent(u)}>Edit</button>
                     <button className="btn sm ghost" type="button" onClick={() => { setEnrollStudent(u); setShowEnroll(true) }}>Enroll face</button>
@@ -197,11 +220,11 @@ export default function Users() {
                     <button className="btn sm ghost" onClick={() => rekey(u)} disabled={busyId === u.user_id} type="button" title="Lost token: revoke + re-issue">⟳</button>
                     <button className="btn sm ghost" onClick={() => removeUser(u)} disabled={busyId === u.user_id} type="button" title="Delete member">✕</button>
                   </span>}
-                </td>
+                </td>}
               </motion.tr>
             ))}
             {rows.length === 0 && !loading && (
-              <tr><td colSpan={6}><div className="empty-state">No members found.<span className="mono">USE ＋ ADD STUDENT</span></div></td></tr>
+              <tr><td colSpan={isAdmin ? 7 : 6}><div className="empty-state">{error ? 'Member records could not be loaded.' : 'No members match this view.'}</div></td></tr>
             )}
           </tbody>
         </table>

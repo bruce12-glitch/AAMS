@@ -53,7 +53,7 @@ class ReportScheduler:
         # Occupancy timeout check every 5 minutes
         self.scheduler.add_job(
             self.check_occupancy_timeouts,
-            IntervalTrigger(minutes=5),
+            IntervalTrigger(minutes=5, timezone='Asia/Kolkata'),
             id='occupancy_timeout',
             name='Check occupancy timeouts'
         )
@@ -77,7 +77,7 @@ class ReportScheduler:
         # Offline alert retry queue (§30.7) every 5 minutes
         self.scheduler.add_job(
             self.flush_pending_alerts,
-            IntervalTrigger(minutes=5),
+            IntervalTrigger(minutes=5, timezone='Asia/Kolkata'),
             id='alert_retry',
             name='Flush pending alerts'
         )

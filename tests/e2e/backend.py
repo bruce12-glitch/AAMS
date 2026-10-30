@@ -11,7 +11,11 @@ os.environ.update(AAMS_ENV='production', ADMIN_EMAIL=credentials['email'],
                   AAMS_ACCESS_PASSWORD=credentials['member_password'],
                   SESSION_SECRET_KEY=secrets.token_urlsafe(48),
                   QR_SECRET_KEY=secrets.token_urlsafe(48),
-                  DATABASE_PATH=str(root / 'showcase.db'))
+                  DATABASE_PATH=str(root / 'showcase.db'),
+                  # Test navigation/polling compresses a full rehearsal into a
+                  # minute. Keep production's default 120/min protection intact;
+                  # use a larger budget only in this disposable test subprocess.
+                  RATE_LIMIT_PER_MIN='1000')
 import numpy as np
 import app.vision as vision
 embedding = np.linspace(-1, 1, 512)
@@ -53,5 +57,24 @@ class TelegramRequest(BaseRequest):
             raise AssertionError(endpoint)
         return 200, json.dumps({'ok': True, 'result': result}).encode()
 telegram.Bot = lambda token, request: RealBot(token=token, request=TelegramRequest(), get_updates_request=TelegramRequest())
+
+# Controlled records live ONLY in this disposable browser-test database. They
+# verify that a previously seeded database is not presented as current evidence.
+from app.database import init_db, get_connection
+init_db()
+with get_connection() as conn:
+    for source, reason, compared in [
+        ('legacy', 'Historical fixture: origin unrecorded', None),
+        ('sample', 'Demo fixture: not security evidence', 1),
+        ('webcam', 'Controlled browser review item', 1),
+        ('snapshot', 'No face detected in controlled capture', 0),
+    ]:
+        event_id = conn.execute('''INSERT INTO entry_logs
+            (decision, reason, tag, similarity, event_source, comparison_performed)
+            VALUES ('DENIED', ?, 'unknown', 0.25, ?, ?)''', (reason, source, compared)).lastrowid
+        if source != 'snapshot':
+            conn.execute('''INSERT INTO alerts
+                (alert_type, message, event_source, entry_log_id, sent_status)
+                VALUES ('UNKNOWN', ?, ?, ?, 'fixture')''', (reason, source, event_id))
 import uvicorn
 uvicorn.run('app.main:app', host='127.0.0.1', port=8000, log_level='warning')

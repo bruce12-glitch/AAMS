@@ -1,311 +1,56 @@
-import { useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 import { usePolling } from '../hooks/useApi'
-import { apiPost, fileToDataUri, simulateEntry } from '../api/client'
+import { simulateEntry } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
 import { MOCK_LIVE } from '../api/mock'
-import { IconCheck, IconX } from '../components/icons'
-import CameraCapture from '../components/CameraCapture'
 import DataNotice from '../components/DataNotice'
 import WebcamAttendance from '../components/WebcamAttendance'
-
-const PIPELINE = [
-  'TOKEN_DETECTED',
-  'FACE_DETECTED',
-  'QUALITY_CHECKED',
-  'LIVENESS_CHECKED',
-  'MATCHED',
-  'DECISION_MADE'
-]
+import SnapshotEntry from '../components/SnapshotEntry'
+import EntryResult from '../components/EntryResult'
 
 const SCENARIOS = ['authorized', 'proxy', 'unpaid', 'unknown', 'spoof', 'tailgate']
-
-const REDUCED_SCAN =
-  typeof window !== 'undefined' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function LiveMonitor() {
   const live = usePolling('/dashboard/live', MOCK_LIVE, 5000, { enabled: !IS_STATIC_DEMO })
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
-
-  // snapshot test state
-  const [mode, setMode] = useState('token_face')
-  const [photoUri, setPhotoUri] = useState('')
-  const [burstUris, setBurstUris] = useState([])
-  const [tokenValue, setTokenValue] = useState('')
-  const [skipLiveness, setSkipLiveness] = useState(true)
-  const [cvError, setCvError] = useState('')
-  const [cameraOpen, setCameraOpen] = useState(false)
-
-  const mainRef = useRef(null)
-  const burstRef = useRef(null)
-
-  const camera = live.data?.camera ?? (IS_STATIC_DEMO ? MOCK_LIVE.camera : {})
-  const camOnline = String(camera?.status ?? '').toLowerCase() === 'online' || camera?.fps > 0
-
-  // Stable identity for the decision banner. Previously this key embedded
-  // Math.random(), so every render produced a new key and React tore down and
-  // remounted the whole banner - replaying its entry animation on each poll.
-  const resultKey = result
-    ? `${result.decision ?? 'x'}-${result.tag ?? 'x'}-${result.event_time ?? result.similarity ?? ''}`
-    : 'none'
-
-  // Pipeline highlight: only mark steps as reached once the API has actually
-  // reported a decision. Deliberately not keyed off local step names, which
-  // previously produced an always-true expression (see git history).
-  const pipelineHot = Boolean(result?.decision)
-
+  const camera = live.data?.camera || {}
+  const camOnline = String(camera.status || '').toLowerCase() === 'online' || camera.fps > 0
   const runScenario = async (scenario) => {
     setBusy(true)
-    setResult(null)
-    // simulateEntry() already falls back to a local simulation constant when
-    // the API is unreachable, and tags the response `source: 'local'`. The
-    // banner renders that tag, so routing through it (instead of calling
-    // apiPost directly and nulling the result on failure) means the scenario
-    // buttons still demonstrate the pipeline without a backend — which is the
-    // entire point of the static build.
-    const res = await simulateEntry(scenario)
-    setResult(res)
-    setBusy(false)
+    try { setResult({ ...await simulateEntry(scenario), source: 'simulation' }) }
+    finally { setBusy(false) }
   }
-
-  const runSnapshot = async () => {
-    setCvError('')
-    setResult(null)
-    if (!photoUri) return setCvError('Pick a face photo first')
-    if (mode === 'token_face' && !tokenValue.trim())
-      return setCvError('Enter a token value (user ID or full signed QR JSON)')
-
-    setBusy(true)
-    try {
-      if (IS_STATIC_DEMO) {
-        const simulated = await simulateEntry('authorized')
-        setResult({
-          ...simulated,
-          reason: 'Showcase simulation completed — the uploaded photo was not analyzed without the backend.'
-        })
-        return
-      }
-      const body = {
-        image_b64: photoUri,
-        liveness_frames_b64: skipLiveness ? [] : burstUris,
-        skip_liveness: skipLiveness || burstUris.length < 2
-      }
-      const path = mode === 'token_face' ? '/entry/process' : '/entry/face-only'
-      if (mode === 'token_face') body.token_value = tokenValue.trim()
-      const res = await apiPost(path, body, 60000)
-      setResult({ ...res, source: 'api' })
-    } catch (err) {
-      setCvError(err.message || 'Entry request failed')
-    } finally {
-      setBusy(false)
-    }
-  }
-
   return (
     <div className="page-wrap">
       <DataNotice error={live.error} loading={live.loading} />
       <div className="page-intro">
         <h1 className="page-title">Live Monitor</h1>
-        <p className="page-sub">Entrance pipeline status and real CV entry testing.</p>
+        <p className="page-sub">Automatic webcam attendance and a separate, no-write recognition check.</p>
       </div>
-
       <div className="grid-main">
         <div className="stack">
           <WebcamAttendance onResult={setResult} />
-          <motion.section
-            className="panel"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-          >
-            <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Entrance Camera</h2>
-              <span className={`badge ${camOnline ? 'active' : 'neutral'}`}>
-                <span className="badge-dot" />
-                {camOnline ? 'online' : 'standby'}
-              </span>
-            </div>
-
-            <div className="camera-classic">
-              <motion.div
-                animate={REDUCED_SCAN ? {} : { y: ['-100%', '400%'] }}
-                transition={{ duration: 4.2, repeat: Infinity, ease: 'linear' }}
-                style={{
-                  position: 'absolute', left: 0, right: 0, height: 44,
-                  background: 'linear-gradient(180deg, transparent, rgba(201,168,106,.10), transparent)',
-                  pointerEvents: 'none'
-                }}
-              />
-              <div style={{ textAlign: 'center', position: 'relative' }}>
-                <div className="mono" style={{ color: 'var(--text-low)', fontSize: 11, letterSpacing: 3 }}>
-                  {camOnline ? `CAM ${camera.source ?? 0} · ${camera.fps} FPS · 1280×720` : 'CAMERA LINK — REMAINING STEP'}
-                </div>
-                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-mid)' }}>
-                  {camOnline ? 'Monitoring entrance…' : 'Connect the lab camera to enable live capture'}
-                </div>
-              </div>
-            </div>
-
-            {!camOnline && (
-              <div className="camera-path-hint">
-                <strong>Camera not linked.</strong> Set <code>camera.source</code> +{' '}
-                <code>capture.enabled: true</code> in <code>config.yaml</code>, restart the API.
-                Snapshot test below works without a camera.
-              </div>
-            )}
-
-            <div className="pipeline" style={{ marginTop: 16 }}>
-              {PIPELINE.map((step) => (
-                <div key={step} className={`pipeline-step ${pipelineHot ? 'hot' : ''}`}>
-                  <span className="step-node" />
-                  {step.replace(/_/g, ' ')}
-                </div>
-              ))}
-            </div>
-          </motion.section>
-
-          <AnimatePresence mode="wait">
-            {result && (
-              <motion.section
-                key={resultKey}
-                className={`decision-banner ${result.decision === 'GRANTED' ? 'granted' : 'denied'}`}
-                initial={{ opacity: 0, scale: 0.94, y: 12 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96, y: -8 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-              >
-                <span className="decision-scanline" />
-                <div className="decision-icon-ring">
-                  {result.decision === 'GRANTED'
-                    ? <IconCheck width={24} height={24} />
-                    : <IconX width={24} height={24} />}
-                </div>
-                <div>
-                  <div className="decision-title" style={{ color: result.decision === 'GRANTED' ? 'var(--green)' : 'var(--red)' }}>
-                    Access {result.decision}
-                  </div>
-                  <div className="decision-reason">{result.reason}</div>
-                  {typeof result.similarity === 'number' && (
-                    <div className="alert-time mono">
-                      similarity {result.similarity.toFixed(2)} · liveness {result.liveness_status ?? 'n/a'}
-                      {result.face_count > 0 ? ` · faces ${result.face_count}` : ''}
-                      {result.occupant_state ? ` · ${result.occupant_state}` : ''}
-                    </div>
-                  )}
-                </div>
-                <span
-                  className="badge neutral"
-                  style={{ marginLeft: 'auto' }}
-                  title={result.source === 'local' ? 'Backend unreachable — simulated locally' : 'Response from API'}
-                >
-                  {result.source === 'local' ? 'local sim' : 'api'}
-                </span>
-              </motion.section>
-            )}
-          </AnimatePresence>
-
-          {cvError && (
-            <motion.div className="form-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {cvError}
-            </motion.div>
-          )}
+          <EntryResult result={result} />
+          <details className="panel">
+            <summary className="panel-title" style={{ cursor: 'pointer' }}>Optional lab camera and pipeline overview</summary>
+            <p>{camOnline ? `Lab camera online · ${camera.fps} FPS` : 'Optional lab camera is on standby. It is separate from the laptop webcam above.'}</p>
+            <p className="field-hint">A lab camera is not required for this laptop demo. For dedicated door hardware set camera.source and capture.enabled in config.yaml.</p>
+            <p className="field-hint">Pipeline overview, not live telemetry: detect → quality → ArcFace embedding → identity → payment/liveness policy → attendance.</p>
+          </details>
         </div>
-
         <div className="stack">
-          <motion.section
-            className="panel"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.15 }}
-          >
-            <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Snapshot Entry Test</h2>
-            </div>
-            <p style={{ fontSize: 12.5, color: 'var(--text-mid)', lineHeight: 1.55, margin: '0 0 14px' }}>
-              {IS_STATIC_DEMO
-                ? 'Showcase mode: demonstrates the entry decision flow. Real face matching starts when the backend is connected.'
-                : 'Runs the real pipeline server-side: detect → quality → ArcFace embed → match → policy.'}
-            </p>
-
-            <div className="chip-row" style={{ marginBottom: 12 }}>
-              <button className={`filter-chip ${mode === 'token_face' ? 'on' : ''}`} onClick={() => setMode('token_face')} type="button">Token + Face</button>
-              <button className={`filter-chip ${mode === 'face_only' ? 'on' : ''}`} onClick={() => setMode('face_only')} type="button">Face only</button>
-            </div>
-
-            <button className={`dropzone slim ${photoUri ? 'has-files' : ''}`} onClick={() => mainRef.current?.click()} type="button">
-              <input ref={mainRef} type="file" accept="image/*" capture="user" hidden
-                onChange={async (e) => { try { setPhotoUri(await fileToDataUri(e.target.files?.[0])) } catch (err) { setCvError(err.message) } }} />
-              {photoUri
-                ? <img src={photoUri} alt="snapshot" style={{ maxHeight: 110, borderRadius: 8 }} />
-                : <>📷 Pick entrance snapshot<span>JPG / PNG — face clearly visible</span></>}
-            </button>
-            <button className="btn ghost" style={{ width: '100%', marginTop: 8 }}
-              onClick={() => setCameraOpen(true)} type="button">Capture from webcam</button>
-
-            {mode === 'token_face' && (
-              <input className="search-input" style={{ width: '100%', marginTop: 10 }}
-                placeholder="Token (user ID or signed QR JSON)"
-                value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} />
-            )}
-
-            <label className="consent-row" style={{ marginTop: 10 }}>
-              <input type="checkbox" checked={skipLiveness}
-                onChange={(e) => setSkipLiveness(e.target.checked)} />
-              Skip blink liveness (single snapshot)
-            </label>
-
-            {!skipLiveness && (
-              <>
-                <button className={`dropzone slim ${burstUris.length ? 'has-files' : ''}`}
-                  onClick={() => burstRef.current?.click()} type="button" style={{ marginTop: 10 }}>
-                  <input ref={burstRef} type="file" accept="image/*" multiple hidden
-                    onChange={async (e) => {
-                      const uris = []
-                      for (const f of Array.from(e.target.files ?? []).slice(0, 12)) {
-                        try { uris.push(await fileToDataUri(f)) } catch (err) { setCvError(err.message) }
-                      }
-                      setBurstUris(uris)
-                    }} />
-                  {burstUris.length
-                    ? <span>{burstUris.length} burst frames ready</span>
-                    : <>🎞️ Pick 4–10 frame burst<span>short sequence capturing a blink</span></>}
-                </button>
-                {burstUris.length > 0 && burstUris.length < 4 && (
-                  <p className="alert-time" style={{ marginTop: 6 }}>Fewer than 4 frames — liveness will stay “unknown”.</p>
-                )}
-              </>
-            )}
-
-            <button className="btn primary" style={{ width: '100%', marginTop: 14 }}
-              onClick={runSnapshot} disabled={busy} type="button">
-              {busy ? (IS_STATIC_DEMO ? 'Running showcase…' : 'Running CV pipeline…') : 'Process Entry'}
-            </button>
-          </motion.section>
-
-          <motion.section
-            className="panel"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, delay: 0.25 }}
-          >
-            <div className="panel-head">
-              <h2 className="panel-title"><span className="tick" />Scenario Simulator</h2>
-            </div>
+          <SnapshotEntry />
+          <details className="panel">
+            <summary className="panel-title" style={{ cursor: 'pointer' }}>Scenario simulator — no real CV</summary>
+            <p className="field-hint">These buttons show example decisions only. They do not test your photo, recognition accuracy or Telegram.</p>
             <div className="chip-row">
-              {SCENARIOS.map((sc) => (
-                <button key={sc} className="scenario-chip" onClick={() => runScenario(sc)} disabled={busy} type="button">
-                  {sc}
-                </button>
-              ))}
+              {SCENARIOS.map((scenario) => <button key={scenario} className="scenario-chip" type="button" disabled={busy}
+                onClick={() => runScenario(scenario)}>{scenario}</button>)}
             </div>
-          </motion.section>
+          </details>
         </div>
       </div>
-      <CameraCapture open={cameraOpen} maxShots={1}
-        onDone={(shots) => setPhotoUri(shots[0] ?? '')}
-        onClose={() => setCameraOpen(false)} />
     </div>
   )
 }
