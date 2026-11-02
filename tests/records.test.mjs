@@ -6,6 +6,7 @@ assert.equal(matchScore({ similarity: 0, comparison_performed: false }), 'Not co
 assert.equal(matchScore({ similarity: .93 }), 'Not recorded')
 assert.equal(matchScore({ similarity: .9365, comparison_performed: true }), '0.936')
 assert.equal(matchScore({ similarity: .9, comparison_performed: 1, event_source: 'sample' }), 'Demo value')
+assert.equal(matchScore({ similarity: null, comparison_performed: 0, event_source: 'sample' }), 'Demo — not compared')
 assert.equal(paymentLabel(null), 'Not evaluated')
 assert.equal(sourceLabel('legacy'), 'Older · source unrecorded')
 assert.equal(readableText('A â€” B'), 'A — B')
