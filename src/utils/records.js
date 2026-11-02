@@ -11,7 +11,7 @@ export const alertTitle = (value) => resultLabel(String(value || '').toLowerCase
 export const paymentLabel = (value) => value ? String(value).replaceAll('_', ' ') : 'Not evaluated'
 
 export function matchScore(row) {
-  if (row.event_source === 'sample') return 'Demo value'
+  if (row.event_source === 'sample') return row.similarity == null ? 'Demo — not compared' : 'Demo value'
   if (row.comparison_performed === false || row.comparison_performed === 0) return 'Not compared'
   if (row.comparison_performed !== true && row.comparison_performed !== 1) return 'Not recorded'
   return Number.isFinite(row.similarity) ? row.similarity.toFixed(3) : 'Not recorded'
