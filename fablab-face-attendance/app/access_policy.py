@@ -61,6 +61,10 @@ class AccessDecision:
         if self.require_liveness and face_result.get('result') == 'MATCH' and liveness_status != 'real':
             return {'decision': 'DENIED', 'reason': 'Liveness not verified — retry and blink naturally', 'alert_type': None, 'tag': 'liveness'}
 
+        if face_result.get('result') == 'AMBIGUOUS':
+            return {'decision': 'DENIED', 'reason': 'Face matches more than one enrollment too closely. Retake a clear capture; an administrator should check for duplicate face enrollments.',
+                    'alert_type': None, 'tag': 'ambiguous'}
+
         # Setup/token failures must not masquerade as a zero-similarity face
         # comparison. Keep entry denied, but give the operator the real cause.
         setup_reasons = {
