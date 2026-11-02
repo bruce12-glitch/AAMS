@@ -37,10 +37,11 @@ export default function EntryResult({ result }) {
             {quality?.blur_variance != null && <div><dt>Sharpness{quality.blur_reference_px ? ` (${quality.blur_reference_px}px reference)` : ''}</dt><dd>{quality.blur_variance} / minimum {quality.blur_min}</dd></div>}
             {quality?.brightness != null && <div><dt>Brightness</dt><dd>{quality.brightness} / range {quality.brightness_min}–{quality.brightness_max}</dd></div>}
             {diagnostics.enrolled_users != null && <div><dt>Enrolled identities searched</dt><dd>{diagnostics.enrolled_users}</dd></div>}
+            {diagnostics.match_margin != null && <div><dt>Separation from next identity</dt><dd>{diagnostics.match_margin.toFixed(3)} / minimum {diagnostics.min_match_margin.toFixed(3)}</dd></div>}
           </dl>}
           {diagnostics?.liveness?.reason && <p className="field-hint">{diagnostics.liveness.reason}</p>}
           {quality && !quality.passed && <p className="field-hint">No identity decision was made. Clean the lens, face a light source and hold still. Use a fresh webcam capture, not a screenshot or AI-enhanced image.</p>}
-          {diagnostics?.frame_selection?.additional_frames_checked > 0 && <p className="field-hint">Checked {diagnostics.frame_selection.additional_frames_checked} earlier burst frames for a usable capture. Identity and liveness checks were not bypassed.</p>}
+          {diagnostics?.frame_selection?.additional_frames_checked > 0 && <p className="field-hint">Compared {diagnostics.frame_selection.additional_frames_checked} burst frames and selected the sharpest quality-passing original capture. Every frame remains subject to the same-person liveness check; no sharpening or generated face details are used.</p>}
           {diagnostics?.comparison_performed && <p className="field-hint">Cosine similarity is a match score, not an accuracy percentage.</p>}
         </>}
       </div>
