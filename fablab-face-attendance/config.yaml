@@ -24,7 +24,7 @@ face:
   max_yaw: 25
   max_pitch: 20
   max_roll: 20
-  blur_threshold: 100
+  blur_threshold: 100         # Laplacian variance after downsampling face to 112px; calibrate with the demo camera
   brightness_min: 40
   brightness_max: 220
 

@@ -117,8 +117,10 @@ async def list_users(_: dict = Depends(require_user)):
     # derived BEFORE the embeddings are blanked, or every member would look
     # face-less in the console.
     for user in users:
-        user['enrolled'] = any(
-            user.get(k) for k in ('face_embedding', 'face_embedding_2', 'face_embedding_3')
+        from app.identity import _decode_embedding
+        user['enrolled'] = not bool(user['is_demo']) and any(
+            _decode_embedding(user.get(k)) is not None
+            for k in ('face_embedding', 'face_embedding_2', 'face_embedding_3')
         )
         user['face_embedding'] = None
         user['face_embedding_2'] = None
@@ -244,7 +246,7 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
                     payment_status=?, payment_expiry=?,
                     face_embedding=?, face_embedding_2=?, face_embedding_3=?,
                     face_image_path=?, password_hash=?, consent_given=?,
-                    active=1, updated_at=CURRENT_TIMESTAMP
+                    active=1, is_demo=0, face_enrollment_source='insightface', updated_at=CURRENT_TIMESTAMP
                 WHERE user_id=?
             ''', (req.name, req.phone, req.email, req.user_type,
                   req.payment_status, req.payment_expiry,
@@ -264,6 +266,7 @@ async def enroll_user(req: EnrollRequest, _: None = Depends(require_admin)):
 
         cursor.execute('UPDATE users SET department=?, year=?, section=? WHERE user_id=?',
                        (req.department, req.year, req.section, req.user_id))
+        cursor.execute("UPDATE users SET is_demo=0, face_enrollment_source='insightface' WHERE user_id=?", (req.user_id,))
 
         # Issue active token (replace old ones).
         #

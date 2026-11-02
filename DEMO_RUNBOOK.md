@@ -77,6 +77,14 @@ Telegram requires internet.
 
 ## Check recognition before recording attendance
 
+The quality check measures sharpness on a downsampled 112px face crop, not the
+original photo size. No AI enhancement or sharpening is applied, and the
+threshold remains 100. The old raw-crop score (for example 44.1) is not directly
+comparable with the new reference-size score. Very blurry, dark, small or
+cropped faces still fail. With blink capture, an unusable last frame can fall
+back to one of four earlier frames; the whole burst must still pass same-person
+and liveness checks. These changes need rehearsal with your physical webcam.
+
 Live Monitor → **Photo & camera check** defaults to **Face only**. Upload an
 original photo or capture from the webcam, then **Check photo — no attendance**.
 The backend performs the same quality, embedding, identity and policy checks
@@ -117,6 +125,31 @@ face enrollment. Re-enabling does **not** revive revoked QR passes; issue a new
 pass if required. Active payment can still be blocked by a past payment expiry.
 
 ### Current records and older examples
+
+**Entry Logs defaults to All records.** Search is performed on the database,
+including history older than the latest 500 rows, by matched/claimed name,
+student ID, reason, result or source. Decision and record-scope filters combine
+with the search. Fifty matching rows are displayed per page; use Next/Previous
+records. CSV exports the displayed page. A no-match message is not a broken
+search; clear filters with **Show all records**. The dashboard still uses
+current recorded events only.
+
+**Members → Add demo examples** (administrator only) adds six clearly labelled
+profiles and sample decisions without deleting or overwriting existing people.
+Repeated clicks are safe. Examples have no invented embeddings, face scores,
+QR passes, phone numbers or email addresses, and they create no occupants,
+real attendance or Telegram notifications. Search `Rahul` or `DEMO-RAHUL` in
+Entry Logs → All records to demonstrate search. Sample GRANTED rows describe a
+hypothetical permitted entry; they are not evidence that anyone attended.
+
+To permit an actual volunteer, use **Add student** or replace a demo profile's
+name and email with the volunteer's real details in **Enroll face**, obtain
+consent, and capture their face. Successful real enrollment promotes the demo
+profile into a real member. Set Account Enabled and Payment active with no
+past expiry, then use Live Monitor to check and record entry. Changing payment
+or clicking Mark reviewed alone never grants attendance. Older stored face
+vectors show **Older enrollment — re-enroll** until genuinely re-enrolled;
+invalid vectors are no longer displayed as enrolled.
 
 Entry Logs show names, decisions, reasons, IST timestamps and capture sources.
 **Not compared** is not a similarity of zero, and missing historical comparison

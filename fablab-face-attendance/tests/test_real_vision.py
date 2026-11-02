@@ -105,6 +105,7 @@ def test_two_real_identities_and_photo_variants_without_side_effects(showcase, t
     scores = {}
     for identity, frame in [('FIXTURE-A', first), ('FIXTURE-B', second)]:
         variants = {'original': frame, 'brighter': cv2.convertScaleAbs(frame, alpha=1.05, beta=8),
+                    'larger': cv2.resize(frame, None, fx=2, fy=2),
                     'cropped': frame[8:-8, 8:-8],
                     'compressed': cv2.imdecode(np.frombuffer(base64.b64decode(encode(frame, 65)), np.uint8), cv2.IMREAD_COLOR)}
         for name, variant in variants.items():
@@ -117,6 +118,8 @@ def test_two_real_identities_and_photo_variants_without_side_effects(showcase, t
     static = preview(first, skip_liveness=False, liveness_frames_b64=[encode(first)] * 4)
     assert static['decision'] == 'DENIED' and static['tag'] == 'liveness'
     assert static['diagnostics']['liveness']['status'] == 'unknown'
+    blurred = preview(cv2.GaussianBlur(first, (0,0), 12))
+    assert blurred['decision'] == 'DENIED' and not blurred['diagnostics']['comparison_performed']
     with db.get_connection() as conn:
         assert conn.execute('SELECT COUNT(*) FROM entry_logs').fetchone()[0] == 0
         assert conn.execute('SELECT COUNT(*) FROM occupants').fetchone()[0] == 0

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock
 from zoneinfo import ZoneInfo
 
 import pytest
+import numpy as np
 
 from tests.test_showcase_flows import showcase, student_payload
 
@@ -36,7 +37,7 @@ def test_readiness_distinguishes_enrolled_from_entry_eligible(showcase):
             ('NO-FACE', 'active', None, 1, None),
         ]
         conn.executemany('INSERT INTO users(user_id,name,payment_status,payment_expiry,active,face_embedding_2) VALUES (?, ?, ?, ?, ?, ?)',
-                         [(uid, uid, payment, expiry, active, face) for uid, payment, expiry, active, face in rows])
+                         [(uid, uid, payment, expiry, active, np.ones(512).tobytes() if face else None) for uid, payment, expiry, active, face in rows])
         conn.execute("INSERT INTO alerts(alert_type,message,sent_status) VALUES ('ENTRY','Queued test','pending')")
     result = client.get('/api/admin/readiness', headers=admin).json()
     assert result['active_members'] == 6

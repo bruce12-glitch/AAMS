@@ -166,6 +166,8 @@ def _ensure_columns():
         },
         'users': {
             'password_hash': 'TEXT',       # console sign-in (email + password)
+            'is_demo': 'INTEGER NOT NULL DEFAULT 0',
+            'face_enrollment_source': "TEXT NOT NULL DEFAULT 'legacy'",
             'department': 'TEXT',
             'year': 'INTEGER',
             'section': 'TEXT',

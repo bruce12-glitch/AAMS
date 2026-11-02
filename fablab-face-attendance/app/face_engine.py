@@ -120,11 +120,19 @@ class FaceEngine:
             passed = False
         if face_roi.size > 0:
             gray_face = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
-            laplacian_var = cv2.Laplacian(gray_face, cv2.CV_64F).var()
+            # Measure every face at ArcFace's 112px input scale. Raw variance
+            # falls when the SAME face is enlarged, so a fixed threshold on
+            # the original crop unfairly rejects high-resolution webcams.
+            # Do not sharpen or enhance: downsample only, never invent detail.
+            reference_size = min(112, gray_face.shape[0], gray_face.shape[1])
+            normalized = cv2.resize(gray_face, (reference_size, reference_size), interpolation=cv2.INTER_AREA)
+            laplacian_var = cv2.Laplacian(normalized, cv2.CV_64F).var()
             metrics['blur_variance'] = round(float(laplacian_var), 1)
+            metrics['blur_variance_raw'] = round(float(cv2.Laplacian(gray_face, cv2.CV_64F).var()), 1)
+            metrics['blur_reference_px'] = reference_size
             
             if laplacian_var < self.blur_threshold:
-                reasons.append(f"Face too blurry: variance {laplacian_var:.1f} < {self.blur_threshold}")
+                reasons.append(f"Face too blurry: sharpness {laplacian_var:.1f} < {self.blur_threshold} at {reference_size}px. Hold still in brighter, even light; clean the webcam lens and retake.")
                 passed = False
         
         # Check 3: Brightness check

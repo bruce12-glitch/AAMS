@@ -238,13 +238,14 @@ def test_telegram_chat_id_validation(showcase, chat_id, expected):
 
 def test_prototype_readiness_counts_active_enrolled_members_and_guards_roles(showcase, monkeypatch):
     import app.vision as vision
+    import numpy as np
     client, admin, member, db = showcase
     monkeypatch.setattr(vision, '_ENGINE', None)
     monkeypatch.setattr(vision, '_ENGINE_FAILED', False)
     monkeypatch.setattr(vision, '_ENGINE_LOADING', False)
     assert client.get('/api/admin/readiness', headers=member).status_code == 403
     with db.get_connection() as conn:
-        conn.execute("INSERT INTO users(user_id,name,face_embedding) VALUES ('READY','Enrolled',?)", (b'embedding',))
+        conn.execute("INSERT INTO users(user_id,name,face_embedding) VALUES ('READY','Enrolled',?)", (np.ones(512).tobytes(),))
         conn.execute("INSERT INTO users(user_id,name) VALUES ('NEW','Not enrolled')")
         conn.execute("INSERT INTO users(user_id,name,face_embedding,active) VALUES ('DISABLED','Disabled',?,0)", (b'embedding',))
     result = client.get('/api/admin/readiness', headers=admin)
