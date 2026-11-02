@@ -53,7 +53,7 @@ class IdentityVerifier:
         cursor.execute('''
             SELECT face_embedding, face_embedding_2, face_embedding_3 
             FROM users 
-            WHERE user_id = ? AND active = 1
+            WHERE user_id = ? AND active = 1 AND is_demo = 0
         ''', (user_id,))
         
         row = cursor.fetchone()
@@ -86,7 +86,7 @@ class IdentityVerifier:
         cursor.execute('''
             SELECT user_id, face_embedding, face_embedding_2, face_embedding_3 
             FROM users 
-            WHERE active = 1
+            WHERE active = 1 AND is_demo = 0
         ''')
         
         rows = cursor.fetchall()
