@@ -173,6 +173,29 @@ def analyze_frames(frames: list) -> dict:
     }
 
 
+def select_burst_frame(frame, frames):
+    """Reuse one inference per capture for focus selection AND blink checks.
+
+    Compare original pixels only. Sharpening/restoration can hallucinate facial
+    detail, so no generated image may earn a quality pass or become evidence.
+    The API bounds this sequence to 12 frames. Every frame stays in liveness.
+    """
+    analysis = analyze_frame(frame)
+    analyses = [analysis if np.array_equal(candidate, frame) else analyze_frame(candidate)
+                for candidate in frames]
+    candidates = [(frame, analysis, None)] + [
+        (candidate, result, index) for index, (candidate, result) in enumerate(zip(frames, analyses))]
+    usable = [item for item in candidates if item[1]['face_count'] == 1 and item[1]['quality_passed']]
+    selected, result, index = max(
+        usable or candidates[:1],
+        key=lambda item: item[1].get('quality_metrics', {}).get('blur_variance', 0))
+    return selected, result, analyses, {
+        'additional_frames_checked': len(frames), 'quality_frame_found': bool(usable),
+        'selected_burst_index': index, 'strategy': 'sharpest_quality_passing_original',
+        'max_face_count': max([analysis['face_count']] + [item['face_count'] for item in analyses]),
+    }
+
+
 def save_evidence(frame: np.ndarray, kind: str = "logs") -> str:
     """
     Persist a frame under images/<kind>/YYYY-MM-DD/ and return its path.
