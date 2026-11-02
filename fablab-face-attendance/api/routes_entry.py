@@ -73,6 +73,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     frame = None
     evidence_rel = None
     face_count = 0
+    frames = None
     quality_note = None
     diagnostics = {'mode': mode, 'identity_result': 'NOT_COMPARED',
                    'comparison_performed': False, 'liveness': {'status': 'unknown'}}
@@ -91,6 +92,23 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         # request, including Telegram sends — stays responsive.
         try:
             analysis = await asyncio.to_thread(analyze_frame, frame)
+            if not analysis.get('quality_passed') and not request.skip_liveness and request.liveness_frames_b64:
+                frames, bad = frames_from_payloads(request.liveness_frames_b64)
+                # A blink can blur the final frame. Retry at most four earlier
+                # burst frames; liveness below still verifies ALL identities
+                # against the selected frame, so swapping people cannot pass.
+                attempted = 0
+                for candidate in reversed(frames[:-1]):
+                    candidate_analysis = await asyncio.to_thread(analyze_frame, candidate)
+                    attempted += 1
+                    if candidate_analysis['face_count'] == 1 and candidate_analysis['quality_passed']:
+                        frame, analysis = candidate, candidate_analysis
+                        break
+                    if attempted == 4:
+                        break
+                diagnostics['frame_selection'] = {'additional_frames_checked': attempted,
+                                                  'quality_frame_found': bool(analysis['quality_passed']),
+                                                  'invalid_frames': bad}
         except VisionUnavailableError as exc:
             raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
@@ -146,9 +164,10 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     # ---- 2. Liveness ------------------------------------------------- #
     liveness_status = 'unknown'
     if not request.skip_liveness and frame is not None:
-        frames, bad = frames_from_payloads(request.liveness_frames_b64 or [])
-        if bad:
-            logger.warning('%d liveness frames failed to decode', bad)
+        if frames is None:
+            frames, bad = frames_from_payloads(request.liveness_frames_b64 or [])
+            if bad:
+                logger.warning('%d liveness frames failed to decode', bad)
         if len(frames) >= 4:
             engine = get_engine()
             checker = LivenessChecker()
