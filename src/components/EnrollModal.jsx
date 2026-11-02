@@ -49,6 +49,7 @@ export default function EnrollModal({ open, onClose, onEnrolled, member }) {
   const submit = async () => {
     setError('')
     if (!form.user_id.trim() || !form.name.trim()) return setError('User ID and Name are required')
+    if (member?.is_demo && /\(demo\)/i.test(form.name)) return setError('Replace the demo name with the consenting person’s real name before enrolling.')
     const cleanMail = normalizeEmail(form.email)
     if (!cleanMail) return setError(`SRMIST email is required (e.g. you${SRMIST_SUFFIX})`)
     if (!isSrmistEmail(cleanMail)) {
@@ -69,7 +70,7 @@ export default function EnrollModal({ open, onClose, onEnrolled, member }) {
       const res = await adminPost('/users/enroll', {
         user_id: form.user_id.trim(),
         name: form.name.trim(),
-        phone: form.phone.trim(),
+        phone: String(form.phone || '').trim(),
         email: cleanMail,
         payment_status: form.payment_status,
         payment_expiry: form.payment_expiry || null,
