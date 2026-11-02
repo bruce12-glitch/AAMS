@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiPost } from '../api/client'
 import { IS_STATIC_DEMO } from '../config/runtime'
+import { configureCamera, CAMERA_SETTLE_MS, nextScanDelay } from '../utils/camera'
 
 /** Laptop camera stays in the browser; only a bounded burst goes to the API. */
 export default function WebcamAttendance({ onResult }) {
@@ -65,7 +66,7 @@ export default function WebcamAttendance({ onResult }) {
               ? `Attendance recorded: ${result.user?.name || result.recognized_id}. ${notificationText}`
               : result.reason || 'No match — face the camera and try again')
           // Sequential requests, bounded camera traffic and time to change person.
-          schedule(scan, 10000)
+          schedule(scan, nextScanDelay(result))
         } catch (err) {
           if (cancelled) return
           setError(err.message || 'Attendance request failed. Check the backend connection.')
@@ -86,10 +87,13 @@ export default function WebcamAttendance({ onResult }) {
           video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
         })
         if (cancelled) { stream.getTracks().forEach((track) => track.stop()); return }
+        await configureCamera(stream)
+        if (cancelled) return
         stage = 'start the camera preview'
         videoRef.current.srcObject = stream
         await videoRef.current.play()
-        await scan()
+        setStatus('Waiting for camera focus and exposure…')
+        schedule(scan, CAMERA_SETTLE_MS)
       } catch (err) {
         if (cancelled) return
         setError(err.name === 'NotAllowedError'
@@ -113,6 +117,7 @@ export default function WebcamAttendance({ onResult }) {
     <section className="panel" aria-label="Laptop webcam attendance">
       <div className="panel-head"><h2 className="panel-title">Laptop Webcam Attendance</h2></div>
       <p>Register each student in Members and enroll their face with consent first. Start the camera, then show one person at a time. Recognition records entry automatically.</p>
+      <p className="field-hint">For stronger matching, enroll up to three clear views of the same person: straight on and slight left/right turns. The server selects the sharpest usable original from each blink burst and retries soft captures automatically. Severe blur still needs a retake.</p>
       <p>While running, face images are sent to your AAMS backend for recognition and evidence storage. Telegram entry messages use the private settings in Communicate.</p>
       <video ref={videoRef} muted playsInline aria-label="Live laptop camera"
         style={{ display: running ? 'block' : 'none', width: '100%', maxHeight: 420, background: '#111', borderRadius: 12 }} />
