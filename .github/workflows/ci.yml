@@ -60,6 +60,11 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Camera and record helper regressions
+        run: |
+          node tests/camera.test.mjs
+          node tests/records.test.mjs
+
   browser-smoke:
     name: Browser showcase flows
     runs-on: ubuntu-latest
