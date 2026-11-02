@@ -17,6 +17,7 @@ capture:
   cooldown_seconds: 45.0     # min gap between entries for the same person
 
 face:
+  min_match_margin: 0.05   # Additional rejection when two different identities score too closely; calibrate locally
   detection_model: "scrfd"
   recognition_model: "arcface"
   match_threshold: 0.45
