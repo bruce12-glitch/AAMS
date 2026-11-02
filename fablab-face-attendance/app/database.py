@@ -160,6 +160,7 @@ def _ensure_columns():
             'delivery_attempts': 'INTEGER DEFAULT 0',
             'last_error': 'TEXT',
             'last_attempt_at': 'TEXT',
+            'next_attempt_at': 'TEXT',
             'dedupe_key': 'TEXT',
             'event_source': "TEXT NOT NULL DEFAULT 'legacy'",
             'entry_log_id': 'INTEGER',
