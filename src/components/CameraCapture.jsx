@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { configureCamera, CAMERA_SETTLE_MS } from '../utils/camera'
 
 /** Secure-context webcam capture used by enrollment and entry testing. */
 export default function CameraCapture({ open, maxShots = 1, burst = false, onDone, onClose }) {
@@ -29,10 +30,12 @@ export default function CameraCapture({ open, maxShots = 1, burst = false, onDon
         })
         if (cancelled) return stream.getTracks().forEach((track) => track.stop())
         streamRef.current = stream
+        await configureCamera(stream)
+        if (cancelled) return
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
-          if (!cancelled) setReady(true)
+          if (!cancelled) timerRef.current = setTimeout(() => setReady(true), CAMERA_SETTLE_MS)
         }
       } catch (err) {
         setError(err?.name === 'NotAllowedError'
@@ -88,6 +91,7 @@ export default function CameraCapture({ open, maxShots = 1, burst = false, onDon
             initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}>
             <h3 className="modal-title">Camera Capture</h3>
             <p className="modal-sub">{burst ? 'Press Capture, then blink naturally during the short sequence. Keep the same person in view.' : 'Face the camera in even light. Keep your full face visible and still.'}</p>
+            {!ready && !error && <p role="status">Waiting for the camera to focus and adjust to the light…</p>}
             <video ref={videoRef} muted playsInline
               style={{ width: '100%', maxHeight: 420, borderRadius: 12, background: '#111', objectFit: 'cover' }} />
             {shots.length > 0 && (

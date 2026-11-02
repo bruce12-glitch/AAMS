@@ -85,7 +85,7 @@ def test_announcement_failure_is_retained_and_retried(showcase, monkeypatch):
     response = client.post('/api/notify/send', json={'message': 'Lab opens at 9 AM.'}, headers=admin)
     assert response.status_code == 200 and response.json()['telegram_sent'] is False
     with _db.get_connection() as conn:
-        conn.execute("UPDATE alerts SET last_attempt_at=datetime('now','-2 minutes')")
+        conn.execute("UPDATE alerts SET last_attempt_at=datetime('now','-2 minutes'), next_attempt_at=datetime('now','-1 second')")
     result = client.post('/api/notify/retry', headers=admin)
     assert result.json()['delivered'] == 1
     history = client.get('/api/notify/history', headers=admin).json()['notifications'][0]

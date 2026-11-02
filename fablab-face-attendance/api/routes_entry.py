@@ -67,6 +67,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         frames_from_payloads,
         get_engine,
         save_evidence,
+        select_burst_frame,
     )
 
     # ---- 1. Obtain embedding ---------------------------------------- #
@@ -74,6 +75,7 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
     evidence_rel = None
     face_count = 0
     frames = None
+    burst_analyses = None
     quality_note = None
     diagnostics = {'mode': mode, 'identity_result': 'NOT_COMPARED',
                    'comparison_performed': False, 'liveness': {'status': 'unknown'}}
@@ -91,24 +93,12 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         # run it in a worker thread so the event loop — and every other
         # request, including Telegram sends — stays responsive.
         try:
-            analysis = await asyncio.to_thread(analyze_frame, frame)
-            if not analysis.get('quality_passed') and not request.skip_liveness and request.liveness_frames_b64:
+            if not request.skip_liveness and request.liveness_frames_b64:
                 frames, bad = frames_from_payloads(request.liveness_frames_b64)
-                # A blink can blur the final frame. Retry at most four earlier
-                # burst frames; liveness below still verifies ALL identities
-                # against the selected frame, so swapping people cannot pass.
-                attempted = 0
-                for candidate in reversed(frames[:-1]):
-                    candidate_analysis = await asyncio.to_thread(analyze_frame, candidate)
-                    attempted += 1
-                    if candidate_analysis['face_count'] == 1 and candidate_analysis['quality_passed']:
-                        frame, analysis = candidate, candidate_analysis
-                        break
-                    if attempted == 4:
-                        break
-                diagnostics['frame_selection'] = {'additional_frames_checked': attempted,
-                                                  'quality_frame_found': bool(analysis['quality_passed']),
-                                                  'invalid_frames': bad}
+                frame, analysis, burst_analyses, selection = await asyncio.to_thread(select_burst_frame, frame, frames)
+                diagnostics['frame_selection'] = {**selection, 'invalid_frames': bad}
+            else:
+                analysis = await asyncio.to_thread(analyze_frame, frame)
         except VisionUnavailableError as exc:
             raise HTTPException(status_code=503, detail=f'CV engine unavailable: {exc}')
 
@@ -171,12 +161,20 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         if len(frames) >= 4:
             engine = get_engine()
             checker = LivenessChecker()
-            live = await asyncio.to_thread(
-                checker.check_liveness,
-                frames_sequence=frames,
-                face_engine=engine,
-                reference_embedding=embedding,
-            )
+            if diagnostics.get('frame_selection', {}).get('max_face_count', 0) > 1:
+                live = {'status': 'unknown', 'blink_detected': False, 'frames_analyzed': len(frames),
+                        'reason': 'Multiple faces in blink capture; keep one person in view.'}
+            else:
+                # Native results retain the actual face objects. Reuse them;
+                # do not run the same heavyweight detector twice per frame.
+                cached = burst_analyses and all('_face_obj' in item or item['face_count'] == 0 for item in burst_analyses)
+                live = await asyncio.to_thread(
+                    checker.check_liveness,
+                    frames_sequence=None if cached else frames,
+                    faces_sequence=[item.get('_face_obj') for item in burst_analyses] if cached else None,
+                    face_engine=engine,
+                    reference_embedding=embedding,
+                )
             liveness_status = live['status']
             diagnostics['liveness'] = {key: live[key] for key in ('status', 'blink_detected', 'frames_analyzed', 'reason')}
         else:
@@ -241,7 +239,10 @@ async def _run_pipeline(request: EntryRequest, mode: str) -> dict:
         payment_user = result.get('user') or {}
 
     diagnostics.update(identity_result=result.get('result'), threshold=verifier.match_threshold,
-                       comparison_performed=result.get('result') in ('MATCH', 'PROXY', 'UNKNOWN'))
+                       comparison_performed=result.get('result') in ('MATCH', 'PROXY', 'UNKNOWN', 'AMBIGUOUS'))
+    for key in ('runner_up_similarity', 'match_margin', 'min_match_margin'):
+        if key in result:
+            diagnostics[key] = result[key]
     if 'enrolled_users' in result:
         diagnostics['enrolled_users'] = result['enrolled_users']
 

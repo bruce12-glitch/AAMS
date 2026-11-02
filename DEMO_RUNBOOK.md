@@ -75,15 +75,47 @@ an already accepted request may still finish. Avoid changing tabs until the
 result has returned. Local recognition can work offline once models are cached;
 Telegram requires internet.
 
+Telegram delivery remains automatic for new granted entries when enabled in
+Communicate. Network failures stay queued with increasing delays (one minute,
+two, four, up to one hour); Telegram flood waits are respected even after a
+restart. Delivery history shows the next retry time. Retry queued messages
+only attempts messages whose wait has elapsed. A photo timeout does not trigger
+an immediate duplicate text send, though an ambiguous network outcome can still
+be delivered twice on a later retry: Telegram offers no application idempotency
+key. If an evidence caption is too long, the full message remains in AAMS.
+
+Never paste a bot token into a chat or a repository. If exposed, use BotFather
+to revoke it, then save the replacement directly in Communicate's password field.
+Keep the chosen personal/group destination and confirm a real test arrives;
+a bot username alone does not identify the receiving chat.
+
 ## Check recognition before recording attendance
 
 The quality check measures sharpness on a downsampled 112px face crop, not the
 original photo size. No AI enhancement or sharpening is applied, and the
 threshold remains 100. The old raw-crop score (for example 44.1) is not directly
 comparable with the new reference-size score. Very blurry, dark, small or
-cropped faces still fail. With blink capture, an unusable last frame can fall
-back to one of four earlier frames; the whole burst must still pass same-person
-and liveness checks. These changes need rehearsal with your physical webcam.
+cropped faces still fail. With blink capture, the server analyzes the full
+bounded burst (10 webcam frames, API maximum 12) and selects the sharpest
+quality-passing original, even if it appears at the beginning. The same detected
+faces are reused for the whole-burst same-person and liveness checks; a clearer
+image of another person cannot replace the volunteer. No generated deblurring
+or sharpening is used to pass a failed image. These changes need rehearsal with
+your physical webcam.
+
+The camera waits 1.5 seconds for focus/exposure at startup and requests continuous
+hardware focus/exposure only when supported. Soft, empty, ambiguous or inconclusive
+blink captures retry after two seconds; other scans retain the ten-second gap.
+Requests are sequential and the attendance/occupancy duplicate protection remains.
+Use three clear, consistent enrollment views to cover small natural pose changes.
+
+An additional identity-separation guard rejects **AMBIGUOUS** results when the two
+best different enrolled people score less than 0.05 apart. The normal match
+threshold remains 0.45; the new rule adds rejections, never weaker acceptance.
+Check duplicate enrollments and retake rather than granting by gallery order.
+These defaults need a separate genuine/impostor evaluation on your volunteers;
+two public test portraits are not an accuracy benchmark or proof of reliability
+under arbitrary blur. Severe blur cannot be reliably identified.
 
 Live Monitor → **Photo & camera check** defaults to **Face only**. Upload an
 original photo or capture from the webcam, then **Check photo — no attendance**.

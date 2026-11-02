@@ -217,7 +217,7 @@ async def history(_: dict = Depends(require_admin)):
     from app.database import get_connection
     conn = get_connection()
     try:
-        rows = conn.execute('SELECT id, alert_type, message, created_at, sent_at, sent_status, delivery_attempts, last_error FROM alerts ORDER BY id DESC LIMIT 50').fetchall()
+        rows = conn.execute('SELECT id, alert_type, message, created_at, sent_at, sent_status, delivery_attempts, last_error, next_attempt_at FROM alerts ORDER BY id DESC LIMIT 50').fetchall()
         return {'notifications': [dict(row) for row in rows]}
     finally:
         conn.close()
@@ -226,4 +226,4 @@ async def history(_: dict = Depends(require_admin)):
 @router.post('/retry')
 async def retry_pending(_: dict = Depends(require_admin)):
     count = await AlertService().flush_pending()
-    return {'success': True, 'delivered': count, 'message': 'Recent attempts wait at least one minute before retry.'}
+    return {'success': True, 'delivered': count, 'message': 'Due messages retried. Pending messages respect Telegram flood waits and increasing retry delays; see Delivery history for the next attempt.'}

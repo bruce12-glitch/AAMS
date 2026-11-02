@@ -1,13 +1,15 @@
 """Telegram transport and a durable, auditable delivery queue."""
 
 import logging
-from datetime import datetime, timezone
+import math
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from app.database import get_connection
 from app.config import get_telegram_config, BASE_DIR
 
 logger = logging.getLogger(__name__)
+_RATE_LIMIT_REASON = 'Telegram rate limit reached; the message remains queued for retry.'
 
 
 def configured(value):
@@ -23,7 +25,7 @@ def delivery_error(exc):
         'BadRequest': 'Telegram rejected the destination or message. Check the chat ID.',
         'TimedOut': 'Telegram timed out; the message remains queued for retry.',
         'NetworkError': 'Telegram is unreachable; the message remains queued for retry.',
-        'RetryAfter': 'Telegram rate limit reached; the message remains queued for retry.',
+        'RetryAfter': _RATE_LIMIT_REASON,
     }
     return names.get(type(exc).__name__, 'Telegram delivery failed; check bot permissions and connection.')
 
@@ -46,24 +48,33 @@ class AlertService:
                 logger.warning('Telegram initialization failed (%s)', type(exc).__name__)
 
     async def _send(self, text, image_path=None):
+        self.retry_after = 0
         if not self.enabled or not self.bot:
             return False, 'Telegram is not configured. Message is queued.'
         try:
+            from telegram.error import BadRequest
             async with self.bot:
                 path = (BASE_DIR / image_path).resolve() if image_path else None
                 image_root = (BASE_DIR / 'images').resolve()
                 if self.send_photo and path and path.is_relative_to(image_root) and path.is_file():
                     try:
                         with path.open('rb') as photo:
-                            await self.bot.send_photo(chat_id=self.chat_id, photo=photo, caption=text[:1024])
-                        if len(text) > 1024:
-                            await self.bot.send_message(chat_id=self.chat_id, text=text[1024:4096])
-                    except Exception:
+                            caption = text if len(text) <= 1024 else text[:980] + '\n… Full message in AAMS Delivery history.'
+                            await self.bot.send_photo(chat_id=self.chat_id, photo=photo, caption=caption)
+                    except BadRequest:
+                        # Only a definite Telegram rejection permits fallback.
+                        # A timeout may mean the photo ARRIVED: sending text
+                        # immediately can duplicate it and ignores flood waits.
                         await self.bot.send_message(chat_id=self.chat_id, text=text[:4096])
                 else:
                     await self.bot.send_message(chat_id=self.chat_id, text=text[:4096])
             return True, 'Delivered to Telegram'
         except Exception as exc:
+            from telegram.error import RetryAfter
+            if isinstance(exc, RetryAfter):
+                delay = exc.retry_after
+                seconds = delay.total_seconds() if isinstance(delay, timedelta) else float(delay)
+                self.retry_after = max(1, math.ceil(seconds))
             logger.warning('Telegram send failed (%s)', type(exc).__name__)
             return False, delivery_error(exc)
 
@@ -106,8 +117,17 @@ class AlertService:
             return False, 'Telegram is not configured. Message is queued.'
         conn = get_connection()
         try:
+            # A new entry must respect an earlier flood wait too. Persisted
+            # state works across API requests, scheduler runs and restarts.
+            wait = conn.execute("SELECT MAX(next_attempt_at) FROM alerts WHERE last_error=? AND datetime(next_attempt_at)>datetime('now')",
+                                (_RATE_LIMIT_REASON,)).fetchone()[0]
+            if wait:
+                delayed = conn.execute("UPDATE alerts SET next_attempt_at=? WHERE id=? AND sent_status='pending' AND (next_attempt_at IS NULL OR datetime(next_attempt_at)<datetime(?))", (wait, alert_id, wait))
+                conn.commit()
+                if delayed.rowcount:
+                    return False, 'Waiting for Telegram rate-limit retry'
             # Atomic claim prevents scheduler/manual retry races in one host.
-            cur = conn.execute("UPDATE alerts SET sent_status='sending', delivery_attempts=delivery_attempts+1, last_attempt_at=datetime('now') WHERE id=? AND sent_status='pending' AND event_source<>'sample'", (alert_id,))
+            cur = conn.execute("UPDATE alerts SET sent_status='sending', delivery_attempts=delivery_attempts+1, last_attempt_at=datetime('now') WHERE id=? AND sent_status='pending' AND event_source<>'sample' AND (next_attempt_at IS NULL OR datetime(next_attempt_at)<=datetime('now'))", (alert_id,))
             conn.commit()
             row = conn.execute('SELECT * FROM alerts WHERE id=?', (alert_id,)).fetchone()
             if not row:
@@ -115,20 +135,30 @@ class AlertService:
             if row['event_source'] == 'sample':
                 return False, 'Sample records are never sent to Telegram'
             if cur.rowcount == 0:
-                return row['sent_status'] == 'sent', 'Already delivered' if row['sent_status'] == 'sent' else 'Delivery is already in progress'
+                reason = 'Already delivered' if row['sent_status'] == 'sent' else 'Waiting for scheduled retry' if row['next_attempt_at'] else 'Delivery is already in progress'
+                return row['sent_status'] == 'sent', reason
         finally:
             conn.close()
         if row['severity'] == 'low' and row['alert_type'] not in {'ANNOUNCE', 'REPORT', 'ENROLLMENT', 'ENTRY', 'TEST'}:
             sent, reason = False, 'Included in daily summary only'
             status = 'suppressed'
         else:
+            self.retry_after = 0
             sent, reason = await self._send(row['message'], row['image_path'])
             status = 'sent' if sent else 'pending'
+        next_attempt = None
+        if status == 'pending':
+            delay = max(getattr(self, 'retry_after', 0), min(3600, 60 * 2 ** min(row['delivery_attempts'] - 1, 6)))
+            next_attempt = (datetime.now(timezone.utc) + timedelta(seconds=delay)).isoformat()
         conn = get_connection()
         try:
-            conn.execute('UPDATE alerts SET sent_status=?, sent_at=?, last_error=? WHERE id=?', (
+            conn.execute('UPDATE alerts SET sent_status=?, sent_at=?, last_error=?, next_attempt_at=? WHERE id=?', (
                 status, datetime.now(timezone.utc).isoformat() if sent else None,
-                None if sent else reason, alert_id))
+                None if sent else reason, next_attempt, alert_id))
+            if getattr(self, 'retry_after', 0):
+                # One configured destination: defer the remaining queue too.
+                # Keep a longer existing wait; never shorten Telegram's wait.
+                conn.execute("UPDATE alerts SET next_attempt_at=? WHERE sent_status='pending' AND (next_attempt_at IS NULL OR datetime(next_attempt_at)<datetime(?))", (next_attempt, next_attempt))
             conn.commit()
         finally:
             conn.close()
@@ -148,7 +178,7 @@ class AlertService:
             # idempotency key: ambiguous network outcomes can be redelivered.
             conn.execute("UPDATE alerts SET sent_status='pending' WHERE sent_status='sending' AND datetime(last_attempt_at)<datetime('now','-5 minutes')")
             conn.execute("UPDATE alerts SET sent_status='expired' WHERE sent_status='pending' AND datetime(created_at)<datetime('now',?)", (f'-{int(max_age_hours)} hours',))
-            rows = conn.execute("SELECT id FROM alerts WHERE sent_status='pending' AND event_source<>'sample' AND (last_attempt_at IS NULL OR datetime(last_attempt_at)<=datetime('now','-1 minute')) ORDER BY id LIMIT 50").fetchall()
+            rows = conn.execute("SELECT id FROM alerts WHERE sent_status='pending' AND event_source<>'sample' AND (next_attempt_at IS NULL OR datetime(next_attempt_at)<=datetime('now')) AND (last_attempt_at IS NULL OR datetime(last_attempt_at)<=datetime('now','-1 minute')) ORDER BY id LIMIT 50").fetchall()
             conn.commit()
         finally:
             conn.close()
@@ -156,6 +186,8 @@ class AlertService:
         for row in rows:
             sent, _reason = await self.deliver(row['id'])
             delivered += int(sent)
+            if getattr(self, 'retry_after', 0):
+                break
         return delivered
 
     def format_proxy_alert(self, location: str, claimed_id: str, 
