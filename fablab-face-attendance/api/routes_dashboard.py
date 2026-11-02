@@ -34,7 +34,7 @@ async def get_stats(scope: RecordScope = 'all'):
     alert_count = cursor.fetchone()[0]
     
     # Active members
-    cursor.execute('SELECT COUNT(*) FROM users WHERE active = 1 AND payment_status = \'active\'')
+    cursor.execute("SELECT COUNT(*) FROM users WHERE active=1 AND is_demo=0 AND payment_status='active'")
     member_count = cursor.fetchone()[0]
     
     conn.close()
@@ -47,24 +47,45 @@ async def get_stats(scope: RecordScope = 'all'):
     }
 
 @router.get('/activity')
-async def get_activity(limit: int = Query(default=20, ge=1, le=500), scope: RecordScope = 'all'):
-    """Get recent activity feed."""
+async def get_activity(limit: int = Query(default=20, ge=1, le=500), scope: RecordScope = 'all',
+                       q: str = Query(default='', max_length=200),
+                       decision: str = Query(default='all', pattern='^(all|GRANTED|DENIED)$'),
+                       offset: int = Query(default=0, ge=0)):
+    """Search all matching database rows before pagination, not a recent subset."""
     from app.database import get_connection
     
     conn = get_connection()
     cursor = conn.cursor()
     
-    cursor.execute('''
-        SELECT e.*, u.name AS recognized_name, c.name AS claimed_name
+    where = scope_sql(scope, 'e.event_source')
+    parameters = []
+    term = q.strip()
+    if term:
+        # Search text, not SQL patterns. Parameterization protects SQL; escaping
+        # LIKE's metacharacters makes an ID containing '_' match literally.
+        escaped = term.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        columns = ('u.name', 'c.name', 'e.recognized_id', 'e.claimed_id',
+                   'e.reason', 'e.tag', 'e.decision', 'e.event_source')
+        where += ' AND (' + ' OR '.join(f"{col} LIKE ? ESCAPE '\\' COLLATE NOCASE" for col in columns) + ')'
+        parameters.extend([f'%{escaped}%'] * len(columns))
+    if decision != 'all':
+        where += ' AND e.decision=?'
+        parameters.append(decision)
+    joined = '''
         FROM entry_logs e
         LEFT JOIN users u ON u.user_id=e.recognized_id
         LEFT JOIN users c ON c.user_id=e.claimed_id
-        WHERE ''' + scope_sql(scope, 'e.event_source') + ' ORDER BY e.id DESC LIMIT ?', (limit,))
+        WHERE ''' + where
+    total = cursor.execute('SELECT COUNT(*) ' + joined, parameters).fetchone()[0]
+    cursor.execute('''
+        SELECT e.*, u.name AS recognized_name, c.name AS claimed_name
+        ''' + joined + ' ORDER BY e.id DESC LIMIT ? OFFSET ?', [*parameters, limit, offset])
     activities = [dict(row) for row in cursor.fetchall()]
     counts = source_counts(conn, 'entry_logs')
     conn.close()
     
-    return {'activities': activities, 'source_counts': counts, 'scope': scope}
+    return {'activities': activities, 'source_counts': counts, 'scope': scope,
+            'total': total, 'limit': limit, 'offset': offset, 'q': term, 'decision': decision}
 
 @router.get('/live')
 async def get_live_status():
