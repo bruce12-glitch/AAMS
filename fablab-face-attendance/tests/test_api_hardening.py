@@ -3,6 +3,7 @@ API hardening: admin guards on credential/mutating routes, sign-in brute
 force limit, and input validation (member IDs, upload size).
 """
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -190,7 +191,7 @@ def test_list_users_strips_credentials_and_reports_enrolled():
             'INSERT INTO users (user_id, name, email, password_hash, '
             'face_embedding, active) VALUES (?, ?, ?, ?, ?, 1)',
             ('HARDPROBE01', 'With Face', 'face@srmist.edu.in',
-             'pbkdf2$200000$abc$def', b'\x00' * 4))
+             'pbkdf2$200000$abc$def', np.ones(512).tobytes()))
         cur.execute(
             'INSERT INTO users (user_id, name, email, password_hash, active) '
             'VALUES (?, ?, ?, ?, 1)',
