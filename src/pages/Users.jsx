@@ -33,11 +33,23 @@ export default function Users() {
   const [editStudent, setEditStudent] = useState(undefined)
   const [success, setSuccess] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [addingDemo, setAddingDemo] = useState(false)
   const [qrView, setQrView] = useState(null)   // {name, dataUri}
   const qrDialogRef = useDialog(!!qrView, () => setQrView(null))
   const qrTitleId = 'qr-pass-title'
   const [qrError, setQrError] = useState('')
   const [rowError, setRowError] = useState('')
+
+  const addDemoData = async () => {
+    if (!window.confirm('Add six labelled demo profiles and sample decisions? No faces, real attendance or Telegram messages will be created. Existing data is preserved.')) return
+    setAddingDemo(true); setRowError(''); setSuccess('')
+    try {
+      const result = await adminPost('/admin/demo-data')
+      await refresh()
+      setSuccess(`${result.message} ${result.members_created} new profiles, ${result.examples_created} new examples. Search them in Entry Logs → All records.`)
+    } catch (err) { setRowError(err.message || 'Could not add demo examples.') }
+    finally { setAddingDemo(false) }
+  }
 
   const showQr = async (u) => {
     setQrError('')
@@ -144,10 +156,12 @@ export default function Users() {
           />
           <button className="btn ghost" type="button" disabled={!rows.length} onClick={() => downloadCsv('aams-students.csv', [['ID', 'Name', 'Email', 'Phone', 'Department', 'Year', 'Section', 'Payment'], ...rows.map((u) => [u.user_id, u.name, u.email, u.phone, u.department, u.year, u.section, u.payment_status])])}>Export CSV</button>
           {isAdmin && <button className="btn primary" onClick={() => setEditStudent(null)} type="button">＋ Add student</button>}
+          {isAdmin && !IS_STATIC_DEMO && <button className="btn ghost" onClick={addDemoData} disabled={addingDemo} type="button">{addingDemo ? 'Adding examples…' : 'Add demo examples'}</button>}
         </div>
       </div>
 
       <DataNotice error={error} loading={loading} />
+      {isAdmin && <p className="field-hint">To permit a registered person: enable their account, set payment active with no past expiry, and enroll their real face with consent. Demo profiles are examples only; replace their name/email with a consenting volunteer’s details before enrollment.</p>}
       {!isAdmin && <div className="read-only-note" role="note">
         <strong>Read-only member view.</strong> Only an administrator can change account or payment status.
         <button className="btn ghost" type="button" onClick={logout}>Sign out to use administrator login</button>
@@ -185,12 +199,13 @@ export default function Users() {
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                     <div className="avatar" style={{ width: 30, height: 30, fontSize: 10.5 }}>{initials(u.name)}</div>
-                    <span className="name-cell">{u.name ?? '—'}{u.active === 0 && <small className="alert-time"> · disabled</small>}</span>
+                    <span className="name-cell">{u.name ?? '—'}{u.is_demo === 1 && <small className="alert-time"> · example only</small>}{u.active === 0 && <small className="alert-time"> · disabled</small>}</span>
                   </div>
                 </td>
                 <td className="mono">{u.user_id}</td>
                 <td><div>{u.email || '—'}</div><small className="alert-time">{[u.phone, u.department, u.year && `Year ${u.year}`, u.section].filter(Boolean).join(' · ')}</small></td>
-                <td><StatusBadge value={u.enrolled ? 'active' : undefined} label={u.enrolled ? 'Enrolled' : 'Not enrolled'} /></td>
+                <td><StatusBadge value={u.enrolled && u.face_enrollment_source === 'insightface' ? 'active' : undefined}
+                  label={u.enrolled ? u.face_enrollment_source === 'insightface' ? 'Enrolled' : 'Older enrollment — re-enroll' : 'Not enrolled'} /></td>
                 <td>{isAdmin && !IS_STATIC_DEMO ? <select className="mini-select" aria-label={`Account status for ${u.name || u.user_id}`}
                   value={u.active === 1 ? '1' : '0'} disabled={busyId === u.user_id}
                   onChange={(event) => setAccount(u, Number(event.target.value))}>
