@@ -89,6 +89,7 @@ export default function Communicate() {
           <div className="kv-row"><span>Last delivered</span><strong>{s.last_sent_at ? parseTimestamp(s.last_sent_at).toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE }) : 'No delivery yet'}</strong></div>
           {isAdmin ? <form onSubmit={save}>
             <p className="field-hint">Save your bot token privately, then choose Connect my Telegram for personal notifications. For a group, add the bot and enter the group ID instead. Verify the chat, send a test and confirm it arrives on your phone.</p>
+            <p className="field-hint">If a token has appeared in a chat, screenshot or repository, revoke it in BotFather and save its replacement here. A bot username is not your personal/group destination.</p>
             <fieldset disabled={busy} className="form-grid">
               <label>Bot token<input type="password" autoComplete="new-password" value={settings.bot_token} onChange={set('bot_token')} placeholder={s.bot_configured ? 'Saved privately · leave blank to keep' : 'Paste bot token'} /></label>
               <label>Chat ID (optional for pairing)<input value={settings.chat_id} onChange={set('chat_id')} placeholder="Personal: 123… · group: -100… or @public_group" /></label>
@@ -129,7 +130,7 @@ export default function Communicate() {
       {isAdmin && <section className="panel table-panel" style={{ marginTop: 20 }}>
         <div className="panel-head"><h2 className="panel-title">Delivery history</h2><button className="btn sm ghost" type="button" disabled={busy || !ready} onClick={() => perform(() => adminPost('/notify/retry', {}, 60000))}>Retry queued messages</button></div>
         <table className="data-table"><thead><tr><th>Event</th><th>Message</th><th>Delivery</th><th>Attempts</th></tr></thead>
-          <tbody>{toArray(history.data, 'notifications').map((row) => <tr key={row.id}><td>{row.alert_type}</td><td className="message-cell">{row.message}<small className="alert-time">{row.last_error}</small></td><td>{row.sent_status}</td><td>{row.delivery_attempts}</td></tr>)}
+          <tbody>{toArray(history.data, 'notifications').map((row) => <tr key={row.id}><td>{row.alert_type}</td><td className="message-cell">{row.message}<small className="alert-time">{row.last_error}</small></td><td>{row.sent_status}{row.next_attempt_at && <small className="alert-time">Retry after {parseTimestamp(row.next_attempt_at).toLocaleString('en-IN', { timeZone: LAB_TIME_ZONE })} IST</small>}</td><td>{row.delivery_attempts}</td></tr>)}
             {!toArray(history.data, 'notifications').length && <tr><td colSpan={4}><div className="empty-state">No notifications yet.</div></td></tr>}
           </tbody></table>
       </section>}
