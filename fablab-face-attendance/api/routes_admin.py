@@ -17,6 +17,13 @@ from app.security import require_admin, require_user
 router = APIRouter(prefix='/api/admin', tags=['admin'])
 
 
+@router.post('/demo-data')
+async def create_demo_data(admin: dict = Depends(require_admin)):
+    """Opt-in examples for an existing prototype DB; not the destructive seeder."""
+    from app.demo_data import add_demo_data
+    return add_demo_data((admin or {}).get('email') or 'administrator')
+
+
 class ExceptionLog(BaseModel):
     action: str
     target_user_id: str
@@ -35,20 +42,23 @@ async def prototype_readiness(_: dict = Depends(require_admin)):
     from app.vision import engine_state
     from app.config import get_telegram_config
     from app.alerts import configured
+    from app.identity import _decode_embedding
 
     conn = get_connection()
     try:
-        total, enrolled, eligible = conn.execute('''
-            SELECT COUNT(*), COALESCE(SUM(enrolled), 0),
-                   COALESCE(SUM(CASE WHEN enrolled AND payment_status='active'
-                       AND (payment_expiry IS NULL OR payment_expiry=''
-                            OR date(payment_expiry)>=?) THEN 1 ELSE 0 END), 0)
-            FROM (SELECT payment_status, payment_expiry,
-                         (COALESCE(length(face_embedding),0)>0
-                          OR COALESCE(length(face_embedding_2),0)>0
-                          OR COALESCE(length(face_embedding_3),0)>0) AS enrolled
-                  FROM users WHERE active=1)
-        ''', (datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat(),)).fetchone()
+        from datetime import date
+        total = enrolled = eligible = 0
+        today = datetime.now(ZoneInfo('Asia/Kolkata')).date()
+        for user in conn.execute('SELECT * FROM users WHERE active=1 AND is_demo=0'):
+            total += 1
+            if not any(_decode_embedding(user[key]) is not None for key in ('face_embedding', 'face_embedding_2', 'face_embedding_3')):
+                continue
+            enrolled += 1
+            try:
+                current = not user['payment_expiry'] or date.fromisoformat(user['payment_expiry']) >= today
+            except ValueError:
+                current = False
+            eligible += int(user['payment_status'] == 'active' and current)
         last_sent = conn.execute("SELECT MAX(sent_at) FROM alerts WHERE sent_status='sent'").fetchone()[0]
         pending = conn.execute("SELECT COUNT(*) FROM alerts WHERE sent_status IN ('pending','sending')").fetchone()[0]
     finally:
