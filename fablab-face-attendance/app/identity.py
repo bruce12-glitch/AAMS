@@ -36,6 +36,27 @@ class IdentityVerifier:
         # FaceEngine's stateless matching helpers.
         self.face_engine = face_engine or FaceEngine
         self.match_threshold = float(get_face_config().get('match_threshold', 0.45))
+        self.min_match_margin = float(get_face_config().get('min_match_margin', 0.05))
+
+    def _ambiguous_match(self, embedding, gallery, similarity, *, claimed_user=None):
+        """Do not choose a person by dictionary order when identities tie.
+
+        Aggregate references per PERSON, not per photo: a member's three
+        enrollment views must not be treated as competing identities.
+        This additional rejection rule never lowers the existing threshold.
+        """
+        scores = sorted((max(self.face_engine.match_embeddings(embedding, ref) for ref in refs)
+                         for refs in gallery.values() if refs), reverse=True)
+        if len(scores) < 2 or scores[0] < self.match_threshold:
+            return None
+        margin = scores[0] - scores[1]
+        if margin < self.min_match_margin:
+            return {'match': False, 'similarity': similarity, 'user': None,
+                    'claimed_user': claimed_user, 'detected_user': None,
+                    'result': 'AMBIGUOUS', 'enrolled_users': len(gallery),
+                    'runner_up_similarity': scores[1], 'match_margin': margin,
+                    'min_match_margin': self.min_match_margin}
+        return None
     
     def get_user_embeddings(self, user_id: str) -> list:
         """
@@ -208,7 +229,14 @@ class IdentityVerifier:
                 max_similarity = similarity
         
         # Step 4: Check if match threshold met
-        if max_similarity >= self.match_threshold:
+        all_embeddings = self.get_all_user_embeddings()
+        best_match_id, best_score = self.face_engine.find_best_match(
+            face_embedding, all_embeddings, threshold=self.match_threshold)
+        ambiguous = self._ambiguous_match(face_embedding, all_embeddings, max_similarity,
+                                          claimed_user=claimed_user_dict)
+        if ambiguous:
+            return ambiguous
+        if max_similarity >= self.match_threshold and best_match_id == claimed_user_id:
             return {
                 'match': True,
                 'similarity': max_similarity,
@@ -218,12 +246,6 @@ class IdentityVerifier:
             }
         
         # Step 5: Check if face matches ANY other user (proxy detection)
-        all_embeddings = self.get_all_user_embeddings()
-
-        best_match_id, best_score = self.face_engine.find_best_match(
-            face_embedding, all_embeddings, threshold=self.match_threshold
-        )
-        
         if best_match_id and best_match_id != claimed_user_id:
             # PROXY: Face matches someone else
             return {
@@ -269,6 +291,9 @@ class IdentityVerifier:
         best_match_id, best_score = self.face_engine.find_best_match(
             face_embedding, all_embeddings, threshold=self.match_threshold
         )
+        ambiguous = self._ambiguous_match(face_embedding, all_embeddings, best_score)
+        if ambiguous:
+            return ambiguous
         
         if best_match_id is None:
             return {
